@@ -1,0 +1,55 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+    <qresource prefix="/icons">
+        <!-- Application icons -->
+        <file>icons/app.ico</file>
+        <file>icons/app.png</file>
+        <file>icons/app.svg</file>
+        
+        <!-- Navigation icons -->
+        <file>icons/settings.png</file>
+        <file>icons/settings.svg</file>
+        <file>icons/about.png</file>
+        <file>icons/about.svg</file>
+        <file>icons/back.png</file>
+        <file>icons/back.svg</file>
+        <file>icons/join.png</file>
+        <file>icons/join.svg</file>
+        <file>icons/recent.png</file>
+        <file>icons/recent.svg</file>
+        
+        <!-- Additional UI icons -->
+        <file>icons/close.svg</file>
+        <file>icons/minimize.svg</file>
+        <file>icons/maximize.svg</file>
+        <file>icons/loading.svg</file>
+        <file>icons/error.svg</file>
+        <file>icons/success.svg</file>
+        <file>icons/warning.svg</file>
+    </qresource>
+    
+    <qresource prefix="/images">
+        <file>images/logo.png</file>
+        <file>images/logo.svg</file>
+        <file>images/welcome-bg.png</file>
+        <file>images/welcome-bg.svg</file>
+        <file>images/placeholder.png</file>
+    </qresource>
+    
+    <qresource prefix="/styles">
+        <file>styles/default.qss</file>
+        <file>styles/dark.qss</file>
+    </qresource>
+    
+    <qresource prefix="/translations">
+        <file>translations/jitsi_en.qm</file>
+        <file>translations/jitsi_zh_CN.qm</file>
+        <file>translations/jitsi_zh_TW.qm</file>
+        <file>translations/jitsi_ja.qm</file>
+        <file>translations/jitsi_ko.qm</file>
+        <file>translations/jitsi_fr.qm</file>
+        <file>translations/jitsi_de.qm</file>
+        <file>translations/jitsi_es.qm</file>
+        <file>translations/jitsi_ru.qm</file>
+    </qresource>
+</RCC>

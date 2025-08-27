@@ -1,0 +1,35 @@
+#ifndef VERSION_H
+#define VERSION_H
+
+// 版本信息
+#define PROJECT_VERSION_MAJOR @PROJECT_VERSION_MAJOR@
+#define PROJECT_VERSION_MINOR @PROJECT_VERSION_MINOR@
+#define PROJECT_VERSION_PATCH @PROJECT_VERSION_PATCH@
+#define PROJECT_VERSION_BUILD @PROJECT_VERSION_BUILD@
+
+#define PROJECT_VERSION "@PROJECT_VERSION@"
+#define PROJECT_COMPANY_NAME "@PROJECT_COMPANY_NAME@"
+#define PROJECT_COPYRIGHT "@PROJECT_COPYRIGHT@"
+#define PROJECT_DESCRIPTION "@PROJECT_DESCRIPTION@"
+
+// 构建信息
+#define BUILD_DATE __DATE__
+#define BUILD_TIME __TIME__
+
+#ifdef _WIN32
+    #define PLATFORM_NAME "Windows"
+#elif defined(__linux__)
+    #define PLATFORM_NAME "Linux"
+#elif defined(__APPLE__)
+    #define PLATFORM_NAME "macOS"
+#else
+    #define PLATFORM_NAME "Unknown"
+#endif
+
+#ifdef _DEBUG
+    #define BUILD_TYPE "Debug"
+#else
+    #define BUILD_TYPE "Release"
+#endif
+
+#endif // VERSION_H

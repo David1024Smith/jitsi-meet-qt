@@ -52,3 +52,11 @@ compile_commands.json
 *creator.user*
 
 *_qmlcache.qrc
+jitsi-meet-electron-master/
+.kiro/specs/jitsi-meet-qt/design.md
+jitsi-meet-qt/docs/BuildAndDeploy.md
+jitsi-meet-qt/docs/ComponentIntegration.md
+jitsi-meet-qt/docs/ConfigurationManagement.md
+jitsi-meet-qt/docs/ErrorHandlingSystem.md
+jitsi-meet-qt/docs/ResourceSystem.md
+jitsi-meet-qt/docs/WindowManager.md
