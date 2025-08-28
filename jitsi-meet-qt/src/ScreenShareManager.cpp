@@ -8,6 +8,13 @@
 #include <QBuffer>
 #include <QImageWriter>
 #include <QDebug>
+
+// Define static constants
+const int ScreenShareManager::DEFAULT_FRAME_RATE;
+const int ScreenShareManager::DEFAULT_BITRATE;
+const int ScreenShareManager::PERFORMANCE_CHECK_INTERVAL;
+const int ScreenShareManager::MIN_FRAME_RATE;
+const int ScreenShareManager::MAX_FRAME_RATE;
 #include <QMessageBox>
 #include <QGridLayout>
 #include <QTabWidget>

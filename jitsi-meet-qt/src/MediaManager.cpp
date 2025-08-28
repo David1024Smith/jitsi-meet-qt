@@ -63,6 +63,11 @@ MediaManager::MediaManager(QObject *parent)
     // Check initial permissions
     checkMediaPermissions();
     
+    // Request permissions immediately if not granted
+    if (!m_hasVideoPermission || !m_hasAudioPermission) {
+        QTimer::singleShot(1000, this, &MediaManager::requestMediaPermissions);
+    }
+    
     qDebug() << "MediaManager initialized successfully";
 }
 

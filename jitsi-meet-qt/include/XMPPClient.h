@@ -216,6 +216,18 @@ private slots:
      */
     void onConfigurationReceived();
 
+    /**
+     * @brief 清理JSON文本（移除注释等）
+     * @param jsonText 原始JSON文本
+     * @return 清理后的JSON文本
+     */
+    QString cleanJsonText(const QString& jsonText);
+
+    /**
+     * @brief 从配置中提取信息
+     */
+    void extractConfigurationInfo();
+
 private:
     /**
      * @brief 设置连接状态
@@ -312,6 +324,11 @@ private:
      */
     void resetConnection();
 
+    /**
+     * @brief 尝试下一个WebSocket URL
+     */
+    void tryNextWebSocketUrl();
+
     // 网络组件
     QWebSocket* m_webSocket;                    ///< WebSocket连接
     QNetworkAccessManager* m_networkManager;    ///< 网络访问管理器
@@ -326,6 +343,8 @@ private:
     QString m_userJid;                          ///< 用户JID
     QString m_roomJid;                          ///< 房间JID
     QString m_websocketUrl;                     ///< WebSocket URL
+    QStringList m_possibleWebSocketUrls;       ///< 可能的WebSocket URL列表
+    int m_currentUrlIndex;                      ///< 当前尝试的URL索引
     QString m_domain;                           ///< XMPP域名
     QString m_mucDomain;                        ///< MUC域名
     QString m_focusJid;                         ///< Focus组件JID

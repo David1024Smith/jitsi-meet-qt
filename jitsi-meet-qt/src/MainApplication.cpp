@@ -551,6 +551,14 @@ void MainApplication::initializeUserInterface() {
         }
     });
     
+    // Request media permissions after UI is initialized
+    QTimer::singleShot(1000, [this]() {
+        if (m_mediaManager) {
+            qDebug() << "Requesting media permissions from MainApplication";
+            m_mediaManager->requestMediaPermissions();
+        }
+    });
+    
     qDebug() << "User interface initialized";
 }
 

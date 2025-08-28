@@ -18,6 +18,7 @@ XMPPClient::XMPPClient(QObject *parent)
     , m_reconnectTimer(new QTimer(this))
     , m_connectionState(Disconnected)
     , m_reconnectAttempts(0)
+    , m_currentUrlIndex(0)
     , m_audioMuted(false)
     , m_videoMuted(false)
 {
@@ -206,18 +207,46 @@ void XMPPClient::establishWebSocketConnection()
     // 构建WebSocket URL
     QUrl serverUrl(m_serverUrl);
     QString wsProtocol = (serverUrl.scheme() == "https") ? "wss" : "ws";
+    QString host = serverUrl.host();
+    int port = serverUrl.port();
     
-    // 使用默认的Jitsi Meet WebSocket路径
-    m_websocketUrl = QString("%1://%2/xmpp-websocket?room=%3")
-                     .arg(wsProtocol, serverUrl.host(), m_roomName);
+    // 构建多个可能的WebSocket URL进行尝试
+    QStringList possibleUrls;
+    
+    // 标准Jitsi Meet WebSocket路径
+    if (port > 0 && port != 80 && port != 443) {
+        possibleUrls << QString("%1://%2:%3/xmpp-websocket?room=%4").arg(wsProtocol, host).arg(port).arg(m_roomName);
+        possibleUrls << QString("%1://%2:%3/http-bind").arg(wsProtocol, host).arg(port);
+        possibleUrls << QString("%1://%2:%3/websocket").arg(wsProtocol, host).arg(port);
+        possibleUrls << QString("%1://%2:%3/colibri-ws/default-id/%4").arg(wsProtocol, host).arg(port).arg(m_roomName);
+    } else {
+        possibleUrls << QString("%1://%2/xmpp-websocket?room=%3").arg(wsProtocol, host, m_roomName);
+        possibleUrls << QString("%1://%2/http-bind").arg(wsProtocol, host);
+        possibleUrls << QString("%1://%2/websocket").arg(wsProtocol, host);
+        possibleUrls << QString("%1://%2/colibri-ws/default-id/%3").arg(wsProtocol, host, m_roomName);
+    }
+    
+    // 备用路径 - 尝试不同的端口
+    if (wsProtocol == "wss") {
+        possibleUrls << QString("wss://%1:443/xmpp-websocket?room=%2").arg(host, m_roomName);
+        possibleUrls << QString("wss://%1:8443/xmpp-websocket?room=%2").arg(host, m_roomName);
+    } else {
+        possibleUrls << QString("ws://%1:80/xmpp-websocket?room=%2").arg(host, m_roomName);
+        possibleUrls << QString("ws://%1:8080/xmpp-websocket?room=%2").arg(host, m_roomName);
+    }
+    
+    m_possibleWebSocketUrls = possibleUrls;
+    m_currentUrlIndex = 0;
+    m_websocketUrl = possibleUrls.first(); // 使用第一个作为主要URL
 
     // 设置域名信息
-    m_domain = serverUrl.host();
+    m_domain = host;
     m_mucDomain = QString("conference.%1").arg(m_domain);
     m_roomJid = QString("%1@%2").arg(m_roomName, m_mucDomain);
     m_focusJid = QString("focus@auth.%1").arg(m_domain);
 
     qDebug() << "Establishing WebSocket connection to:" << m_websocketUrl;
+    qDebug() << "Alternative URLs available:" << possibleUrls.size();
     qDebug() << "Room JID:" << m_roomJid;
     qDebug() << "Domain:" << m_domain;
 
@@ -228,6 +257,16 @@ void XMPPClient::establishWebSocketConnection()
 
     m_webSocket = new QWebSocket(QString(), QWebSocketProtocol::VersionLatest, this);
     
+    // 配置请求头
+    QNetworkRequest request;
+    request.setRawHeader("User-Agent", "JitsiMeetQt/1.0");
+    request.setRawHeader("Origin", m_serverUrl.toUtf8());
+    
+    // 配置SSL设置（临时忽略SSL错误用于调试）
+    QSslConfiguration sslConfig = QSslConfiguration::defaultConfiguration();
+    sslConfig.setPeerVerifyMode(QSslSocket::VerifyNone);
+    request.setSslConfiguration(sslConfig);
+    
     // 连接信号
     connect(m_webSocket, &QWebSocket::connected, this, &XMPPClient::onWebSocketConnected);
     connect(m_webSocket, &QWebSocket::disconnected, this, &XMPPClient::onWebSocketDisconnected);
@@ -235,8 +274,51 @@ void XMPPClient::establishWebSocketConnection()
     connect(m_webSocket, &QWebSocket::errorOccurred,
             this, &XMPPClient::onWebSocketError);
 
+    // 设置连接超时
+    QTimer* connectionTimer = new QTimer(this);
+    connectionTimer->setSingleShot(true);
+    connectionTimer->setInterval(15000); // 15秒超时
+    
+    connect(connectionTimer, &QTimer::timeout, [this, connectionTimer]() {
+        qWarning() << "WebSocket connection timeout";
+        connectionTimer->deleteLater();
+        if (m_webSocket && m_webSocket->state() == QAbstractSocket::ConnectingState) {
+            m_webSocket->abort();
+            emit errorOccurred("Connection timeout");
+        }
+    });
+    
+    connect(m_webSocket, &QWebSocket::connected, [connectionTimer]() {
+        connectionTimer->stop();
+        connectionTimer->deleteLater();
+    });
+    
+    connect(m_webSocket, &QWebSocket::errorOccurred, [connectionTimer](QAbstractSocket::SocketError) {
+        connectionTimer->stop();
+        connectionTimer->deleteLater();
+    });
+
     // 开始连接
+    connectionTimer->start();
     m_webSocket->open(QUrl(m_websocketUrl));
+}
+
+void XMPPClient::tryNextWebSocketUrl()
+{
+    if (m_currentUrlIndex + 1 < m_possibleWebSocketUrls.size()) {
+        m_currentUrlIndex++;
+        m_websocketUrl = m_possibleWebSocketUrls[m_currentUrlIndex];
+        qDebug() << "Trying next WebSocket URL:" << m_websocketUrl;
+        
+        // 延迟重试以避免过快的连接尝试
+        QTimer::singleShot(2000, this, [this]() {
+            establishWebSocketConnection();
+        });
+    } else {
+        qWarning() << "All WebSocket URLs failed, connection failed";
+        setConnectionState(Error);
+        emit errorOccurred("Failed to establish WebSocket connection to any URL");
+    }
 }
 
 void XMPPClient::sendXMPPStanza(const QString& stanza)
@@ -529,12 +611,20 @@ void XMPPClient::onWebSocketMessageReceived(const QString& message)
 
 void XMPPClient::onWebSocketError(QAbstractSocket::SocketError error)
 {
-    qWarning() << "WebSocket error:" << error;
-    setConnectionState(Error);
-    emit errorOccurred(QString("WebSocket error: %1").arg(error));
+    qWarning() << "WebSocket error:" << error << "for URL:" << m_websocketUrl;
     
-    // 尝试重连
-    startReconnection();
+    // 尝试下一个URL而不是立即设置错误状态
+    if (m_currentUrlIndex + 1 < m_possibleWebSocketUrls.size()) {
+        qDebug() << "Trying next WebSocket URL due to error";
+        tryNextWebSocketUrl();
+    } else {
+        qWarning() << "All WebSocket URLs failed";
+        setConnectionState(Error);
+        emit errorOccurred(QString("WebSocket connection failed: %1").arg(error));
+        
+        // 尝试重连
+        startReconnection();
+    }
 }
 
 void XMPPClient::onHeartbeatTimer()
@@ -577,40 +667,110 @@ void XMPPClient::onConfigurationReceived()
         QByteArray data = reply->readAll();
         QString configText = QString::fromUtf8(data);
         
-        // 解析JavaScript配置文件
-        // 简单的正则表达式解析，实际项目中可能需要更复杂的解析
-        QRegularExpression configRegex("config\\s*=\\s*({.*?});", QRegularExpression::DotMatchesEverythingOption);
-        QRegularExpressionMatch match = configRegex.match(configText);
+        qDebug() << "Received configuration data, size:" << data.size() << "bytes";
         
-        if (match.hasMatch()) {
-            QString jsonText = match.captured(1);
-            QJsonParseError parseError;
-            QJsonDocument doc = QJsonDocument::fromJson(jsonText.toUtf8(), &parseError);
+        // 更健壮的JavaScript配置文件解析
+        bool configParsed = false;
+        
+        // 尝试多种解析方法
+        QStringList configPatterns = {
+            "config\\s*=\\s*({[^}]*(?:{[^}]*}[^}]*)*})",
+            "var\\s+config\\s*=\\s*({[^}]*(?:{[^}]*}[^}]*)*})",
+            "window\\.config\\s*=\\s*({[^}]*(?:{[^}]*}[^}]*)*})"
+        };
+        
+        for (const QString& pattern : configPatterns) {
+            QRegularExpression configRegex(pattern, QRegularExpression::DotMatchesEverythingOption);
+            QRegularExpressionMatch match = configRegex.match(configText);
             
-            if (parseError.error == QJsonParseError::NoError) {
-                m_serverConfig = doc.object();
-                qDebug() << "Server configuration loaded successfully";
+            if (match.hasMatch()) {
+                QString jsonText = match.captured(1);
                 
-                // 从配置中提取WebSocket URL等信息
-                QJsonObject websocket = m_serverConfig["websocket"].toObject();
-                if (!websocket.isEmpty()) {
-                    QString wsUrl = websocket["url"].toString();
-                    if (!wsUrl.isEmpty()) {
-                        m_websocketUrl = wsUrl;
-                    }
+                // 清理JSON文本（移除JavaScript注释等）
+                jsonText = cleanJsonText(jsonText);
+                
+                QJsonParseError parseError;
+                QJsonDocument doc = QJsonDocument::fromJson(jsonText.toUtf8(), &parseError);
+                
+                if (parseError.error == QJsonParseError::NoError) {
+                    m_serverConfig = doc.object();
+                    qDebug() << "Server configuration loaded successfully using pattern:" << pattern;
+                    configParsed = true;
+                    
+                    // 从配置中提取有用信息
+                    extractConfigurationInfo();
+                    break;
+                } else {
+                    qDebug() << "JSON parse error with pattern" << pattern << ":" << parseError.errorString();
+                    qDebug() << "JSON text preview:" << jsonText.left(200);
                 }
-            } else {
-                qWarning() << "Failed to parse server configuration JSON:" << parseError.errorString();
             }
-        } else {
-            qWarning() << "Failed to extract configuration from response";
+        }
+        
+        if (!configParsed) {
+            qWarning() << "Failed to parse server configuration, using defaults";
+            qDebug() << "Config text preview:" << configText.left(500);
         }
     } else {
         qWarning() << "Failed to fetch server configuration:" << reply->errorString();
+        qDebug() << "HTTP status code:" << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     }
 
     reply->deleteLater();
     
-    // 继续建立WebSocket连接
+    // 继续建立WebSocket连接（即使配置解析失败也要尝试连接）
     establishWebSocketConnection();
+}
+
+QString XMPPClient::cleanJsonText(const QString& jsonText)
+{
+    QString cleaned = jsonText;
+    
+    // 移除单行注释
+    cleaned.remove(QRegularExpression("//.*$", QRegularExpression::MultilineOption));
+    
+    // 移除多行注释
+    cleaned.remove(QRegularExpression("/\\*.*?\\*/", QRegularExpression::DotMatchesEverythingOption));
+    
+    // 移除尾随逗号
+    cleaned.replace(QRegularExpression(",\\s*}"), "}");
+    cleaned.replace(QRegularExpression(",\\s*]"), "]");
+    
+    return cleaned;
+}
+
+void XMPPClient::extractConfigurationInfo()
+{
+    if (m_serverConfig.isEmpty()) {
+        return;
+    }
+    
+    // 提取WebSocket相关配置
+    if (m_serverConfig.contains("websocket")) {
+        QJsonValue wsValue = m_serverConfig["websocket"];
+        if (wsValue.isObject()) {
+            QJsonObject wsConfig = wsValue.toObject();
+            if (wsConfig.contains("url")) {
+                QString wsUrl = wsConfig["url"].toString();
+                if (!wsUrl.isEmpty()) {
+                    qDebug() << "Found WebSocket URL in config:" << wsUrl;
+                    // 这里可以使用配置中的URL，但我们仍然保留备用方案
+                }
+            }
+        }
+    }
+    
+    // 提取其他有用的配置信息
+    if (m_serverConfig.contains("hosts")) {
+        QJsonObject hosts = m_serverConfig["hosts"].toObject();
+        if (hosts.contains("domain")) {
+            QString configDomain = hosts["domain"].toString();
+            if (!configDomain.isEmpty()) {
+                qDebug() << "Found domain in config:" << configDomain;
+                // 可以使用配置中的域名
+            }
+        }
+    }
+    
+    qDebug() << "Configuration extraction completed";
 }
