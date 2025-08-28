@@ -78,10 +78,3 @@ jitsi-meet-qt/
 - `jitsi-meet://room-name` - 使用默认服务器加入房间
 - `jitsi-meet://server.com/room-name` - 使用指定服务器加入房间
 
-## 许可证
-
-本项目基于Apache License 2.0许可证开源。
-
-## 贡献
-
-欢迎提交Issue和Pull Request来改进这个项目。
