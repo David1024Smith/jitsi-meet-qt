@@ -36,6 +36,10 @@ public:
                    valid == other.valid &&
                    screenName == other.screenName;
         }
+        
+        bool operator!=(const WindowState& other) const {
+            return !(*this == other);
+        }
     };
 
     /**

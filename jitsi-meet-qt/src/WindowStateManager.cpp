@@ -23,10 +23,12 @@ WindowStateManager::WindowStateManager(ConfigurationManager* configManager, QObj
     m_rememberWindowState = m_configManager->currentConfiguration().rememberWindowState;
 
     // 监听屏幕配置变化
-    connect(QGuiApplication::instance(), &QGuiApplication::screenAdded,
-            this, &WindowStateManager::onScreenConfigurationChanged);
-    connect(QGuiApplication::instance(), &QGuiApplication::screenRemoved,
-            this, &WindowStateManager::onScreenConfigurationChanged);
+    if (auto* guiApp = qobject_cast<QGuiApplication*>(QGuiApplication::instance())) {
+        connect(guiApp, &QGuiApplication::screenAdded,
+                this, [this](QScreen*) { onScreenConfigurationChanged(); });
+        connect(guiApp, &QGuiApplication::screenRemoved,
+                this, [this](QScreen*) { onScreenConfigurationChanged(); });
+    }
 
     qDebug() << "WindowStateManager initialized, remember state:" << m_rememberWindowState;
 }

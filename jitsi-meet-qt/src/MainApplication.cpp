@@ -198,9 +198,7 @@ void MainApplication::initializeApplication() {
     // Set application icon and window properties
     setQuitOnLastWindowClosed(true);
     
-    // Enable high DPI scaling
-    setAttribute(Qt::AA_EnableHighDpiScaling, true);
-    setAttribute(Qt::AA_UseHighDpiPixmaps, true);
+    // High DPI scaling is enabled by default in Qt 6
     
     // Initialize all manager components
     initializeManagers();
@@ -352,8 +350,9 @@ void MainApplication::onProtocolUrlReceived(const QString& url) {
             qWarning() << "Failed to parse protocol URL:" << url;
         }
     }
-}void Mai
-nApplication::initializeTranslationManager() {
+}
+
+void MainApplication::initializeTranslationManager() {
     // Create translation manager
     m_translationManager = new TranslationManager(this);
     
@@ -516,7 +515,7 @@ void MainApplication::setupComponentConnections() {
                 [this](bool darkMode) {
                     qDebug() << "Dark mode changed to:" << darkMode;
                     if (m_themeManager) {
-                        auto theme = darkMode ? ThemeManager::DarkTheme : ThemeManager::LightTheme;
+                        auto theme = darkMode ? ThemeManager::Theme::Dark : ThemeManager::Theme::Light;
                         m_themeManager->setTheme(theme);
                     }
                 });
@@ -539,7 +538,7 @@ void MainApplication::initializeUserInterface() {
     // Apply theme settings
     if (m_themeManager && m_configurationManager) {
         bool darkMode = m_configurationManager->isDarkMode();
-        auto theme = darkMode ? ThemeManager::DarkTheme : ThemeManager::LightTheme;
+        auto theme = darkMode ? ThemeManager::Theme::Dark : ThemeManager::Theme::Light;
         m_themeManager->setTheme(theme);
         qDebug() << "Applied theme settings, dark mode:" << darkMode;
     }
@@ -555,18 +554,3 @@ void MainApplication::initializeUserInterface() {
     qDebug() << "User interface initialized";
 }
 
-void MainApplication::initializeProtocolHandler() {
-    // Create protocol handler
-    m_protocolHandler = new ProtocolHandler(this);
-    
-    // Register protocol handler
-    if (m_protocolHandler->registerProtocol()) {
-        qDebug() << "Protocol handler registered successfully";
-        
-        // Connect protocol URL signals
-        connect(m_protocolHandler, &ProtocolHandler::protocolUrlReceived,
-                this, &MainApplication::onProtocolUrlReceived);
-    } else {
-        qWarning() << "Failed to register protocol handler";
-    }
-}

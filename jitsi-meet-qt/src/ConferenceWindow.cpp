@@ -198,10 +198,11 @@ void ConferenceWindow::setupConnections()
                 this, &ConferenceWindow::onLocalVideoStarted);
         connect(m_mediaManager, &MediaManager::localVideoStopped,
                 this, &ConferenceWindow::onLocalVideoStopped);
-        connect(m_mediaManager, &MediaManager::remoteVideoReceived,
-                this, &ConferenceWindow::onRemoteVideoReceived);
-        connect(m_mediaManager, &MediaManager::remoteVideoRemoved,
-                this, &ConferenceWindow::onRemoteVideoRemoved);
+        // Remote video signals are handled by ConferenceManager
+        // connect(m_conferenceManager, &ConferenceManager::remoteVideoReceived,
+        //         this, &ConferenceWindow::onRemoteVideoReceived);
+        // connect(m_conferenceManager, &ConferenceManager::remoteVideoRemoved,
+        //         this, &ConferenceWindow::onRemoteVideoRemoved);
     }
     
     // 聊天管理器信号连接
@@ -458,105 +459,7 @@ void ConferenceWindow::createStatusBar()
     m_mainLayout->addWidget(m_mainSplitter);
 }
 
-void ConferenceWindow::setupManagers()
-{
-    // 创建会议管理器
-    m_conferenceManager = new ConferenceManager(this);
-    
-    // 创建媒体管理器
-    m_mediaManager = new MediaManager(this);
-    
-    // 创建聊天管理器
-    m_chatManager = new ChatManager(this);
-    
-    // 创建屏幕共享管理器
-    m_screenShareManager = new ScreenShareManager(this);
-    
-    // 设置管理器之间的关联
-    // 注意：这些关联在实际的管理器实现中需要相应的方法
-    // m_chatManager->setXMPPClient(m_conferenceManager->xmppClient());
-    // m_mediaManager->setWebRTCEngine(m_conferenceManager->webRTCEngine());
-    // m_screenShareManager->setWebRTCEngine(m_conferenceManager->webRTCEngine());
-}
 
-void ConferenceWindow::setupConnections()
-{
-    // 导航栏连接
-    connect(m_navigationBar, &NavigationBar::backClicked, 
-            this, &ConferenceWindow::onBackButtonClicked);
-    
-    // 会议管理器连接
-    connect(m_conferenceManager, &ConferenceManager::connectionStateChanged,
-            this, &ConferenceWindow::onConnectionStateChanged);
-    connect(m_conferenceManager, &ConferenceManager::conferenceStateChanged,
-            this, &ConferenceWindow::onConferenceStateChanged);
-    connect(m_conferenceManager, &ConferenceManager::conferenceJoined,
-            this, &ConferenceWindow::onConferenceJoined);
-    connect(m_conferenceManager, &ConferenceManager::conferenceLeft,
-            this, &ConferenceWindow::onConferenceLeft);
-    connect(m_conferenceManager, &ConferenceManager::participantJoined,
-            this, &ConferenceWindow::onParticipantJoined);
-    connect(m_conferenceManager, &ConferenceManager::participantLeft,
-            this, &ConferenceWindow::onParticipantLeft);
-    connect(m_conferenceManager, &ConferenceManager::participantUpdated,
-            this, &ConferenceWindow::onParticipantUpdated);
-    connect(m_conferenceManager, &ConferenceManager::localMediaStateChanged,
-            this, &ConferenceWindow::onLocalMediaStateChanged);
-    connect(m_conferenceManager, &ConferenceManager::screenShareStateChanged,
-            this, &ConferenceWindow::onScreenShareStateChanged);
-    connect(m_conferenceManager, &ConferenceManager::errorOccurred,
-            this, &ConferenceWindow::onErrorOccurred);
-    
-    // 媒体管理器连接
-    connect(m_mediaManager, &MediaManager::localVideoStarted,
-            this, &ConferenceWindow::onLocalVideoStarted);
-    connect(m_mediaManager, &MediaManager::localVideoStopped,
-            this, &ConferenceWindow::onLocalVideoStopped);
-    connect(m_mediaManager, &MediaManager::remoteVideoReceived,
-            this, &ConferenceWindow::onRemoteVideoReceived);
-    connect(m_mediaManager, &MediaManager::remoteVideoRemoved,
-            this, &ConferenceWindow::onRemoteVideoRemoved);
-    
-    // 聊天管理器连接
-    connect(m_chatManager, &ChatManager::messageReceived,
-            this, &ConferenceWindow::onChatMessageReceived);
-    connect(m_chatManager, &ChatManager::messageSent,
-            this, &ConferenceWindow::onChatMessageSent);
-    connect(m_chatManager, &ChatManager::unreadCountChanged,
-            this, &ConferenceWindow::onUnreadCountChanged);
-    
-    // 屏幕共享管理器连接
-    connect(m_screenShareManager, &ScreenShareManager::screenShareStarted,
-            this, &ConferenceWindow::onScreenShareStarted);
-    connect(m_screenShareManager, &ScreenShareManager::screenShareStopped,
-            this, &ConferenceWindow::onScreenShareStopped);
-    connect(m_screenShareManager, &ScreenShareManager::remoteScreenShareReceived,
-            this, &ConferenceWindow::onRemoteScreenShareReceived);
-    connect(m_screenShareManager, &ScreenShareManager::remoteScreenShareRemoved,
-            this, &ConferenceWindow::onRemoteScreenShareRemoved);
-    
-    // 控制按钮连接
-    connect(m_muteAudioButton, &QPushButton::clicked,
-            this, &ConferenceWindow::onMuteAudioClicked);
-    connect(m_muteVideoButton, &QPushButton::clicked,
-            this, &ConferenceWindow::onMuteVideoClicked);
-    connect(m_screenShareButton, &QPushButton::clicked,
-            this, &ConferenceWindow::onScreenShareClicked);
-    connect(m_chatToggleButton, &QPushButton::clicked,
-            this, &ConferenceWindow::onChatToggleClicked);
-    connect(m_participantsToggleButton, &QPushButton::clicked,
-            this, &ConferenceWindow::onParticipantsToggleClicked);
-    
-    // 聊天输入连接
-    connect(m_sendButton, &QPushButton::clicked,
-            this, &ConferenceWindow::onSendChatMessage);
-    connect(m_chatInput, &QLineEdit::returnPressed,
-            this, &ConferenceWindow::onChatInputReturnPressed);
-    
-    // 参与者列表连接
-    connect(m_participantsList, &QListWidget::itemClicked,
-            this, &ConferenceWindow::onParticipantItemClicked);
-}
 
 void ConferenceWindow::applyStyles()
 {

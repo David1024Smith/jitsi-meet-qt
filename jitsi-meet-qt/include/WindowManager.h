@@ -198,12 +198,14 @@ signals:
      */
     void windowDestroyed(WindowType type);
 
-private slots:
+public slots:
     /**
      * @brief 处理欢迎窗口的加入会议请求
      * @param url 会议URL
      */
     void onJoinConference(const QString& url);
+
+private slots:
     
     /**
      * @brief 处理会议窗口的返回请求

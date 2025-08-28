@@ -1,7 +1,7 @@
 #include "ScreenShareManager.h"
 #include "WebRTCEngine.h"
 #include <QApplication>
-#include <QDesktopWidget>
+// QDesktopWidget is deprecated in Qt 6, use QScreen instead
 #include <QScreen>
 #include <QWindow>
 #include <QPixmap>
@@ -32,8 +32,10 @@ ScreenShareManager::ScreenShareManager(QObject *parent)
     connect(m_performanceTimer, &QTimer::timeout, this, &ScreenShareManager::adjustQualityBasedOnPerformance);
     
     // 监听屏幕变化
-    connect(QGuiApplication::instance(), &QGuiApplication::screenAdded, this, &ScreenShareManager::onScreenChanged);
-    connect(QGuiApplication::instance(), &QGuiApplication::screenRemoved, this, &ScreenShareManager::onScreenChanged);
+    if (auto guiApp = qobject_cast<QGuiApplication*>(QGuiApplication::instance())) {
+        connect(guiApp, &QGuiApplication::screenAdded, this, &ScreenShareManager::onScreenChanged);
+        connect(guiApp, &QGuiApplication::screenRemoved, this, &ScreenShareManager::onScreenChanged);
+    }
     
     // 初始化屏幕和窗口列表
     refreshScreenList();

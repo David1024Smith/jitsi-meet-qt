@@ -157,7 +157,9 @@ void PerformanceManager::preloadResources()
     // 在后台线程中预加载资源
     QThread::create([this]() {
         // 预加载样式表
-        QApplication::instance()->setStyleSheet("");
+        if (auto app = qobject_cast<QApplication*>(QApplication::instance())) {
+            app->setStyleSheet("");
+        }
         
         // 预加载字体
         // 这里可以添加字体预加载逻辑
@@ -283,11 +285,7 @@ void PerformanceManager::initializeOptimizations()
 {
     qDebug() << "Performance: Initializing optimizations";
     
-    // 设置应用程序属性以优化性能
-    if (QApplication::instance()) {
-        QApplication::instance()->setAttribute(Qt::AA_UseHighDpiPixmaps, true);
-        QApplication::instance()->setAttribute(Qt::AA_EnableHighDpiScaling, true);
-    }
+    // High DPI support is enabled by default in Qt 6
     
     setupMemoryThresholds();
 }

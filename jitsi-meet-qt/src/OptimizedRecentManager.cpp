@@ -231,9 +231,11 @@ QList<RecentItem> OptimizedRecentManager::searchRecentItems(const QString& query
         
         // 限制缓存大小
         if (m_searchCache.size() > 100) {
-            auto it = m_searchCache.begin();
-            std::advance(it, 50);
-            m_searchCache.erase(it, m_searchCache.end());
+            // 在Qt 6中，需要逐个删除元素
+            auto keys = m_searchCache.keys();
+            for (int i = 50; i < keys.size(); ++i) {
+                m_searchCache.remove(keys[i]);
+            }
         }
     }
     

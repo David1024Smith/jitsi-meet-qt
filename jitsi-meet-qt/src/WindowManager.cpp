@@ -98,7 +98,9 @@ void WindowManager::setTranslationManager(TranslationManager* translationManager
     if (m_translationManager) {
         // 连接语言改变信号到所有现有窗口
         connect(m_translationManager, &TranslationManager::languageChanged,
-                this, &WindowManager::onLanguageChanged);
+                this, [this](TranslationManager::Language, const QString& languageCode) {
+                    onLanguageChanged(languageCode);
+                });
         qDebug() << "TranslationManager connected to WindowManager";
     }
 }

@@ -12,9 +12,7 @@
  */
 int main(int argc, char *argv[])
 {
-    // Enable high DPI support before creating QApplication
-    QApplication::setAttribute(Qt::AA_EnableHighDpiScaling, true);
-    QApplication::setAttribute(Qt::AA_UseHighDpiPixmaps, true);
+    // High DPI support is enabled by default in Qt 6
     
     try {
         // Create main application instance

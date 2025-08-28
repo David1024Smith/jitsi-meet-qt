@@ -10,6 +10,7 @@
 #include <QDebug>
 #include <QVideoWidget>
 #include <QTimer>
+#include <random>
 
 SettingsDialog::SettingsDialog(ConfigurationManager* configManager,
                                TranslationManager* translationManager,
@@ -339,7 +340,7 @@ void SettingsDialog::loadSettings()
     m_serverTimeoutSpin->setValue(settings.serverTimeout);
     
     // Load interface settings
-    QString currentLang = m_translationManager ? m_translationManager->currentLanguage() : "en";
+    QString currentLang = m_translationManager ? m_translationManager->currentLanguageCode() : "en";
     int langIndex = m_languageCombo->findData(currentLang);
     if (langIndex >= 0) {
         m_languageCombo->setCurrentIndex(langIndex);
@@ -384,7 +385,7 @@ void SettingsDialog::applySettings()
     
     // Apply language change
     QString selectedLang = m_languageCombo->currentData().toString();
-    if (m_translationManager && selectedLang != m_translationManager->currentLanguage()) {
+    if (m_translationManager && selectedLang != m_translationManager->currentLanguageCode()) {
         m_translationManager->setLanguage(selectedLang);
         emit languageChanged(selectedLang);
     }
@@ -736,7 +737,10 @@ void SettingsDialog::testMicrophone()
         // For now, simulate some activity
         QTimer::singleShot(100, [this]() {
             if (m_microphoneTestActive && m_microphoneLevel) {
-                m_microphoneLevel->setValue(qrand() % 80 + 20);
+                static std::random_device rd;
+                static std::mt19937 gen(rd());
+                static std::uniform_int_distribution<> dis(20, 99);
+                m_microphoneLevel->setValue(dis(gen));
                 QTimer::singleShot(100, this, [this]() { testMicrophone(); });
             }
         });
@@ -812,4 +816,21 @@ void SettingsDialog::updateTestStatus()
     if (m_testSpeakerButton) {
         m_testSpeakerButton->setText(m_speakerTestActive ? tr("stop_test") : tr("test_speaker"));
     }
+}
+
+void SettingsDialog::onServerUrlChanged()
+{
+    validateServerUrl();
+}
+
+void SettingsDialog::onDarkModeToggled()
+{
+    if (!m_darkModeCheck) {
+        return;
+    }
+    
+    bool darkMode = m_darkModeCheck->isChecked();
+    qDebug() << "Dark mode toggled:" << darkMode;
+    
+    // TODO: Apply dark mode theme when ThemeManager is integrated
 }

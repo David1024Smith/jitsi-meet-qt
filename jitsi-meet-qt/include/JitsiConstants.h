@@ -6,7 +6,7 @@
 namespace JitsiConstants {
     // 应用程序信息
     const QString APP_NAME = "Jitsi Meet";
-    const QString APP_VERSION = "1.0.0";
+    const QString APPLICATION_VERSION = "1.0.0";
     const QString APP_ORGANIZATION = "Jitsi Meet Qt";
     const QString APP_DOMAIN = "jitsi.org";
     

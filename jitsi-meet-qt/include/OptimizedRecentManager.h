@@ -61,6 +61,7 @@ private:
     void saveRecentItemsSync();
     void sortRecentItems();
     void trimToMaxItems();
+    void updateUrlIndex();
     QString generateCacheKey(const QString& url) const;
 
     mutable QMutex m_itemsMutex;

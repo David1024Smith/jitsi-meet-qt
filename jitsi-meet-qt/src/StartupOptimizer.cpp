@@ -63,7 +63,6 @@ void StartupOptimizer::enableFastStartup()
     startPhaseTimer("FastStartup");
     
     // 设置应用程序属性以加快启动
-    QCoreApplication::setAttribute(Qt::AA_DisableWindowContextHelpButton, true);
     QCoreApplication::setAttribute(Qt::AA_DontCreateNativeWidgetSiblings, true);
     
     // 预加载关键资源

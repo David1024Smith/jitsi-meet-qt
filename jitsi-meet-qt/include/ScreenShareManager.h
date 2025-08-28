@@ -21,7 +21,7 @@
 #include <QMap>
 #include <QBuffer>
 #include <QImageWriter>
-#include <QDesktopWidget>
+#include <QApplication>
 
 class WebRTCEngine;
 

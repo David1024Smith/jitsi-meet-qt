@@ -190,7 +190,7 @@ void XMPPClient::fetchServerConfiguration()
 
     QNetworkReply* reply = m_networkManager->get(request);
     connect(reply, &QNetworkReply::finished, this, &XMPPClient::onConfigurationReceived);
-    connect(reply, QOverload<QNetworkReply::NetworkError>::of(&QNetworkReply::error),
+    connect(reply, &QNetworkReply::errorOccurred,
             [this, reply](QNetworkReply::NetworkError error) {
                 qWarning() << "Failed to fetch server configuration:" << error << reply->errorString();
                 // 使用默认配置继续连接
@@ -232,7 +232,7 @@ void XMPPClient::establishWebSocketConnection()
     connect(m_webSocket, &QWebSocket::connected, this, &XMPPClient::onWebSocketConnected);
     connect(m_webSocket, &QWebSocket::disconnected, this, &XMPPClient::onWebSocketDisconnected);
     connect(m_webSocket, &QWebSocket::textMessageReceived, this, &XMPPClient::onWebSocketMessageReceived);
-    connect(m_webSocket, QOverload<QAbstractSocket::SocketError>::of(&QWebSocket::error),
+    connect(m_webSocket, &QWebSocket::errorOccurred,
             this, &XMPPClient::onWebSocketError);
 
     // 开始连接

@@ -81,6 +81,7 @@ private slots:
 private:
     void initializeOptimizations();
     void setupMemoryThresholds();
+    void checkPerformanceThresholds(MetricType type, double value);
     
     static PerformanceManager* s_instance;
     
