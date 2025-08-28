@@ -65,22 +65,15 @@ void setupApplicationStyle(MainApplication* app)
 }
 
 /**
- * @brief 设置WebEngine
+ * @brief 设置应用程序环境
  */
-void setupWebEngine()
+void setupApplicationEnvironment()
 {
-    // 设置WebEngine的命令行参数
-    qputenv("QTWEBENGINE_DISABLE_SANDBOX", "1");
-    qputenv("QTWEBENGINE_CHROMIUM_FLAGS", 
-            "--disable-web-security "
-            "--allow-running-insecure-content "
-            "--disable-features=VizDisplayCompositor");
+    // 设置网络相关环境变量
+    qputenv("QT_LOGGING_RULES", "qt.network.ssl.debug=false");
     
-    // 启用WebRTC功能
-    qputenv("QTWEBENGINE_CHROMIUM_FLAGS", 
-            qgetenv("QTWEBENGINE_CHROMIUM_FLAGS") + 
-            " --enable-media-stream "
-            "--enable-usermedia-screen-capturing");
+    // 启用硬件加速（如果可用）
+    qputenv("QT_QUICK_BACKEND", "rhi");
 }
 
 /**
@@ -92,8 +85,8 @@ int main(int argc, char *argv[])
     QApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
     QApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
     
-    // 设置WebEngine
-    setupWebEngine();
+    // 设置应用程序环境
+    setupApplicationEnvironment();
     
     // 创建应用程序实例
     MainApplication app(argc, argv);

@@ -21,7 +21,7 @@ public:
         qint64 totalMemory;
         qint64 heapMemory;
         qint64 stackMemory;
-        qint64 webEngineMemory;
+        qint64 networkMemory;
         qint64 qtObjectsMemory;
         int activeAllocations;
         double fragmentationRatio;
@@ -93,7 +93,7 @@ private:
     void detectMemoryLeaks();
     void calculateFragmentation();
     qint64 estimateQtObjectsMemory();
-    qint64 estimateWebEngineMemory();
+    qint64 estimateNetworkMemory();
     double calculateGrowthRate() const;
     OptimizationSuggestion createSuggestion(const QString& category, 
                                            const QString& description,

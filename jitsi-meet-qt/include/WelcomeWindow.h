@@ -77,6 +77,12 @@ public slots:
      */
     void retranslateUi();
 
+protected:
+    /**
+     * @brief Handle change events (including language changes)
+     */
+    void changeEvent(QEvent* event) override;
+
 signals:
     /**
      * @brief Emitted when user wants to join a conference

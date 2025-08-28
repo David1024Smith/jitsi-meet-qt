@@ -19,6 +19,7 @@ public:
     enum Theme {
         LightTheme,
         DarkTheme,
+        ModernTheme,
         SystemTheme  // Follow system preference
     };
 

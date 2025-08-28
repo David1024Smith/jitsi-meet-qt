@@ -107,7 +107,7 @@ void MemoryProfiler::takeSnapshot()
 #endif
     
     // 估算各组件内存使用
-    snapshot.webEngineMemory = estimateWebEngineMemory();
+    snapshot.networkMemory = estimateNetworkMemory();
     snapshot.qtObjectsMemory = estimateQtObjectsMemory();
     snapshot.stackMemory = snapshot.totalMemory - snapshot.heapMemory;
     
@@ -130,7 +130,7 @@ void MemoryProfiler::takeSnapshot()
     
     qDebug() << "MemoryProfiler: Snapshot taken - Total:" 
              << snapshot.totalMemory / (1024*1024) << "MB"
-             << "WebEngine:" << snapshot.webEngineMemory / (1024*1024) << "MB";
+             << "Network:" << snapshot.networkMemory / (1024*1024) << "MB";
 }
 
 MemoryProfiler::MemorySnapshot MemoryProfiler::getCurrentSnapshot() const
@@ -214,14 +214,14 @@ QList<MemoryProfiler::OptimizationSuggestion> MemoryProfiler::generateOptimizati
         ));
     }
     
-    // 检查WebEngine内存使用
-    if (current.webEngineMemory > current.totalMemory * 0.7) {
+    // 检查网络组件内存使用
+    if (current.networkMemory > current.totalMemory * 0.3) {
         suggestions.append(createSuggestion(
-            "WebEngine Memory",
-            "WebEngine is using excessive memory",
-            "Clear WebEngine cache and optimize web content",
-            5,
-            current.webEngineMemory * 0.3
+            "Network Memory",
+            "Network components are using excessive memory",
+            "Clear network cache and optimize connections",
+            4,
+            current.networkMemory * 0.2
         ));
     }
     
@@ -264,7 +264,7 @@ QJsonObject MemoryProfiler::generateDetailedReport() const
     QJsonObject currentObj;
     currentObj["totalMemory"] = current.totalMemory;
     currentObj["heapMemory"] = current.heapMemory;
-    currentObj["webEngineMemory"] = current.webEngineMemory;
+    currentObj["networkMemory"] = current.networkMemory;
     currentObj["qtObjectsMemory"] = current.qtObjectsMemory;
     currentObj["activeAllocations"] = current.activeAllocations;
     currentObj["fragmentationRatio"] = current.fragmentationRatio;
@@ -312,7 +312,7 @@ QString MemoryProfiler::generateTextReport() const
     report += "Current Memory Usage:\n";
     report += QString("  Total Memory: %1 MB\n").arg(current.totalMemory / (1024*1024));
     report += QString("  Heap Memory: %1 MB\n").arg(current.heapMemory / (1024*1024));
-    report += QString("  WebEngine Memory: %1 MB\n").arg(current.webEngineMemory / (1024*1024));
+    report += QString("  Network Memory: %1 MB\n").arg(current.networkMemory / (1024*1024));
     report += QString("  Qt Objects Memory: %1 MB\n").arg(current.qtObjectsMemory / (1024*1024));
     report += QString("  Active Allocations: %1\n").arg(current.activeAllocations);
     report += QString("  Fragmentation Ratio: %1%\n\n").arg(current.fragmentationRatio * 100, 0, 'f', 1);
@@ -483,13 +483,12 @@ qint64 MemoryProfiler::estimateQtObjectsMemory()
     return objectCount * 1024; // 假设每个对象平均1KB
 }
 
-qint64 MemoryProfiler::estimateWebEngineMemory()
+qint64 MemoryProfiler::estimateNetworkMemory()
 {
-    // 估算WebEngine占用的内存
-    // 实际实现需要与WebEngine集成
+    // 估算网络组件占用的内存
     QMutexLocker locker(&m_snapshotsMutex);
     if (!m_snapshots.isEmpty()) {
-        return m_snapshots.last().totalMemory * 0.6; // 估算60%
+        return m_snapshots.last().totalMemory * 0.1; // 估算10%
     }
     return 0;
 }

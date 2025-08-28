@@ -239,6 +239,8 @@ void MainApplication::registerProtocolHandler()
 
 void MainApplication::initializeManagers()
 {
+    qDebug() << "Initializing all application managers...";
+    
     // 创建启动优化器并开始优化
     m_startupOptimizer = new StartupOptimizer(this);
     m_startupOptimizer->setOptimizationLevel(StartupOptimizer::Moderate);
@@ -258,8 +260,9 @@ void MainApplication::initializeManagers()
     m_memoryProfiler->startProfiling();
 #endif
     
-    // 创建配置管理器
+    // 创建配置管理器（必须首先创建，其他组件依赖它）
     m_configManager = new ConfigurationManager(this);
+    qDebug() << "ConfigurationManager initialized";
     
     // 创建优化的最近项目管理器
     m_recentManager = new OptimizedRecentManager(this);
@@ -267,36 +270,22 @@ void MainApplication::initializeManagers()
     
     // 创建翻译管理器
     m_translationManager = new TranslationManager(this);
+    qDebug() << "TranslationManager initialized";
     
     // 创建协议处理器
     m_protocolHandler = new ProtocolHandler(this);
+    qDebug() << "ProtocolHandler initialized";
     
     // 创建窗口管理器
     m_windowManager = new WindowManager(this);
     
-    // 设置窗口管理器的配置管理器
+    // 设置窗口管理器的依赖组件
     m_windowManager->setConfigurationManager(m_configManager);
-    
-    // 设置窗口管理器的翻译管理器
     m_windowManager->setTranslationManager(m_translationManager);
+    qDebug() << "WindowManager initialized and configured";
     
-    // 连接信号
-    connect(m_protocolHandler, &ProtocolHandler::protocolUrlReceived,
-            this, &MainApplication::handleProtocolUrl);
-    
-    // 连接配置管理器和翻译管理器
-    connect(m_configManager, &ConfigurationManager::languageChanged,
-            m_translationManager, &TranslationManager::onConfigLanguageChanged);
-    
-    // 连接窗口管理器信号
-    connect(m_windowManager, &WindowManager::windowChanged,
-            this, &MainApplication::onWindowChanged);
-    connect(m_windowManager, &WindowManager::windowStateChanged,
-            this, &MainApplication::onWindowStateChanged);
-    
-    // 连接配置变更信号到窗口管理器
-    connect(m_configManager, &ConfigurationManager::configurationChanged,
-            this, &MainApplication::onConfigurationChanged);
+    // 建立核心信号连接
+    setupCoreConnections();
     
     // 初始化翻译系统
     m_translationManager->initialize();
@@ -315,7 +304,7 @@ void MainApplication::initializeManagers()
     }
 #endif
     
-    qDebug() << "All managers initialized";
+    qDebug() << "All managers initialized successfully";
     
     // 标记启动完成
     if (m_performanceManager) {
@@ -323,11 +312,7 @@ void MainApplication::initializeManagers()
     }
     
     // 显示初始窗口
-    if (!m_startupUrl.isEmpty()) {
-        handleProtocolUrl(m_startupUrl);
-    } else if (m_showWelcome) {
-        m_windowManager->showWindow(WindowManager::WelcomeWindow);
-    }
+    showInitialWindow();
 }
 
 void MainApplication::parseCommandLineArguments()
@@ -461,4 +446,97 @@ PerformanceManager* MainApplication::performanceManager() const
 OptimizedRecentManager* MainApplication::recentManager() const
 {
     return m_recentManager;
+}
+
+void MainApplication::setupCoreConnections()
+{
+    qDebug() << "Setting up core signal connections...";
+    
+    // 协议处理器连接
+    connect(m_protocolHandler, &ProtocolHandler::protocolUrlReceived,
+            this, &MainApplication::handleProtocolUrl);
+    
+    // 配置管理器和翻译管理器连接
+    connect(m_configManager, &ConfigurationManager::languageChanged,
+            m_translationManager, &TranslationManager::onConfigLanguageChanged);
+    
+    // 窗口管理器信号连接
+    connect(m_windowManager, &WindowManager::windowChanged,
+            this, &MainApplication::onWindowChanged);
+    connect(m_windowManager, &WindowManager::windowStateChanged,
+            this, &MainApplication::onWindowStateChanged);
+    connect(m_windowManager, &WindowManager::dataTransferred,
+            this, &MainApplication::onDataTransferred);
+    connect(m_windowManager, &WindowManager::windowCreated,
+            this, &MainApplication::onWindowCreated);
+    connect(m_windowManager, &WindowManager::windowDestroyed,
+            this, &MainApplication::onWindowDestroyed);
+    
+    // 配置变更信号到窗口管理器
+    connect(m_configManager, &ConfigurationManager::configurationChanged,
+            this, &MainApplication::onConfigurationChanged);
+    
+    // 最近项目管理器连接
+    if (m_recentManager) {
+        connect(m_recentManager, &OptimizedRecentManager::recentItemsChanged,
+                this, &MainApplication::onRecentItemsChanged);
+    }
+    
+    qDebug() << "Core signal connections established";
+}
+
+void MainApplication::showInitialWindow()
+{
+    qDebug() << "Showing initial window...";
+    
+    if (!m_startupUrl.isEmpty()) {
+        qDebug() << "Starting with protocol URL:" << m_startupUrl;
+        handleProtocolUrl(m_startupUrl);
+    } else if (m_showWelcome) {
+        qDebug() << "Showing welcome window";
+        m_windowManager->showWindow(WindowManager::WelcomeWindow);
+    } else {
+        qDebug() << "No initial window to show";
+    }
+}
+
+void MainApplication::onDataTransferred(int fromType, int toType, const QVariantMap& data)
+{
+    qDebug() << "Data transferred from window type" << fromType << "to type" << toType 
+             << "with" << data.size() << "data items";
+    
+    // 可以在这里添加数据传递的额外处理逻辑
+    // 例如记录用户行为、更新统计信息等
+}
+
+void MainApplication::onWindowCreated(int type)
+{
+    qDebug() << "Window created - type:" << type;
+    
+    // 窗口创建后的额外处理
+    if (m_performanceManager) {
+        m_performanceManager->recordWindowCreation(type);
+    }
+}
+
+void MainApplication::onWindowDestroyed(int type)
+{
+    qDebug() << "Window destroyed - type:" << type;
+    
+    // 窗口销毁后的清理工作
+    if (m_performanceManager) {
+        m_performanceManager->recordWindowDestruction(type);
+    }
+}
+
+void MainApplication::onRecentItemsChanged()
+{
+    qDebug() << "Recent items changed, notifying windows";
+    
+    // 通知相关窗口更新最近项目列表
+    if (m_windowManager && m_windowManager->hasWindow(WindowManager::WelcomeWindow)) {
+        QVariantMap data;
+        data["action"] = "refreshRecentItems";
+        m_windowManager->sendDataToWindow(WindowManager::WelcomeWindow, data);
+    }
 }

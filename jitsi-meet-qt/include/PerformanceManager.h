@@ -7,10 +7,7 @@
 #include <QHash>
 #include <QMutex>
 #include <QThread>
-#include <QWebEngineProfile>
 #include <memory>
-
-class QWebEngineView;
 class ConfigurationManager;
 class PerformanceConfig;
 
@@ -25,7 +22,7 @@ public:
     struct PerformanceMetrics {
         qint64 startupTime = 0;
         qint64 memoryUsage = 0;
-        qint64 webEngineMemory = 0;
+        qint64 networkMemory = 0;
         int recentItemsCount = 0;
         qint64 configLoadTime = 0;
         qint64 resourceLoadTime = 0;
@@ -45,10 +42,8 @@ public:
     void preloadResources();
     void optimizeResourceLoading();
 
-    // WebEngine内存管理
-    void setupWebEngineOptimization(QWebEngineView* webView);
-    void clearWebEngineCache();
-    void optimizeWebEngineMemory();
+    // 网络内存管理
+    void optimizeNetworkMemory();
 
     // 历史记录性能优化
     void optimizeRecentItemsLoading();
@@ -82,7 +77,7 @@ private:
     void setupMemoryThresholds();
     void cleanupUnusedResources();
     qint64 getProcessMemoryUsage();
-    qint64 getWebEngineMemoryUsage();
+    qint64 getNetworkMemoryUsage();
 
     static PerformanceManager* s_instance;
     
@@ -99,9 +94,8 @@ private:
     qint64 m_memoryCriticalThreshold;
     int m_maxRecentItems;
     
-    // WebEngine优化
-    QWebEngineProfile* m_webProfile;
-    bool m_webEngineOptimized;
+    // 网络优化
+    bool m_networkOptimized;
     
     // 资源预加载
     QHash<QString, QByteArray> m_preloadedResources;

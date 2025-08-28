@@ -2,54 +2,69 @@
 <RCC version="1.0">
     <qresource prefix="/icons">
         <!-- Application icons -->
-        <file>icons/app.ico</file>
-        <file>icons/app.png</file>
         <file>icons/app.svg</file>
         
         <!-- Navigation icons -->
-        <file>icons/settings.png</file>
         <file>icons/settings.svg</file>
-        <file>icons/about.png</file>
         <file>icons/about.svg</file>
-        <file>icons/back.png</file>
         <file>icons/back.svg</file>
-        <file>icons/join.png</file>
-        <file>icons/join.svg</file>
-        <file>icons/recent.png</file>
         <file>icons/recent.svg</file>
         
-        <!-- Additional UI icons -->
+        <!-- Conference control icons -->
+        <file>icons/microphone.svg</file>
+        <file>icons/microphone-off.svg</file>
+        <file>icons/camera.svg</file>
+        <file>icons/camera-off.svg</file>
+        <file>icons/screen-share.svg</file>
+        <file>icons/chat.svg</file>
+        <file>icons/participants.svg</file>
+        <file>icons/phone-hangup.svg</file>
+        <file>icons/send.svg</file>
+        <file>icons/volume-up.svg</file>
+        <file>icons/volume-off.svg</file>
+        
+        <!-- UI control icons -->
+        <file>icons/fullscreen.svg</file>
+        <file>icons/fullscreen-exit.svg</file>
+        <file>icons/dropdown.svg</file>
+        <file>icons/dropdown-dark.svg</file>
+        <file>icons/refresh.svg</file>
+        
+        <!-- Status icons -->
         <file>icons/close.svg</file>
-        <file>icons/minimize.svg</file>
-        <file>icons/maximize.svg</file>
-        <file>icons/loading.svg</file>
+        <file>icons/warning.svg</file>
         <file>icons/error.svg</file>
         <file>icons/success.svg</file>
-        <file>icons/warning.svg</file>
+        <file>icons/loading.svg</file>
+        
+        <!-- Window control icons -->
+        <file>icons/minimize.svg</file>
+        <file>icons/maximize.svg</file>
+        <file>icons/join.svg</file>
     </qresource>
     
     <qresource prefix="/images">
-        <file>images/logo.png</file>
         <file>images/logo.svg</file>
-        <file>images/welcome-bg.png</file>
+        <file>images/placeholder.svg</file>
         <file>images/welcome-bg.svg</file>
-        <file>images/placeholder.png</file>
+        <file>images/conference-bg.svg</file>
+        <file>images/pattern.svg</file>
     </qresource>
     
     <qresource prefix="/styles">
         <file>styles/default.qss</file>
         <file>styles/dark.qss</file>
+        <file>styles/modern.qss</file>
     </qresource>
     
     <qresource prefix="/translations">
-        <file>translations/jitsi_en.qm</file>
-        <file>translations/jitsi_zh_CN.qm</file>
-        <file>translations/jitsi_zh_TW.qm</file>
-        <file>translations/jitsi_ja.qm</file>
-        <file>translations/jitsi_ko.qm</file>
-        <file>translations/jitsi_fr.qm</file>
-        <file>translations/jitsi_de.qm</file>
-        <file>translations/jitsi_es.qm</file>
-        <file>translations/jitsi_ru.qm</file>
+        <file>../translations/jitsi_en.qm</file>
+        <file>../translations/jitsi_zh_CN.qm</file>
+        <file>../translations/jitsi_ja.qm</file>
+        <file>../translations/jitsi_ko.qm</file>
+        <file>../translations/jitsi_fr.qm</file>
+        <file>../translations/jitsi_de.qm</file>
+        <file>../translations/jitsi_es.qm</file>
+        <file>../translations/jitsi_ru.qm</file>
     </qresource>
 </RCC>

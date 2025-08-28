@@ -9,25 +9,7 @@
 #include <QDateTime>
 #include <QFuture>
 #include <QFutureWatcher>
-
-struct RecentItem {
-    QString url;
-    QString displayName;
-    QDateTime timestamp;
-    int accessCount;
-    
-    bool operator<(const RecentItem& other) const {
-        // 按访问时间和频率排序
-        if (timestamp.date() == other.timestamp.date()) {
-            return accessCount > other.accessCount;
-        }
-        return timestamp > other.timestamp;
-    }
-    
-    bool operator==(const RecentItem& other) const {
-        return url == other.url;
-    }
-};
+#include "models/RecentItem.h"
 
 /**
  * @brief 优化的最近项目管理器 - 提供高性能的历史记录管理

@@ -118,6 +118,7 @@ QString ThemeManager::themeToString(Theme theme)
     switch (theme) {
         case LightTheme: return "light";
         case DarkTheme: return "dark";
+        case ModernTheme: return "modern";
         case SystemTheme: return "system";
         default: return "light";
     }
@@ -127,6 +128,7 @@ ThemeManager::Theme ThemeManager::themeFromString(const QString& themeStr)
 {
     QString lower = themeStr.toLower();
     if (lower == "dark") return DarkTheme;
+    if (lower == "modern") return ModernTheme;
     if (lower == "system") return SystemTheme;
     return LightTheme; // Default to light
 }
@@ -151,6 +153,9 @@ void ThemeManager::applyStyleSheet(Theme theme)
     switch (theme) {
         case DarkTheme:
             stylesheetPath = ":/styles/dark.qss";
+            break;
+        case ModernTheme:
+            stylesheetPath = ":/styles/modern.qss";
             break;
         case LightTheme:
         default:
@@ -213,6 +218,9 @@ void ThemeManager::updateIconTheme()
     if (actualTheme == DarkTheme) {
         qDebug() << "Updated to dark icon theme";
         // Here you could switch to dark variants of icons
+    } else if (actualTheme == ModernTheme) {
+        qDebug() << "Updated to modern icon theme";
+        // Here you could switch to modern variants of icons
     } else {
         qDebug() << "Updated to light icon theme";
         // Here you could switch to light variants of icons

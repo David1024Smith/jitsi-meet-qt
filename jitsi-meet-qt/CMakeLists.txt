@@ -5,6 +5,12 @@ project(JitsiMeetQt VERSION 1.0.0 LANGUAGES CXX)
 # 设置C++标准
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+# 强制设置C++标准编译选项
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
+endif()
 
 # 设置构建类型
 if(NOT CMAKE_BUILD_TYPE)
@@ -28,13 +34,15 @@ endif()
 # 设置Qt版本要求
 set(QT_MIN_VERSION "5.15.2")
 
-# 查找Qt组件
+# 查找Qt组件 - 使用纯C++实现，不依赖WebEngine
 find_package(Qt5 ${QT_MIN_VERSION} REQUIRED COMPONENTS
     Core
     Widgets
-    WebEngine
-    WebEngineWidgets
     Network
+    WebSockets
+    Multimedia
+    MultimediaWidgets
+    Xml
     LinguistTools
 )
 
@@ -42,6 +50,9 @@ find_package(Qt5 ${QT_MIN_VERSION} REQUIRED COMPONENTS
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
+
+# 添加CMake模块路径
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
 # 包含目录
 include_directories(
@@ -64,12 +75,20 @@ set(SOURCES
     src/NavigationBar.cpp
     src/RecentListWidget.cpp
     src/models/RecentItem.cpp
+    src/XMPPClient.cpp
+    src/WebRTCEngine.cpp
+    src/MediaManager.cpp
+    src/ConferenceManager.cpp
+    src/AuthenticationManager.cpp
+    src/ChatManager.cpp
+    src/ScreenShareManager.cpp
     src/JitsiError.cpp
     src/ErrorRecoveryManager.cpp
     src/ErrorDialog.cpp
     src/ErrorUtils.cpp
     src/ThemeManager.cpp
     src/StyleUtils.cpp
+    src/StyleHelper.cpp
     src/PerformanceManager.cpp
     src/MemoryLeakDetector.cpp
     src/StartupOptimizer.cpp
@@ -92,6 +111,13 @@ set(HEADERS
     include/NavigationBar.h
     include/RecentListWidget.h
     include/models/RecentItem.h
+    include/XMPPClient.h
+    include/WebRTCEngine.h
+    include/MediaManager.h
+    include/ConferenceManager.h
+    include/AuthenticationManager.h
+    include/ChatManager.h
+    include/ScreenShareManager.h
     include/JitsiConstants.h
     include/JitsiError.h
     include/ErrorRecoveryManager.h
@@ -99,6 +125,7 @@ set(HEADERS
     include/ErrorUtils.h
     include/ThemeManager.h
     include/StyleUtils.h
+    include/StyleHelper.h
     include/PerformanceManager.h
     include/MemoryLeakDetector.h
     include/StartupOptimizer.h
@@ -106,6 +133,21 @@ set(HEADERS
     include/PerformanceConfig.h
     include/MemoryProfiler.h
 )
+
+# 翻译文件
+set(TS_FILES
+    translations/jitsi_en.ts
+    translations/jitsi_zh_CN.ts
+    translations/jitsi_ja.ts
+    translations/jitsi_ko.ts
+    translations/jitsi_fr.ts
+    translations/jitsi_de.ts
+    translations/jitsi_es.ts
+    translations/jitsi_ru.ts
+)
+
+# 编译翻译文件
+qt5_create_translation(QM_FILES ${SOURCES} ${HEADERS} ${TS_FILES})
 
 # 资源文件
 set(RESOURCES
@@ -117,16 +159,44 @@ add_executable(${PROJECT_NAME}
     ${SOURCES}
     ${HEADERS}
     ${RESOURCES}
+    ${QM_FILES}
 )
 
-# 链接Qt库
+# 第三方库依赖配置
+find_package(PkgConfig QUIET)
+
+# OpenSSL依赖（用于安全连接）
+find_package(OpenSSL QUIET)
+if(OpenSSL_FOUND)
+    target_link_libraries(${PROJECT_NAME} OpenSSL::SSL OpenSSL::Crypto)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE OPENSSL_AVAILABLE)
+endif()
+
+# 链接Qt库 - 使用纯C++实现所需的库
 target_link_libraries(${PROJECT_NAME}
     Qt5::Core
     Qt5::Widgets
-    Qt5::WebEngine
-    Qt5::WebEngineWidgets
     Qt5::Network
+    Qt5::WebSockets
+    Qt5::Multimedia
+    Qt5::MultimediaWidgets
+    Qt5::Xml
 )
+
+# Windows特定的系统库
+if(WIN32)
+    target_link_libraries(${PROJECT_NAME}
+        ws2_32      # Winsock
+        winmm       # Windows Multimedia
+        ole32       # OLE
+        oleaut32    # OLE Automation
+        uuid        # UUID
+        advapi32    # Advanced API
+        shell32     # Shell API
+        user32      # User API
+        gdi32       # GDI
+    )
+endif()
 
 # 版本信息配置
 set(PROJECT_VERSION_MAJOR 1)

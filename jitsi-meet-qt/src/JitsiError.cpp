@@ -57,6 +57,14 @@ QString JitsiError::typeString() const
         return "ValidationError";
     case ErrorType::SystemError:
         return "SystemError";
+    case ErrorType::WebRTCError:
+        return "WebRTCError";
+    case ErrorType::XMPPConnectionError:
+        return "XMPPConnectionError";
+    case ErrorType::AuthenticationError:
+        return "AuthenticationError";
+    case ErrorType::MediaDeviceError:
+        return "MediaDeviceError";
     default:
         return "UnknownError";
     }
@@ -142,6 +150,14 @@ QString JitsiError::toUserMessage() const
         return QString("输入的信息不符合要求，请检查后重新输入。");
     case ErrorType::SystemError:
         return QString("系统出现错误，请重启应用程序后重试。");
+    case ErrorType::WebRTCError:
+        return QString("音视频连接失败，请检查摄像头和麦克风设备。");
+    case ErrorType::XMPPConnectionError:
+        return QString("无法连接到会议服务器，请检查网络连接和服务器地址。");
+    case ErrorType::AuthenticationError:
+        return QString("身份验证失败，请检查会议室密码或权限设置。");
+    case ErrorType::MediaDeviceError:
+        return QString("媒体设备访问失败，请检查摄像头和麦克风权限。");
     default:
         return m_message;
     }
@@ -153,6 +169,9 @@ bool JitsiError::isRecoverable() const
     case ErrorType::NetworkError:
     case ErrorType::InvalidUrl:
     case ErrorType::ValidationError:
+    case ErrorType::XMPPConnectionError:
+    case ErrorType::WebRTCError:
+    case ErrorType::MediaDeviceError:
         return true;
     case ErrorType::WebEngineError:
         return m_severity != ErrorSeverity::Critical;
@@ -160,6 +179,8 @@ bool JitsiError::isRecoverable() const
     case ErrorType::ProtocolError:
         return m_severity == ErrorSeverity::Warning || m_severity == ErrorSeverity::Info;
     case ErrorType::SystemError:
+        return m_severity != ErrorSeverity::Critical;
+    case ErrorType::AuthenticationError:
         return m_severity != ErrorSeverity::Critical;
     default:
         return false;
@@ -241,6 +262,34 @@ JitsiError JitsiError::systemError(const QString& message, const QString& detail
 {
     JitsiError error(ErrorType::SystemError, message, details, ErrorSeverity::Critical);
     error.addContext("category", "system");
+    return error;
+}
+
+JitsiError JitsiError::webRTCError(const QString& message, const QString& details)
+{
+    JitsiError error(ErrorType::WebRTCError, message, details, ErrorSeverity::Error);
+    error.addContext("category", "webrtc");
+    return error;
+}
+
+JitsiError JitsiError::xmppConnectionError(const QString& message, const QString& details)
+{
+    JitsiError error(ErrorType::XMPPConnectionError, message, details, ErrorSeverity::Error);
+    error.addContext("category", "xmpp");
+    return error;
+}
+
+JitsiError JitsiError::authenticationError(const QString& message, const QString& details)
+{
+    JitsiError error(ErrorType::AuthenticationError, message, details, ErrorSeverity::Error);
+    error.addContext("category", "authentication");
+    return error;
+}
+
+JitsiError JitsiError::mediaDeviceError(const QString& message, const QString& details)
+{
+    JitsiError error(ErrorType::MediaDeviceError, message, details, ErrorSeverity::Warning);
+    error.addContext("category", "media");
     return error;
 }
 

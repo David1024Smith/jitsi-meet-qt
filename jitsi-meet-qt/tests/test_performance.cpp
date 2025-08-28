@@ -3,6 +3,8 @@
 #include <QSignalSpy>
 #include <QTimer>
 #include <QThread>
+#include <QElapsedTimer>
+#include <QJsonObject>
 
 #include "PerformanceManager.h"
 #include "MemoryLeakDetector.h"
@@ -22,7 +24,7 @@ private slots:
     // PerformanceManager tests
     void testPerformanceManagerStartup();
     void testPerformanceManagerMemoryMonitoring();
-    void testPerformanceManagerWebEngineOptimization();
+    void testPerformanceManagerNetworkOptimization();
     void testPerformanceManagerMetrics();
     
     // MemoryLeakDetector tests
@@ -115,11 +117,10 @@ void TestPerformance::testPerformanceManagerMemoryMonitoring()
     QVERIFY(memoryAfterCleanup > 0);
 }
 
-void TestPerformance::testPerformanceManagerWebEngineOptimization()
+void TestPerformance::testPerformanceManagerNetworkOptimization()
 {
-    // 测试WebEngine优化（不需要实际的WebEngine实例）
-    m_performanceManager->optimizeWebEngineMemory();
-    m_performanceManager->clearWebEngineCache();
+    // 测试网络优化
+    m_performanceManager->optimizeNetworkMemory();
     
     // 验证操作完成（主要测试不会崩溃）
     QVERIFY(true);
@@ -132,7 +133,7 @@ void TestPerformance::testPerformanceManagerMetrics()
     // 验证指标结构
     QVERIFY(metrics.startupTime >= 0);
     QVERIFY(metrics.memoryUsage >= 0);
-    QVERIFY(metrics.webEngineMemory >= 0);
+    QVERIFY(metrics.networkMemory >= 0);
     QVERIFY(metrics.recentItemsCount >= 0);
     QVERIFY(metrics.configLoadTime >= 0);
     QVERIFY(metrics.resourceLoadTime >= 0);
@@ -488,3 +489,57 @@ void TestPerformance::testMemoryProfilerSnapshots()
     // 清理快照历史
     m_memoryProfiler->clearSnapshotHistory();
     QCOMPARE(m_memoryProfiler->getSnapshotCount(), 0);
+}
+
+void TestPerformance::testMemoryProfilerAnalysis()
+{
+    QSignalSpy trendSpy(m_memoryProfiler, &MemoryProfiler::memoryTrendChanged);
+    QSignalSpy suggestionSpy(m_memoryProfiler, &MemoryProfiler::optimizationSuggestionAvailable);
+    
+    m_memoryProfiler->startProfiling();
+    
+    // 生成一些快照
+    for (int i = 0; i < 5; ++i) {
+        m_memoryProfiler->takeSnapshot();
+        QTest::qWait(10);
+    }
+    
+    // 分析趋势
+    MemoryProfiler::MemoryTrend trend = m_memoryProfiler->analyzeTrend(1);
+    QVERIFY(trend.averageUsage >= 0);
+    QVERIFY(trend.peakUsage >= trend.averageUsage);
+    QVERIFY(trend.minimumUsage <= trend.averageUsage);
+    
+    // 生成优化建议
+    QList<MemoryProfiler::OptimizationSuggestion> suggestions = m_memoryProfiler->generateOptimizationSuggestions();
+    QVERIFY(suggestions.size() >= 0);
+    
+    m_memoryProfiler->stopProfiling();
+}
+
+void TestPerformance::testMemoryProfilerReporting()
+{
+    m_memoryProfiler->startProfiling();
+    
+    // 生成一些数据
+    for (int i = 0; i < 3; ++i) {
+        m_memoryProfiler->takeSnapshot();
+        QTest::qWait(10);
+    }
+    
+    // 测试JSON报告
+    QJsonObject jsonReport = m_memoryProfiler->generateDetailedReport();
+    QVERIFY(!jsonReport.isEmpty());
+    QVERIFY(jsonReport.contains("timestamp"));
+    QVERIFY(jsonReport.contains("currentSnapshot"));
+    QVERIFY(jsonReport.contains("trend"));
+    
+    // 测试文本报告
+    QString textReport = m_memoryProfiler->generateTextReport();
+    QVERIFY(!textReport.isEmpty());
+    QVERIFY(textReport.contains("Memory Profiler Report"));
+    
+    m_memoryProfiler->stopProfiling();
+}QTES
+T_MAIN(TestPerformance)
+#include "test_performance.moc"

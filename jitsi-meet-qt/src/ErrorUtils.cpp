@@ -562,6 +562,34 @@ QStringList ErrorUtils::getErrorSuggestions(const JitsiError& error)
                    << "检查系统资源使用情况"
                    << "联系技术支持";
         break;
+        
+    case ErrorType::WebRTCError:
+        suggestions << "检查摄像头和麦克风权限"
+                   << "重新启动媒体设备"
+                   << "检查防火墙设置"
+                   << "尝试使用其他浏览器";
+        break;
+        
+    case ErrorType::XMPPConnectionError:
+        suggestions << "检查网络连接"
+                   << "验证服务器地址"
+                   << "检查防火墙和代理设置"
+                   << "稍后重试连接";
+        break;
+        
+    case ErrorType::AuthenticationError:
+        suggestions << "检查会议室密码"
+                   << "验证用户权限"
+                   << "联系会议组织者"
+                   << "尝试重新加入会议";
+        break;
+        
+    case ErrorType::MediaDeviceError:
+        suggestions << "检查摄像头和麦克风连接"
+                   << "授予应用程序设备权限"
+                   << "重新插拔设备"
+                   << "检查设备驱动程序";
+        break;
     }
     
     return suggestions;

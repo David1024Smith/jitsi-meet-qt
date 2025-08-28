@@ -308,6 +308,22 @@ void ErrorDialog::updateButtonStates()
     case ErrorType::ConfigurationError:
         m_resetButton->setText("重置设置");
         break;
+    case ErrorType::WebRTCError:
+        m_retryButton->setText("重新初始化");
+        m_resetButton->setText("重置设备");
+        break;
+    case ErrorType::XMPPConnectionError:
+        m_retryButton->setText("重新连接");
+        m_ignoreButton->setText("离线模式");
+        break;
+    case ErrorType::AuthenticationError:
+        m_retryButton->setText("重新验证");
+        m_ignoreButton->setText("跳过验证");
+        break;
+    case ErrorType::MediaDeviceError:
+        m_retryButton->setText("重新检测");
+        m_resetButton->setText("重置权限");
+        break;
     default:
         break;
     }

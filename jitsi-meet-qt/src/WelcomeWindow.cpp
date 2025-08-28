@@ -20,6 +20,7 @@
 #include <QFont>
 #include <QSizePolicy>
 #include <QSpacerItem>
+#include <QEvent>
 
 WelcomeWindow::WelcomeWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -534,4 +535,12 @@ void WelcomeWindow::retranslateUi()
     
     // Regenerate random room names with new translations
     setupRandomRoomNames();
+}
+
+void WelcomeWindow::changeEvent(QEvent* event)
+{
+    if (event->type() == QEvent::LanguageChange) {
+        retranslateUi();
+    }
+    QMainWindow::changeEvent(event);
 }

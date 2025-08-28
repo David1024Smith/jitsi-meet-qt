@@ -291,3 +291,235 @@ QLabel#LoadingLabel {
     color: #666666;
     font-style: italic;
 }
+
+/* Conference Window Styles */
+QWidget#ConferenceWindow {
+    background-color: #F5F5F5;
+}
+
+/* Video Area */
+QScrollArea#VideoScrollArea {
+    background-color: #212121;
+    border: none;
+    border-radius: 8px;
+}
+
+QWidget#VideoArea {
+    background-color: #212121;
+}
+
+QLabel#NoVideoLabel {
+    color: #BDBDBD;
+    font-size: 14pt;
+    font-weight: 500;
+    background-color: #424242;
+    border-radius: 8px;
+    padding: 20px;
+}
+
+/* Control Panel */
+QWidget#ControlPanel {
+    background-color: #FFFFFF;
+    border-top: 1px solid #E0E0E0;
+    padding: 12px;
+}
+
+QPushButton#MuteAudioButton,
+QPushButton#MuteVideoButton,
+QPushButton#ScreenShareButton,
+QPushButton#ChatToggleButton,
+QPushButton#ParticipantsToggleButton {
+    background-color: #F5F5F5;
+    border: 2px solid #E0E0E0;
+    border-radius: 24px;
+    padding: 12px;
+    min-width: 48px;
+    min-height: 48px;
+    max-width: 48px;
+    max-height: 48px;
+}
+
+QPushButton#MuteAudioButton:hover,
+QPushButton#MuteVideoButton:hover,
+QPushButton#ScreenShareButton:hover,
+QPushButton#ChatToggleButton:hover,
+QPushButton#ParticipantsToggleButton:hover {
+    background-color: #E3F2FD;
+    border-color: #2196F3;
+}
+
+QPushButton#MuteAudioButton:checked,
+QPushButton#MuteVideoButton:checked {
+    background-color: #FFEBEE;
+    border-color: #F44336;
+    color: #F44336;
+}
+
+QPushButton#ScreenShareButton:checked,
+QPushButton#ChatToggleButton:checked,
+QPushButton#ParticipantsToggleButton:checked {
+    background-color: #E3F2FD;
+    border-color: #2196F3;
+    color: #2196F3;
+}
+
+QPushButton#HangupButton {
+    background-color: #F44336;
+    color: white;
+    border: none;
+    border-radius: 24px;
+    padding: 12px;
+    min-width: 48px;
+    min-height: 48px;
+    max-width: 48px;
+    max-height: 48px;
+}
+
+QPushButton#HangupButton:hover {
+    background-color: #D32F2F;
+}
+
+QPushButton#HangupButton:pressed {
+    background-color: #B71C1C;
+}
+
+/* Chat Panel */
+QWidget#ChatPanel {
+    background-color: #FFFFFF;
+    border-left: 1px solid #E0E0E0;
+    min-width: 300px;
+    max-width: 400px;
+}
+
+QTextEdit#ChatDisplay {
+    background-color: #FAFAFA;
+    border: 1px solid #E0E0E0;
+    border-radius: 8px;
+    padding: 8px;
+    font-size: 10pt;
+}
+
+QLineEdit#ChatInput {
+    border-radius: 20px;
+    padding: 8px 16px;
+    margin-right: 8px;
+}
+
+QPushButton#SendButton {
+    background-color: #2196F3;
+    border: none;
+    border-radius: 20px;
+    padding: 8px 16px;
+    min-width: 40px;
+    color: white;
+}
+
+QPushButton#SendButton:hover {
+    background-color: #1976D2;
+}
+
+QPushButton#SendButton:disabled {
+    background-color: #BDBDBD;
+}
+
+/* Participants Panel */
+QWidget#ParticipantsPanel {
+    background-color: #FFFFFF;
+    border-left: 1px solid #E0E0E0;
+    min-width: 250px;
+    max-width: 300px;
+}
+
+QListWidget#ParticipantsList {
+    background-color: #FAFAFA;
+    border: 1px solid #E0E0E0;
+    border-radius: 8px;
+    padding: 4px;
+}
+
+QListWidget#ParticipantsList::item {
+    background-color: transparent;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 6px;
+    margin: 2px 0;
+}
+
+QListWidget#ParticipantsList::item:hover {
+    background-color: #E3F2FD;
+}
+
+/* Status Bar */
+QWidget#StatusBar {
+    background-color: #F5F5F5;
+    border-top: 1px solid #E0E0E0;
+    padding: 8px 16px;
+}
+
+QLabel#ConnectionStatusLabel {
+    color: #666666;
+    font-size: 9pt;
+}
+
+QLabel#ParticipantCountLabel {
+    color: #666666;
+    font-size: 9pt;
+    font-weight: 500;
+}
+
+QProgressBar#ConnectionProgress {
+    background-color: #E0E0E0;
+    border: none;
+    border-radius: 2px;
+    height: 4px;
+}
+
+QProgressBar#ConnectionProgress::chunk {
+    background-color: #4CAF50;
+    border-radius: 2px;
+}
+
+/* Unread Chat Badge */
+QLabel#ChatUnreadLabel {
+    background-color: #F44336;
+    color: white;
+    border-radius: 10px;
+    padding: 2px 6px;
+    font-size: 8pt;
+    font-weight: bold;
+    min-width: 16px;
+}
+
+/* Video Widget Styling */
+QWidget.VideoWidget {
+    background-color: #424242;
+    border: 2px solid #616161;
+    border-radius: 8px;
+}
+
+QWidget.VideoWidget:hover {
+    border-color: #2196F3;
+}
+
+QWidget.MainVideoWidget {
+    background-color: #212121;
+    border: 2px solid #424242;
+    border-radius: 12px;
+}
+
+/* Splitter Styling */
+QSplitter::handle {
+    background-color: #E0E0E0;
+}
+
+QSplitter::handle:horizontal {
+    width: 2px;
+}
+
+QSplitter::handle:vertical {
+    height: 2px;
+}
+
+QSplitter::handle:hover {
+    background-color: #2196F3;
+}

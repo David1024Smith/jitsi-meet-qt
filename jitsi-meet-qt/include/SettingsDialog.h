@@ -13,9 +13,14 @@
 #include <QHBoxLayout>
 #include <QFormLayout>
 #include <QDialogButtonBox>
+#include <QProgressBar>
+#include <QSlider>
+#include <QVideoWidget>
+#include "models/ApplicationSettings.h"
 
 class ConfigurationManager;
 class TranslationManager;
+class MediaManager;
 struct ApplicationSettings;
 
 /**
@@ -30,10 +35,12 @@ public:
      * @brief 构造函数
      * @param configManager 配置管理器
      * @param translationManager 翻译管理器
+     * @param mediaManager 媒体管理器
      * @param parent 父窗口
      */
     explicit SettingsDialog(ConfigurationManager* configManager,
                            TranslationManager* translationManager,
+                           MediaManager* mediaManager,
                            QWidget* parent = nullptr);
 
     /**
@@ -110,6 +117,51 @@ private slots:
      */
     void onTranslationChanged();
 
+    /**
+     * @brief 摄像头选择改变时的处理
+     */
+    void onCameraChanged();
+
+    /**
+     * @brief 麦克风选择改变时的处理
+     */
+    void onMicrophoneChanged();
+
+    /**
+     * @brief 扬声器选择改变时的处理
+     */
+    void onSpeakerChanged();
+
+    /**
+     * @brief 测试摄像头
+     */
+    void testCamera();
+
+    /**
+     * @brief 测试麦克风
+     */
+    void testMicrophone();
+
+    /**
+     * @brief 测试扬声器
+     */
+    void testSpeaker();
+
+    /**
+     * @brief 停止所有设备测试
+     */
+    void stopAllTests();
+
+    /**
+     * @brief 麦克风音量改变时的处理
+     */
+    void onMicrophoneVolumeChanged(int volume);
+
+    /**
+     * @brief 扬声器音量改变时的处理
+     */
+    void onSpeakerVolumeChanged(int volume);
+
 private:
     /**
      * @brief 初始化用户界面
@@ -127,6 +179,12 @@ private:
      * @return 界面设置组框
      */
     QGroupBox* createInterfaceGroup();
+
+    /**
+     * @brief 创建音视频设备设置组
+     * @return 音视频设备设置组框
+     */
+    QGroupBox* createMediaDeviceGroup();
 
     /**
      * @brief 创建会议设置组
@@ -185,10 +243,26 @@ private:
      */
     bool hasChanges() const;
 
+    /**
+     * @brief 刷新设备列表
+     */
+    void refreshDeviceList();
+
+    /**
+     * @brief 更新设备测试状态
+     */
+    void updateTestStatus();
+
+    /**
+     * @brief 初始化设备列表
+     */
+    void initializeDeviceLists();
+
 private:
     // 管理器
     ConfigurationManager* m_configManager;
     TranslationManager* m_translationManager;
+    MediaManager* m_mediaManager;
 
     // 服务器设置
     QGroupBox* m_serverGroup;
@@ -204,6 +278,24 @@ private:
     QCheckBox* m_darkModeCheck;
     QCheckBox* m_rememberWindowStateCheck;
     QLabel* m_languageLabel;
+
+    // 音视频设备设置
+    QGroupBox* m_mediaDeviceGroup;
+    QComboBox* m_cameraCombo;
+    QComboBox* m_microphoneCombo;
+    QComboBox* m_speakerCombo;
+    QPushButton* m_testCameraButton;
+    QPushButton* m_testMicrophoneButton;
+    QPushButton* m_testSpeakerButton;
+    QVideoWidget* m_cameraPreview;
+    QProgressBar* m_microphoneLevel;
+    QSlider* m_microphoneVolumeSlider;
+    QSlider* m_speakerVolumeSlider;
+    QLabel* m_cameraLabel;
+    QLabel* m_microphoneLabel;
+    QLabel* m_speakerLabel;
+    QLabel* m_microphoneVolumeLabel;
+    QLabel* m_speakerVolumeLabel;
 
     // 会议设置
     QGroupBox* m_conferenceGroup;
@@ -226,6 +318,11 @@ private:
 
     // 原始设置（用于检测更改）
     ApplicationSettings m_originalSettings;
+
+    // 设备测试状态
+    bool m_cameraTestActive;
+    bool m_microphoneTestActive;
+    bool m_speakerTestActive;
 };
 
 #endif // SETTINGSDIALOG_H

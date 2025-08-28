@@ -379,10 +379,7 @@ void WindowManager::createConferenceWindow()
         
         m_conferenceWindow = new ::ConferenceWindow();
         
-        // 设置服务器URL
-        if (m_configManager) {
-            m_conferenceWindow->setServerUrl(m_configManager->serverUrl());
-        }
+        // 配置管理器将在需要时由ConferenceWindow内部使用
         
         // 连接窗口信号
         connectWindowSignals(ConferenceWindow, m_conferenceWindow);
@@ -405,7 +402,7 @@ void WindowManager::createSettingsDialog()
     if (!m_settingsDialog) {
         qDebug() << "Creating SettingsDialog";
         
-        m_settingsDialog = new ::SettingsDialog(m_configManager, m_translationManager);
+        m_settingsDialog = new ::SettingsDialog(m_configManager, m_translationManager, nullptr);
         
         // 连接窗口信号
         connectWindowSignals(SettingsDialog, m_settingsDialog);
@@ -560,8 +557,8 @@ void WindowManager::closeAllWindows()
     closeWindow(ConferenceWindow);
     closeWindow(SettingsDialog);
 }
-v
-oid WindowManager::onWindowClosed()
+
+void WindowManager::onWindowClosed()
 {
     QWidget* sender = qobject_cast<QWidget*>(this->sender());
     if (!sender) {
@@ -701,10 +698,7 @@ void WindowManager::applyWindowData(WindowType type, const QVariantMap& data)
         if (m_conferenceWindow) {
             if (data.contains("url")) {
                 QString url = data.value("url").toString();
-                m_conferenceWindow->loadConference(url);
-            }
-            if (data.contains("serverUrl")) {
-                m_conferenceWindow->setServerUrl(data.value("serverUrl").toString());
+                m_conferenceWindow->joinConference(url);
             }
         }
         break;

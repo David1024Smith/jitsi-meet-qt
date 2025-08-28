@@ -124,7 +124,32 @@ public slots:
      * @brief 处理内存泄漏检测事件
      * @param leaks 检测到的内存泄漏信息
      */
-    void onMemoryLeakDetected(const QList<class MemoryLeakDetector::AllocationInfo>& leaks);
+    void onMemoryLeakDetected(const QVariantList& leaks);
+    
+    /**
+     * @brief 处理窗口间数据传递事件
+     * @param fromType 源窗口类型
+     * @param toType 目标窗口类型
+     * @param data 传递的数据
+     */
+    void onDataTransferred(int fromType, int toType, const QVariantMap& data);
+    
+    /**
+     * @brief 处理窗口创建事件
+     * @param type 窗口类型
+     */
+    void onWindowCreated(int type);
+    
+    /**
+     * @brief 处理窗口销毁事件
+     * @param type 窗口类型
+     */
+    void onWindowDestroyed(int type);
+    
+    /**
+     * @brief 处理最近项目变更事件
+     */
+    void onRecentItemsChanged();
 
 private slots:
     /**
@@ -165,6 +190,16 @@ private:
      * @return 发送成功返回true
      */
     bool sendMessageToFirstInstance(const QString& message);
+    
+    /**
+     * @brief 设置核心组件间的信号连接
+     */
+    void setupCoreConnections();
+    
+    /**
+     * @brief 显示初始窗口
+     */
+    void showInitialWindow();
 
 private:
     static MainApplication* s_instance;

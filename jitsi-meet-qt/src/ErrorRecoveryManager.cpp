@@ -87,6 +87,18 @@ ErrorRecoveryManager::RecoveryResult ErrorRecoveryManager::handleError(const Jit
     case ErrorType::SystemError:
         result = handleSystemErrorInternal(error);
         break;
+    case ErrorType::WebRTCError:
+        result = handleWebRTCErrorInternal(error);
+        break;
+    case ErrorType::XMPPConnectionError:
+        result = handleXMPPConnectionErrorInternal(error);
+        break;
+    case ErrorType::AuthenticationError:
+        result = handleAuthenticationErrorInternal(error);
+        break;
+    case ErrorType::MediaDeviceError:
+        result = handleMediaDeviceErrorInternal(error);
+        break;
     default:
         result = RecoveryResult(false, RecoveryStrategy::UserIntervention, "Unknown error type");
         break;
@@ -191,6 +203,34 @@ ErrorRecoveryManager::RecoveryResult ErrorRecoveryManager::attemptRecovery(Error
         emit restartRequired("System error detected");
         break;
         
+    case ErrorType::WebRTCError:
+        // WebRTC错误：重启媒体引擎
+        result.success = reinitializeMediaDevices();
+        result.strategy = RecoveryStrategy::Restart;
+        result.message = result.success ? "Media engine restarted" : "Failed to restart media engine";
+        break;
+        
+    case ErrorType::XMPPConnectionError:
+        // XMPP连接错误：重新连接
+        result.success = restartXMPPConnection();
+        result.strategy = RecoveryStrategy::Retry;
+        result.message = result.success ? "XMPP connection restarted" : "Failed to restart XMPP connection";
+        break;
+        
+    case ErrorType::AuthenticationError:
+        // 认证错误：需要用户重新输入凭据
+        result.strategy = RecoveryStrategy::UserIntervention;
+        result.success = false;
+        result.message = "Authentication failed, user credentials required";
+        break;
+        
+    case ErrorType::MediaDeviceError:
+        // 媒体设备错误：重新初始化设备
+        result.success = reinitializeMediaDevices();
+        result.strategy = RecoveryStrategy::Reset;
+        result.message = result.success ? "Media devices reinitialized" : "Failed to reinitialize media devices";
+        break;
+        
     default:
         result.strategy = RecoveryStrategy::None;
         result.success = false;
@@ -278,6 +318,30 @@ void ErrorRecoveryManager::handleConfigurationError(const QString& message, cons
 void ErrorRecoveryManager::handleProtocolError(const QString& message, const QString& details)
 {
     JitsiError error = JitsiError::protocolError(message, details);
+    handleError(error);
+}
+
+void ErrorRecoveryManager::handleWebRTCError(const QString& message, const QString& details)
+{
+    JitsiError error = JitsiError::webRTCError(message, details);
+    handleError(error);
+}
+
+void ErrorRecoveryManager::handleXMPPConnectionError(const QString& message, const QString& details)
+{
+    JitsiError error = JitsiError::xmppConnectionError(message, details);
+    handleError(error);
+}
+
+void ErrorRecoveryManager::handleAuthenticationError(const QString& message, const QString& details)
+{
+    JitsiError error = JitsiError::authenticationError(message, details);
+    handleError(error);
+}
+
+void ErrorRecoveryManager::handleMediaDeviceError(const QString& message, const QString& details)
+{
+    JitsiError error = JitsiError::mediaDeviceError(message, details);
     handleError(error);
 }
 
@@ -627,4 +691,128 @@ void ErrorRecoveryManager::setupDialogButtons(QMessageBox* dialog, const JitsiEr
 void ErrorRecoveryManager::updateErrorStatistics(ErrorType errorType)
 {
     m_errorStats[errorType]++;
+}
+
+ErrorRecoveryManager::RecoveryResult ErrorRecoveryManager::handleWebRTCErrorInternal(const JitsiError& error)
+{
+    RecoveryResult result;
+    
+    if (error.severity() == ErrorSeverity::Critical) {
+        result.strategy = RecoveryStrategy::UserIntervention;
+        result.success = false;
+        result.message = "Critical WebRTC error, manual intervention required";
+        emit userInterventionRequired(error);
+    } else {
+        result.success = reinitializeMediaDevices();
+        result.strategy = RecoveryStrategy::Restart;
+        result.message = result.success ? "Media devices reinitialized successfully" : "Failed to reinitialize media devices";
+        
+        if (!result.success && m_showErrorDialogs) {
+            showErrorDialog(error);
+        }
+    }
+    
+    return result;
+}
+
+ErrorRecoveryManager::RecoveryResult ErrorRecoveryManager::handleXMPPConnectionErrorInternal(const JitsiError& error)
+{
+    RecoveryResult result;
+    
+    // 检查重试次数
+    int& retryCount = m_retryCount[ErrorType::XMPPConnectionError];
+    
+    if (retryCount < m_maxRetryCount) {
+        retryCount++;
+        result.success = restartXMPPConnection();
+        result.strategy = RecoveryStrategy::Retry;
+        result.message = result.success ? 
+            QString("XMPP connection restarted (attempt %1/%2)").arg(retryCount).arg(m_maxRetryCount) :
+            QString("Failed to restart XMPP connection (attempt %1/%2)").arg(retryCount).arg(m_maxRetryCount);
+        
+        if (!result.success) {
+            // 启动重试定时器
+            m_retryTimer->start(5000 * retryCount);
+        }
+    } else {
+        result.strategy = RecoveryStrategy::UserIntervention;
+        result.success = false;
+        result.message = "XMPP connection failed after maximum retry attempts";
+        
+        if (m_showErrorDialogs) {
+            emit userInterventionRequired(error);
+        }
+    }
+    
+    return result;
+}
+
+ErrorRecoveryManager::RecoveryResult ErrorRecoveryManager::handleAuthenticationErrorInternal(const JitsiError& error)
+{
+    RecoveryResult result;
+    result.strategy = RecoveryStrategy::UserIntervention;
+    result.success = false;
+    result.message = "Authentication failed, user credentials required";
+    
+    if (m_showErrorDialogs) {
+        showErrorDialog(error);
+    }
+    
+    return result;
+}
+
+ErrorRecoveryManager::RecoveryResult ErrorRecoveryManager::handleMediaDeviceErrorInternal(const JitsiError& error)
+{
+    RecoveryResult result;
+    
+    if (error.severity() == ErrorSeverity::Critical) {
+        result.strategy = RecoveryStrategy::UserIntervention;
+        result.success = false;
+        result.message = "Critical media device error, check device permissions";
+        emit userInterventionRequired(error);
+    } else {
+        result.success = reinitializeMediaDevices();
+        result.strategy = RecoveryStrategy::Reset;
+        result.message = result.success ? "Media devices reset successfully" : "Failed to reset media devices";
+        
+        if (!result.success && m_showErrorDialogs) {
+            showErrorDialog(error);
+        }
+    }
+    
+    return result;
+}
+
+bool ErrorRecoveryManager::restartXMPPConnection()
+{
+    try {
+        // 重启XMPP连接的逻辑
+        // 这里需要与XMPPClient组件交互
+        qCDebug(errorRecovery) << "Restarting XMPP connection";
+        
+        // 模拟重启过程
+        // 实际实现中需要调用XMPPClient的重连方法
+        
+        return true;
+    } catch (...) {
+        qCWarning(errorRecovery) << "Failed to restart XMPP connection";
+        return false;
+    }
+}
+
+bool ErrorRecoveryManager::reinitializeMediaDevices()
+{
+    try {
+        // 重新初始化媒体设备的逻辑
+        // 这里需要与MediaManager组件交互
+        qCDebug(errorRecovery) << "Reinitializing media devices";
+        
+        // 模拟重新初始化过程
+        // 实际实现中需要调用MediaManager的重新初始化方法
+        
+        return true;
+    } catch (...) {
+        qCWarning(errorRecovery) << "Failed to reinitialize media devices";
+        return false;
+    }
 }

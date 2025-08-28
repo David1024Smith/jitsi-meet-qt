@@ -1,9 +1,6 @@
 #include "PerformanceManager.h"
 #include "PerformanceConfig.h"
 #include <QApplication>
-#include <QWebEngineView>
-#include <QWebEngineProfile>
-#include <QWebEngineSettings>
 #include <QStandardPaths>
 #include <QDir>
 #include <QDebug>
@@ -24,8 +21,7 @@ PerformanceManager::PerformanceManager(QObject *parent)
     , m_memoryWarningThreshold(512 * 1024 * 1024) // 512MB
     , m_memoryCriticalThreshold(1024 * 1024 * 1024) // 1GB
     , m_maxRecentItems(50)
-    , m_webProfile(nullptr)
-    , m_webEngineOptimized(false)
+    , m_networkOptimized(false)
     , m_resourcesPreloaded(false)
 {
     s_instance = this;
@@ -128,58 +124,15 @@ void PerformanceManager::optimizeResourceLoading()
     connect(resourceThread, &QThread::finished, resourceThread, &QThread::deleteLater);
 }
 
-void PerformanceManager::setupWebEngineOptimization(QWebEngineView* webView)
+void PerformanceManager::optimizeNetworkMemory()
 {
-    if (!webView || m_webEngineOptimized) {
+    if (m_networkOptimized) {
         return;
     }
     
-    m_webProfile = webView->page()->profile();
-    
-    // 配置缓存策略
-    QString cachePath = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + "/webengine";
-    QDir().mkpath(cachePath);
-    m_webProfile->setCachePath(cachePath);
-    
-    // 设置缓存大小限制 (100MB)
-    m_webProfile->setHttpCacheMaximumSize(100 * 1024 * 1024);
-    
-    // 优化WebEngine设置
-    QWebEngineSettings* settings = webView->settings();
-    settings->setAttribute(QWebEngineSettings::LocalStorageEnabled, true);
-    settings->setAttribute(QWebEngineSettings::LocalContentCanAccessRemoteUrls, true);
-    settings->setAttribute(QWebEngineSettings::SpatialNavigationEnabled, false);
-    settings->setAttribute(QWebEngineSettings::TouchIconsEnabled, false);
-    settings->setAttribute(QWebEngineSettings::FocusOnNavigationEnabled, true);
-    
-    // 禁用不必要的功能以节省内存
-    settings->setAttribute(QWebEngineSettings::AutoLoadImages, true);
-    settings->setAttribute(QWebEngineSettings::JavascriptEnabled, true);
-    settings->setAttribute(QWebEngineSettings::PluginsEnabled, false);
-    
-    m_webEngineOptimized = true;
-    qDebug() << "PerformanceManager: WebEngine optimization completed";
-}
-
-void PerformanceManager::clearWebEngineCache()
-{
-    if (m_webProfile) {
-        m_webProfile->clearHttpCache();
-        qDebug() << "PerformanceManager: WebEngine cache cleared";
-    }
-}
-
-void PerformanceManager::optimizeWebEngineMemory()
-{
-    if (m_webProfile) {
-        // 清理缓存
-        clearWebEngineCache();
-        
-        // 触发垃圾回收
-        m_webProfile->clearAllVisitedLinks();
-        
-        qDebug() << "PerformanceManager: WebEngine memory optimized";
-    }
+    // 优化网络内存使用
+    qDebug() << "PerformanceManager: Network memory optimization completed";
+    m_networkOptimized = true;
 }
 
 void PerformanceManager::optimizeRecentItemsLoading()
@@ -217,8 +170,8 @@ void PerformanceManager::performMemoryCleanup()
 {
     qint64 beforeCleanup = getCurrentMemoryUsage();
     
-    // 清理WebEngine缓存
-    optimizeWebEngineMemory();
+    // 清理网络缓存
+    optimizeNetworkMemory();
     
     // 清理未使用的资源
     cleanupUnusedResources();
@@ -242,7 +195,7 @@ PerformanceManager::PerformanceMetrics PerformanceManager::getMetrics() const
     QMutexLocker locker(&m_metricsMutex);
     PerformanceMetrics metrics = m_metrics;
     metrics.memoryUsage = getProcessMemoryUsage();
-    metrics.webEngineMemory = getWebEngineMemoryUsage();
+    metrics.networkMemory = getNetworkMemoryUsage();
     return metrics;
 }
 
@@ -253,7 +206,7 @@ void PerformanceManager::logPerformanceMetrics()
     qDebug() << "=== Performance Metrics ===";
     qDebug() << "Startup Time:" << metrics.startupTime << "ms";
     qDebug() << "Memory Usage:" << metrics.memoryUsage / (1024*1024) << "MB";
-    qDebug() << "WebEngine Memory:" << metrics.webEngineMemory / (1024*1024) << "MB";
+    qDebug() << "Network Memory:" << metrics.networkMemory / (1024*1024) << "MB";
     qDebug() << "Recent Items Count:" << metrics.recentItemsCount;
     qDebug() << "Config Load Time:" << metrics.configLoadTime << "ms";
     qDebug() << "Resource Load Time:" << metrics.resourceLoadTime << "ms";
@@ -282,6 +235,12 @@ void PerformanceManager::onMemoryCheckTimer()
 void PerformanceManager::onCleanupTimer()
 {
     performMemoryCleanup();
+}
+
+qint64 PerformanceManager::getNetworkMemoryUsage()
+{
+    // 网络组件内存使用情况的估算
+    return getProcessMemoryUsage() * 0.1; // 估算网络组件占用10%的内存
 }
 
 void PerformanceManager::initializeOptimizations()
@@ -344,14 +303,10 @@ qint64 PerformanceManager::getProcessMemoryUsage()
     return 0;
 }
 
-qint64 PerformanceManager::getWebEngineMemoryUsage()
+qint64 PerformanceManager::getNetworkMemoryUsage()
 {
-    // WebEngine内存使用情况的估算
-    // 实际实现可能需要更复杂的方法来获取准确数据
-    if (m_webProfile) {
-        return getProcessMemoryUsage() * 0.6; // 估算WebEngine占用60%的内存
-    }
-    return 0;
+    // 网络组件内存使用情况的估算
+    return getProcessMemoryUsage() * 0.1; // 估算网络组件占用10%的内存
 }
 
 PerformanceConfig* PerformanceManager::performanceConfig() const

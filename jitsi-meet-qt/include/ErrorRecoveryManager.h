@@ -146,6 +146,26 @@ public slots:
      * @brief 处理协议错误
      */
     void handleProtocolError(const QString& message, const QString& details = QString());
+    
+    /**
+     * @brief 处理WebRTC错误
+     */
+    void handleWebRTCError(const QString& message, const QString& details = QString());
+    
+    /**
+     * @brief 处理XMPP连接错误
+     */
+    void handleXMPPConnectionError(const QString& message, const QString& details = QString());
+    
+    /**
+     * @brief 处理认证错误
+     */
+    void handleAuthenticationError(const QString& message, const QString& details = QString());
+    
+    /**
+     * @brief 处理媒体设备错误
+     */
+    void handleMediaDeviceError(const QString& message, const QString& details = QString());
 
 signals:
     /**
@@ -185,6 +205,10 @@ private:
     RecoveryResult handleProtocolErrorInternal(const JitsiError& error);
     RecoveryResult handleValidationErrorInternal(const JitsiError& error);
     RecoveryResult handleSystemErrorInternal(const JitsiError& error);
+    RecoveryResult handleWebRTCErrorInternal(const JitsiError& error);
+    RecoveryResult handleXMPPConnectionErrorInternal(const JitsiError& error);
+    RecoveryResult handleAuthenticationErrorInternal(const JitsiError& error);
+    RecoveryResult handleMediaDeviceErrorInternal(const JitsiError& error);
     
     // 恢复策略实现
     bool resetToDefaults();
@@ -192,6 +216,8 @@ private:
     bool restartWebEngine();
     bool validateAndFixConfiguration();
     bool retryLastOperation();
+    bool restartXMPPConnection();
+    bool reinitializeMediaDevices();
     
     // 日志相关
     void initializeLogging();

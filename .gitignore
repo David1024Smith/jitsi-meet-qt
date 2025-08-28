@@ -60,3 +60,6 @@ jitsi-meet-qt/docs/ConfigurationManagement.md
 jitsi-meet-qt/docs/ErrorHandlingSystem.md
 jitsi-meet-qt/docs/ResourceSystem.md
 jitsi-meet-qt/docs/WindowManager.md
+build/
+jitsi-meet-qt/docs/
+.kiro/specs/

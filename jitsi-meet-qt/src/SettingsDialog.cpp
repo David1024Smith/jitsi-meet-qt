@@ -1,19 +1,24 @@
 #include "SettingsDialog.h"
 #include "ConfigurationManager.h"
 #include "TranslationManager.h"
+#include "MediaManager.h"
 #include "models/ApplicationSettings.h"
 #include <QApplication>
 #include <QMessageBox>
 #include <QUrl>
 #include <QRegularExpression>
 #include <QDebug>
+#include <QVideoWidget>
+#include <QTimer>
 
 SettingsDialog::SettingsDialog(ConfigurationManager* configManager,
                                TranslationManager* translationManager,
+                               MediaManager* mediaManager,
                                QWidget* parent)
     : QDialog(parent)
     , m_configManager(configManager)
     , m_translationManager(translationManager)
+    , m_mediaManager(mediaManager)
     , m_serverGroup(nullptr)
     , m_serverUrlEdit(nullptr)
     , m_serverTimeoutSpin(nullptr)
@@ -25,6 +30,22 @@ SettingsDialog::SettingsDialog(ConfigurationManager* configManager,
     , m_darkModeCheck(nullptr)
     , m_rememberWindowStateCheck(nullptr)
     , m_languageLabel(nullptr)
+    , m_mediaDeviceGroup(nullptr)
+    , m_cameraCombo(nullptr)
+    , m_microphoneCombo(nullptr)
+    , m_speakerCombo(nullptr)
+    , m_testCameraButton(nullptr)
+    , m_testMicrophoneButton(nullptr)
+    , m_testSpeakerButton(nullptr)
+    , m_cameraPreview(nullptr)
+    , m_microphoneLevel(nullptr)
+    , m_microphoneVolumeSlider(nullptr)
+    , m_speakerVolumeSlider(nullptr)
+    , m_cameraLabel(nullptr)
+    , m_microphoneLabel(nullptr)
+    , m_speakerLabel(nullptr)
+    , m_microphoneVolumeLabel(nullptr)
+    , m_speakerVolumeLabel(nullptr)
     , m_conferenceGroup(nullptr)
     , m_autoJoinAudioCheck(nullptr)
     , m_autoJoinVideoCheck(nullptr)
@@ -36,14 +57,19 @@ SettingsDialog::SettingsDialog(ConfigurationManager* configManager,
     , m_applyButton(nullptr)
     , m_resetButton(nullptr)
     , m_mainLayout(nullptr)
+    , m_cameraTestActive(false)
+    , m_microphoneTestActive(false)
+    , m_speakerTestActive(false)
 {
     setupUI();
     setupConnections();
+    initializeDeviceLists();
     loadSettings();
 }
 
 SettingsDialog::~SettingsDialog()
 {
+    stopAllTests();
     // Qt handles cleanup automatically
 }
 
@@ -60,6 +86,7 @@ void SettingsDialog::setupUI()
     // Create groups
     m_mainLayout->addWidget(createServerGroup());
     m_mainLayout->addWidget(createInterfaceGroup());
+    m_mainLayout->addWidget(createMediaDeviceGroup());
     m_mainLayout->addWidget(createConferenceGroup());
     m_mainLayout->addWidget(createAdvancedGroup());
     
@@ -133,6 +160,72 @@ QGroupBox* SettingsDialog::createInterfaceGroup()
     return m_interfaceGroup;
 }
 
+QGroupBox* SettingsDialog::createMediaDeviceGroup()
+{
+    m_mediaDeviceGroup = new QGroupBox(tr("media_device_settings"), this);
+    QFormLayout* layout = new QFormLayout(m_mediaDeviceGroup);
+    
+    // Camera selection
+    m_cameraLabel = new QLabel(tr("camera_label"));
+    QHBoxLayout* cameraLayout = new QHBoxLayout();
+    m_cameraCombo = new QComboBox();
+    m_testCameraButton = new QPushButton(tr("test_camera"));
+    cameraLayout->addWidget(m_cameraCombo);
+    cameraLayout->addWidget(m_testCameraButton);
+    
+    layout->addRow(m_cameraLabel, cameraLayout);
+    
+    // Camera preview
+    m_cameraPreview = new QVideoWidget();
+    m_cameraPreview->setFixedSize(320, 240);
+    m_cameraPreview->hide();
+    layout->addRow("", m_cameraPreview);
+    
+    // Microphone selection
+    m_microphoneLabel = new QLabel(tr("microphone_label"));
+    QHBoxLayout* microphoneLayout = new QHBoxLayout();
+    m_microphoneCombo = new QComboBox();
+    m_testMicrophoneButton = new QPushButton(tr("test_microphone"));
+    microphoneLayout->addWidget(m_microphoneCombo);
+    microphoneLayout->addWidget(m_testMicrophoneButton);
+    
+    layout->addRow(m_microphoneLabel, microphoneLayout);
+    
+    // Microphone level indicator
+    m_microphoneLevel = new QProgressBar();
+    m_microphoneLevel->setRange(0, 100);
+    m_microphoneLevel->setValue(0);
+    m_microphoneLevel->setTextVisible(false);
+    m_microphoneLevel->hide();
+    layout->addRow("", m_microphoneLevel);
+    
+    // Microphone volume
+    m_microphoneVolumeLabel = new QLabel(tr("microphone_volume"));
+    m_microphoneVolumeSlider = new QSlider(Qt::Horizontal);
+    m_microphoneVolumeSlider->setRange(0, 100);
+    m_microphoneVolumeSlider->setValue(80);
+    layout->addRow(m_microphoneVolumeLabel, m_microphoneVolumeSlider);
+    
+    // Speaker selection
+    m_speakerLabel = new QLabel(tr("speaker_label"));
+    QHBoxLayout* speakerLayout = new QHBoxLayout();
+    m_speakerCombo = new QComboBox();
+    m_testSpeakerButton = new QPushButton(tr("test_speaker"));
+    speakerLayout->addWidget(m_speakerCombo);
+    speakerLayout->addWidget(m_testSpeakerButton);
+    
+    layout->addRow(m_speakerLabel, speakerLayout);
+    
+    // Speaker volume
+    m_speakerVolumeLabel = new QLabel(tr("speaker_volume"));
+    m_speakerVolumeSlider = new QSlider(Qt::Horizontal);
+    m_speakerVolumeSlider->setRange(0, 100);
+    m_speakerVolumeSlider->setValue(80);
+    layout->addRow(m_speakerVolumeLabel, m_speakerVolumeSlider);
+    
+    return m_mediaDeviceGroup;
+}
+
 QGroupBox* SettingsDialog::createConferenceGroup()
 {
     m_conferenceGroup = new QGroupBox(tr("conference_settings"), this);
@@ -180,6 +273,41 @@ void SettingsDialog::setupConnections()
     connect(m_serverUrlEdit, &QLineEdit::textChanged, this, &SettingsDialog::validateServerUrl);
     connect(m_languageCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &SettingsDialog::onLanguageChanged);
+    
+    // Media device connections
+    if (m_cameraCombo) {
+        connect(m_cameraCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+                this, &SettingsDialog::onCameraChanged);
+    }
+    if (m_microphoneCombo) {
+        connect(m_microphoneCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+                this, &SettingsDialog::onMicrophoneChanged);
+    }
+    if (m_speakerCombo) {
+        connect(m_speakerCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+                this, &SettingsDialog::onSpeakerChanged);
+    }
+    
+    // Device test connections
+    if (m_testCameraButton) {
+        connect(m_testCameraButton, &QPushButton::clicked, this, &SettingsDialog::testCamera);
+    }
+    if (m_testMicrophoneButton) {
+        connect(m_testMicrophoneButton, &QPushButton::clicked, this, &SettingsDialog::testMicrophone);
+    }
+    if (m_testSpeakerButton) {
+        connect(m_testSpeakerButton, &QPushButton::clicked, this, &SettingsDialog::testSpeaker);
+    }
+    
+    // Volume slider connections
+    if (m_microphoneVolumeSlider) {
+        connect(m_microphoneVolumeSlider, &QSlider::valueChanged,
+                this, &SettingsDialog::onMicrophoneVolumeChanged);
+    }
+    if (m_speakerVolumeSlider) {
+        connect(m_speakerVolumeSlider, &QSlider::valueChanged,
+                this, &SettingsDialog::onSpeakerVolumeChanged);
+    }
     
     // Clear recent button
     connect(m_clearRecentButton, &QPushButton::clicked, [this]() {
@@ -233,12 +361,14 @@ void SettingsDialog::saveSettings()
         return;
     }
     
+    stopAllTests();
     applySettings();
     accept();
 }
 
 void SettingsDialog::cancelSettings()
 {
+    stopAllTests();
     reject();
 }
 
@@ -331,6 +461,27 @@ void SettingsDialog::updateUIText()
         m_advancedGroup->setTitle(tr("advanced_settings"));
     }
     
+    if (m_mediaDeviceGroup) {
+        m_mediaDeviceGroup->setTitle(tr("media_device_settings"));
+    }
+    
+    // Update media device labels
+    if (m_cameraLabel) {
+        m_cameraLabel->setText(tr("camera_label"));
+    }
+    if (m_microphoneLabel) {
+        m_microphoneLabel->setText(tr("microphone_label"));
+    }
+    if (m_speakerLabel) {
+        m_speakerLabel->setText(tr("speaker_label"));
+    }
+    if (m_microphoneVolumeLabel) {
+        m_microphoneVolumeLabel->setText(tr("microphone_volume"));
+    }
+    if (m_speakerVolumeLabel) {
+        m_speakerVolumeLabel->setText(tr("speaker_volume"));
+    }
+    
     // Update button texts
     if (m_buttonBox) {
         m_buttonBox->button(QDialogButtonBox::Ok)->setText(tr("save_button"));
@@ -394,6 +545,7 @@ void SettingsDialog::showValidationError(const QString& message)
 
 void SettingsDialog::showSettings()
 {
+    refreshDeviceList();
     loadSettings();
     show();
     raise();
@@ -403,4 +555,240 @@ void SettingsDialog::showSettings()
 void SettingsDialog::resetToDefaults()
 {
     restoreDefaults();
+}
+
+void SettingsDialog::initializeDeviceLists()
+{
+    if (!m_mediaManager) {
+        return;
+    }
+    
+    refreshDeviceList();
+}
+
+void SettingsDialog::refreshDeviceList()
+{
+    if (!m_mediaManager) {
+        return;
+    }
+    
+    // Clear existing items
+    if (m_cameraCombo) {
+        m_cameraCombo->clear();
+        QList<MediaManager::MediaDevice> cameras = m_mediaManager->availableCameras();
+        for (const auto& camera : cameras) {
+            m_cameraCombo->addItem(camera.name, camera.id);
+        }
+        
+        // Select current camera
+        MediaManager::MediaDevice currentCamera = m_mediaManager->currentCamera();
+        int cameraIndex = m_cameraCombo->findData(currentCamera.id);
+        if (cameraIndex >= 0) {
+            m_cameraCombo->setCurrentIndex(cameraIndex);
+        }
+    }
+    
+    if (m_microphoneCombo) {
+        m_microphoneCombo->clear();
+        QList<MediaManager::MediaDevice> microphones = m_mediaManager->availableMicrophones();
+        for (const auto& microphone : microphones) {
+            m_microphoneCombo->addItem(microphone.name, microphone.id);
+        }
+        
+        // Select current microphone
+        MediaManager::MediaDevice currentMicrophone = m_mediaManager->currentMicrophone();
+        int microphoneIndex = m_microphoneCombo->findData(currentMicrophone.id);
+        if (microphoneIndex >= 0) {
+            m_microphoneCombo->setCurrentIndex(microphoneIndex);
+        }
+    }
+    
+    if (m_speakerCombo) {
+        m_speakerCombo->clear();
+        QList<MediaManager::MediaDevice> speakers = m_mediaManager->availableSpeakers();
+        for (const auto& speaker : speakers) {
+            m_speakerCombo->addItem(speaker.name, speaker.id);
+        }
+        
+        // Select current speaker
+        MediaManager::MediaDevice currentSpeaker = m_mediaManager->currentSpeaker();
+        int speakerIndex = m_speakerCombo->findData(currentSpeaker.id);
+        if (speakerIndex >= 0) {
+            m_speakerCombo->setCurrentIndex(speakerIndex);
+        }
+    }
+    
+    // Update volume sliders
+    if (m_microphoneVolumeSlider && m_mediaManager) {
+        m_microphoneVolumeSlider->setValue(m_mediaManager->microphoneVolume());
+    }
+    if (m_speakerVolumeSlider && m_mediaManager) {
+        m_speakerVolumeSlider->setValue(m_mediaManager->speakerVolume());
+    }
+}
+
+void SettingsDialog::onCameraChanged()
+{
+    if (!m_mediaManager || !m_cameraCombo) {
+        return;
+    }
+    
+    QString deviceId = m_cameraCombo->currentData().toString();
+    if (!deviceId.isEmpty()) {
+        m_mediaManager->selectCamera(deviceId);
+    }
+}
+
+void SettingsDialog::onMicrophoneChanged()
+{
+    if (!m_mediaManager || !m_microphoneCombo) {
+        return;
+    }
+    
+    QString deviceId = m_microphoneCombo->currentData().toString();
+    if (!deviceId.isEmpty()) {
+        m_mediaManager->selectMicrophone(deviceId);
+    }
+}
+
+void SettingsDialog::onSpeakerChanged()
+{
+    if (!m_mediaManager || !m_speakerCombo) {
+        return;
+    }
+    
+    QString deviceId = m_speakerCombo->currentData().toString();
+    if (!deviceId.isEmpty()) {
+        m_mediaManager->selectSpeaker(deviceId);
+    }
+}
+
+void SettingsDialog::testCamera()
+{
+    if (!m_mediaManager || !m_cameraPreview || !m_testCameraButton) {
+        return;
+    }
+    
+    if (m_cameraTestActive) {
+        // Stop camera test
+        m_mediaManager->stopLocalVideo();
+        m_cameraPreview->hide();
+        m_testCameraButton->setText(tr("test_camera"));
+        m_cameraTestActive = false;
+    } else {
+        // Start camera test
+        stopAllTests(); // Stop other tests first
+        
+        m_mediaManager->startLocalVideo();
+        QVideoWidget* localWidget = m_mediaManager->localVideoWidget();
+        if (localWidget) {
+            // Copy the video output to our preview widget
+            m_cameraPreview->show();
+            m_testCameraButton->setText(tr("stop_test"));
+            m_cameraTestActive = true;
+        }
+    }
+}
+
+void SettingsDialog::testMicrophone()
+{
+    if (!m_mediaManager || !m_microphoneLevel || !m_testMicrophoneButton) {
+        return;
+    }
+    
+    if (m_microphoneTestActive) {
+        // Stop microphone test
+        m_mediaManager->stopLocalAudio();
+        m_microphoneLevel->hide();
+        m_testMicrophoneButton->setText(tr("test_microphone"));
+        m_microphoneTestActive = false;
+    } else {
+        // Start microphone test
+        stopAllTests(); // Stop other tests first
+        
+        m_mediaManager->startLocalAudio();
+        m_microphoneLevel->show();
+        m_testMicrophoneButton->setText(tr("stop_test"));
+        m_microphoneTestActive = true;
+        
+        // TODO: Connect to actual microphone level monitoring
+        // For now, simulate some activity
+        QTimer::singleShot(100, [this]() {
+            if (m_microphoneTestActive && m_microphoneLevel) {
+                m_microphoneLevel->setValue(qrand() % 80 + 20);
+                QTimer::singleShot(100, this, [this]() { testMicrophone(); });
+            }
+        });
+    }
+}
+
+void SettingsDialog::testSpeaker()
+{
+    if (!m_mediaManager || !m_testSpeakerButton) {
+        return;
+    }
+    
+    if (m_speakerTestActive) {
+        // Stop speaker test
+        m_testSpeakerButton->setText(tr("test_speaker"));
+        m_speakerTestActive = false;
+        // TODO: Stop test sound playback
+    } else {
+        // Start speaker test
+        stopAllTests(); // Stop other tests first
+        
+        m_testSpeakerButton->setText(tr("stop_test"));
+        m_speakerTestActive = true;
+        
+        // TODO: Play test sound through selected speaker
+        QMessageBox::information(this, tr("speaker_test"), tr("speaker_test_message"));
+        
+        // Auto-stop after a few seconds
+        QTimer::singleShot(3000, [this]() {
+            if (m_speakerTestActive) {
+                testSpeaker();
+            }
+        });
+    }
+}
+
+void SettingsDialog::stopAllTests()
+{
+    if (m_cameraTestActive) {
+        testCamera();
+    }
+    if (m_microphoneTestActive) {
+        testMicrophone();
+    }
+    if (m_speakerTestActive) {
+        testSpeaker();
+    }
+}
+
+void SettingsDialog::onMicrophoneVolumeChanged(int volume)
+{
+    if (m_mediaManager) {
+        m_mediaManager->setMicrophoneVolume(volume);
+    }
+}
+
+void SettingsDialog::onSpeakerVolumeChanged(int volume)
+{
+    if (m_mediaManager) {
+        m_mediaManager->setSpeakerVolume(volume);
+    }
+}
+
+void SettingsDialog::updateTestStatus()
+{
+    // Update UI based on current test status
+    if (m_testCameraButton) {
+        m_testCameraButton->setText(m_cameraTestActive ? tr("stop_test") : tr("test_camera"));
+    }
+    if (m_testMicrophoneButton) {
+        m_testMicrophoneButton->setText(m_microphoneTestActive ? tr("stop_test") : tr("test_microphone"));
+    }
+    if (m_testSpeakerButton) {
+        m_testSpeakerButton->setText(m_speakerTestActive ? tr("stop_test") : tr("test_speaker"));
+    }
 }

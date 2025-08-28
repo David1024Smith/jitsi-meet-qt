@@ -15,7 +15,11 @@ enum class ErrorType {
     ConfigurationError, // 配置文件错误
     ProtocolError,      // 协议处理错误
     ValidationError,    // 数据验证错误
-    SystemError        // 系统级错误
+    SystemError,        // 系统级错误
+    WebRTCError,        // WebRTC相关错误
+    XMPPConnectionError,// XMPP连接错误
+    AuthenticationError,// 认证错误
+    MediaDeviceError    // 媒体设备错误
 };
 
 /**
@@ -129,6 +133,10 @@ public:
     static JitsiError protocolError(const QString& message, const QString& details = QString());
     static JitsiError validationError(const QString& field, const QString& value, const QString& reason = QString());
     static JitsiError systemError(const QString& message, const QString& details = QString());
+    static JitsiError webRTCError(const QString& message, const QString& details = QString());
+    static JitsiError xmppConnectionError(const QString& message, const QString& details = QString());
+    static JitsiError authenticationError(const QString& message, const QString& details = QString());
+    static JitsiError mediaDeviceError(const QString& message, const QString& details = QString());
 
 private:
     ErrorType m_type;
