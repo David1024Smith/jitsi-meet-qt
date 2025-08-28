@@ -457,9 +457,14 @@ QByteArray ScreenShareManager::encodeFrame(const QPixmap& frame)
 void ScreenShareManager::sendFrameToWebRTC(const QByteArray& frameData)
 {
     if (m_webrtcEngine) {
-        // 发送到WebRTC引擎
-        // m_webrtcEngine->sendScreenShareFrame(frameData);
-        qDebug() << "ScreenShareManager: Sent frame to WebRTC, size:" << frameData.size();
+        // Convert byte array back to QPixmap for WebRTC transmission
+        QPixmap frame;
+        if (frame.loadFromData(frameData, "JPEG")) {
+            m_webrtcEngine->sendScreenFrame(frame);
+            qDebug() << "ScreenShareManager: Sent frame to WebRTC, size:" << frameData.size();
+        } else {
+            emit encodingError("Failed to convert frame data for WebRTC transmission");
+        }
     }
 }
 

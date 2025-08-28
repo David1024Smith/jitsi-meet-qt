@@ -13,6 +13,19 @@
 #include <QNetworkReply>
 #include <QJsonObject>
 #include <QJsonDocument>
+#include <QMediaCaptureSession>
+#include <QVideoSink>
+#include <QAudioOutput>
+#include <QMediaDevices>
+#include <QCameraDevice>
+#include <QAudioDevice>
+#include <memory>
+#include <optional>
+#include <QPixmap>
+#include <QVariantMap>
+
+// Forward declarations
+class MediaManager;
 
 class WebRTCEngine : public QObject
 {
@@ -52,6 +65,23 @@ public:
     // Media stream management
     void addLocalStream(QMediaRecorder* recorder);
     void removeLocalStream();
+    void startLocalVideo();
+    void stopLocalVideo();
+    void startLocalAudio();
+    void stopLocalAudio();
+    
+    // Media device management
+    QList<QCameraDevice> availableCameras() const;
+    QList<QAudioDevice> availableAudioInputs() const;
+    QList<QAudioDevice> availableAudioOutputs() const;
+    void setCamera(const QCameraDevice& device);
+    void setAudioInput(const QAudioDevice& device);
+    void setAudioOutput(const QAudioDevice& device);
+    
+    // Permission handling
+    void requestMediaPermissions();
+    bool hasVideoPermission() const;
+    bool hasAudioPermission() const;
     
     // SDP handling
     void createOffer();
@@ -68,6 +98,12 @@ public:
     IceConnectionState iceConnectionState() const;
     bool hasLocalStream() const;
     
+    // Screen sharing
+    void sendScreenFrame(const QPixmap& frame);
+    
+    // Media settings
+    void updateMediaSettings(const QVariantMap& settings);
+    
 signals:
     void localStreamReady(QVideoWidget* videoWidget);
     void remoteStreamReceived(const QString& participantId, QVideoWidget* videoWidget);
@@ -78,11 +114,30 @@ signals:
     void connectionStateChanged(ConnectionState state);
     void iceConnectionStateChanged(IceConnectionState state);
     void error(const QString& message);
+    
+    // Media permission signals
+    void mediaPermissionsRequested();
+    void mediaPermissionsGranted(bool video, bool audio);
+    void mediaPermissionsDenied();
+    
+    // Media state signals
+    void localVideoStarted();
+    void localVideoStopped();
+    void localAudioStarted();
+    void localAudioStopped();
+    
+    // Device signals
+    void cameraChanged(const QCameraDevice& device);
+    void audioInputChanged(const QAudioDevice& device);
+    void audioOutputChanged(const QAudioDevice& device);
 
 private slots:
     void onIceGatheringTimer();
     void onConnectionCheckTimer();
     void onStunServerResponse();
+    void onCameraActiveChanged(bool active);
+    void onCameraErrorOccurred(QCamera::Error error);
+    void onMediaDevicesChanged();
 
 private:
     void setupPeerConnection();
@@ -101,6 +156,13 @@ private:
     // Media handling
     void initializeLocalMedia();
     void cleanupLocalMedia();
+    void setupMediaDevices();
+    void updateMediaDevices();
+    
+    // Permission handling
+    void checkMediaPermissions();
+    void handlePermissionResult(bool granted, const QString& permission);
+    void setupCameraConnections();
     
     // State management
     ConnectionState m_connectionState;
@@ -109,9 +171,22 @@ private:
     // Media components
     QMap<QString, QVideoWidget*> m_remoteStreams;
     QVideoWidget* m_localVideoWidget;
-    QCamera* m_camera;
-    QAudioInput* m_audioInput;
+    std::unique_ptr<QCamera> m_camera;
+    std::unique_ptr<QAudioInput> m_audioInput;
+    std::unique_ptr<QAudioOutput> m_audioOutput;
+    std::unique_ptr<QMediaCaptureSession> m_captureSession;
     QMediaRecorder* m_mediaRecorder;
+    
+    // Media devices
+    QCameraDevice m_currentCameraDevice;
+    QAudioDevice m_currentAudioInputDevice;
+    QAudioDevice m_currentAudioOutputDevice;
+    
+    // Permission state
+    bool m_hasVideoPermission;
+    bool m_hasAudioPermission;
+    bool m_videoEnabled;
+    bool m_audioEnabled;
     
     // ICE and connection management
     QList<IceCandidate> m_localIceCandidates;

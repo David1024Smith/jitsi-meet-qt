@@ -1,209 +1,367 @@
 #include "TranslationManager.h"
-#include "JitsiConstants.h"
-
-#include <QApplication>
-#include <QDir>
+#include <QCoreApplication>
 #include <QLibraryInfo>
-#include <QLocale>
+#include <QStandardPaths>
 #include <QDebug>
+#include <QFileInfo>
 
-TranslationManager::TranslationManager(QObject* parent)
+TranslationManager* TranslationManager::s_instance = nullptr;
+
+TranslationManager::TranslationManager(QObject *parent)
     : QObject(parent)
-    , m_appTranslator(nullptr)
-    , m_qtTranslator(nullptr)
-    , m_currentLanguage("en")
+    , m_currentLanguage(Language::Auto)
+    , m_currentLanguageCode("en")
+    , m_translator(std::make_unique<QTranslator>())
+    , m_qtTranslator(std::make_unique<QTranslator>())
+    , m_initialized(false)
 {
-    initializeAvailableLanguages();
-    qDebug() << "TranslationManager created";
+    s_instance = this;
+    
+    // Set translations path
+    m_translationsPath = QCoreApplication::applicationDirPath() + "/translations";
+    
+    // Initialize language information
+    initializeLanguageInfo();
 }
 
 TranslationManager::~TranslationManager()
 {
-    unloadCurrentTranslation();
+    unloadTranslation();
+    s_instance = nullptr;
 }
 
-void TranslationManager::initialize()
+TranslationManager* TranslationManager::instance()
 {
-    // 检测系统语言
-    QString systemLanguage = detectSystemLanguage();
-    qDebug() << "System language detected:" << systemLanguage;
+    return s_instance;
+}
+
+bool TranslationManager::initialize()
+{
+    if (m_initialized) {
+        return true;
+    }
+
+    qDebug() << "Initializing TranslationManager...";
+    qDebug() << "Translations path:" << m_translationsPath;
+
+    // Update available languages based on existing files
+    updateAvailableLanguages();
+
+    // Detect and set system language
+    Language systemLang = detectSystemLanguage();
+    qDebug() << "Detected system language:" << languageToCode(systemLang);
+
+    // Set initial language (auto-detect)
+    bool success = setLanguage(Language::Auto);
     
-    // 设置默认语言
-    setLanguage(systemLanguage);
+    m_initialized = success;
+    return success;
 }
 
-QStringList TranslationManager::availableLanguages() const
+bool TranslationManager::setLanguage(Language language)
 {
-    return m_availableLanguages;
-}
+    Language targetLanguage = language;
+    
+    // Handle auto-detection
+    if (language == Language::Auto) {
+        targetLanguage = detectSystemLanguage();
+        qDebug() << "Auto-detected language:" << languageToCode(targetLanguage);
+    }
 
-QString TranslationManager::languageDisplayName(const QString& languageCode) const
-{
-    return m_languageNames.value(languageCode, languageCode);
-}
+    QString languageCode = languageToCode(targetLanguage);
+    
+    // Check if language is supported
+    if (!isLanguageSupported(targetLanguage)) {
+        qWarning() << "Language not supported:" << languageCode << "- falling back to English";
+        targetLanguage = Language::English;
+        languageCode = "en";
+    }
 
-QString TranslationManager::currentLanguage() const
-{
-    return m_currentLanguage;
+    // Don't reload if it's the same language
+    if (m_currentLanguage == targetLanguage && m_currentLanguageCode == languageCode) {
+        return true;
+    }
+
+    // Unload current translation
+    unloadTranslation();
+
+    // Load new translation (skip for English as it's the source language)
+    bool success = true;
+    if (targetLanguage != Language::English) {
+        success = loadTranslation(languageCode);
+        if (!success) {
+            qWarning() << "Failed to load translation for:" << languageCode << "- falling back to English";
+            targetLanguage = Language::English;
+            languageCode = "en";
+        }
+    }
+
+    // Update current language
+    Language oldLanguage = m_currentLanguage;
+    m_currentLanguage = targetLanguage;
+    m_currentLanguageCode = languageCode;
+
+    // Emit signal if language actually changed
+    if (oldLanguage != targetLanguage) {
+        emit languageChanged(targetLanguage, languageCode);
+        qDebug() << "Language changed to:" << languageCode;
+    }
+
+    return success;
 }
 
 bool TranslationManager::setLanguage(const QString& languageCode)
 {
-    QString targetLanguage = languageCode;
-    
-    // 处理自动检测
-    if (targetLanguage == "auto") {
-        targetLanguage = detectSystemLanguage();
+    Language language = codeToLanguage(languageCode);
+    if (language == Language::Auto && languageCode != "auto") {
+        qWarning() << "Unknown language code:" << languageCode;
+        return false;
     }
     
-    // 检查语言是否可用
-    if (!m_availableLanguages.contains(targetLanguage)) {
-        qWarning() << "Language not available:" << targetLanguage << "falling back to English";
-        targetLanguage = "en";
-    }
-    
-    if (m_currentLanguage == targetLanguage) {
-        qDebug() << "Language already set to:" << targetLanguage;
-        return true;
-    }
-    
-    // 卸载当前翻译
-    unloadCurrentTranslation();
-    
-    // 加载新翻译
-    bool success = loadTranslation(targetLanguage);
-    if (success) {
-        m_currentLanguage = targetLanguage;
-        emit languageChanged(targetLanguage);
-        qDebug() << "Language changed to:" << targetLanguage;
-    } else {
-        qWarning() << "Failed to load translation for:" << targetLanguage;
-        // 尝试加载英语作为后备
-        if (targetLanguage != "en") {
-            return setLanguage("en");
-        }
-    }
-    
-    return success;
+    return setLanguage(language);
 }
 
-QString TranslationManager::detectSystemLanguage() const
+TranslationManager::Language TranslationManager::currentLanguage() const
+{
+    return m_currentLanguage;
+}
+
+QString TranslationManager::currentLanguageCode() const
+{
+    return m_currentLanguageCode;
+}
+
+TranslationManager::Language TranslationManager::systemLanguage() const
+{
+    return detectSystemLanguage();
+}
+
+QList<TranslationManager::LanguageInfo> TranslationManager::availableLanguages() const
+{
+    QList<LanguageInfo> available;
+    for (const auto& info : m_languageInfo) {
+        if (info.available || info.language == Language::English) {
+            available.append(info);
+        }
+    }
+    return available;
+}
+
+std::optional<TranslationManager::LanguageInfo> TranslationManager::getLanguageInfo(Language language) const
+{
+    for (const auto& info : m_languageInfo) {
+        if (info.language == language) {
+            return info;
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<TranslationManager::LanguageInfo> TranslationManager::getLanguageInfo(const QString& languageCode) const
+{
+    for (const auto& info : m_languageInfo) {
+        if (info.code == languageCode) {
+            return info;
+        }
+    }
+    return std::nullopt;
+}
+
+bool TranslationManager::isLanguageSupported(Language language) const
+{
+    auto info = getLanguageInfo(language);
+    return info.has_value() && (info->available || language == Language::English);
+}
+
+bool TranslationManager::isLanguageSupported(const QString& languageCode) const
+{
+    auto info = getLanguageInfo(languageCode);
+    return info.has_value() && (info->available || languageCode == "en");
+}
+
+QString TranslationManager::translate(const QString& context, const QString& key, const QString& disambiguation) const
+{
+    if (!m_translator) {
+        return key;
+    }
+    
+    QString translation = m_translator->translate(context.toUtf8().constData(), 
+                                                 key.toUtf8().constData(), 
+                                                 disambiguation.toUtf8().constData());
+    
+    // Return key if translation not found
+    return translation.isEmpty() ? key : translation;
+}
+
+void TranslationManager::reloadTranslations()
+{
+    Language currentLang = m_currentLanguage;
+    setLanguage(Language::English);  // Temporarily switch to English
+    setLanguage(currentLang);        // Switch back to reload
+}
+
+void TranslationManager::onApplicationLanguageChanged()
+{
+    // Handle system language changes
+    if (m_currentLanguage == Language::Auto) {
+        Language newSystemLang = detectSystemLanguage();
+        if (newSystemLang != codeToLanguage(m_currentLanguageCode)) {
+            setLanguage(Language::Auto);
+        }
+    }
+}
+
+TranslationManager::Language TranslationManager::detectSystemLanguage() const
 {
     QLocale systemLocale = QLocale::system();
     QString languageCode = systemLocale.name();
     
-    // 提取语言部分（例如从 "zh_CN" 提取 "zh_CN"）
-    if (m_availableLanguages.contains(languageCode)) {
-        return languageCode;
+    qDebug() << "System locale:" << languageCode;
+    
+    // Handle specific locale mappings
+    if (languageCode.startsWith("zh")) {
+        return Language::Chinese;
+    } else if (languageCode.startsWith("es")) {
+        return Language::Spanish;
+    } else if (languageCode.startsWith("fr")) {
+        return Language::French;
+    } else if (languageCode.startsWith("de")) {
+        return Language::German;
+    } else if (languageCode.startsWith("ja")) {
+        return Language::Japanese;
+    } else if (languageCode.startsWith("ko")) {
+        return Language::Korean;
+    } else if (languageCode.startsWith("ru")) {
+        return Language::Russian;
+    } else if (languageCode.startsWith("pt")) {
+        return Language::Portuguese;
+    } else if (languageCode.startsWith("it")) {
+        return Language::Italian;
     }
     
-    // 尝试只使用语言代码（例如从 "zh_CN" 提取 "zh"）
-    QString shortCode = languageCode.split('_').first();
-    if (m_availableLanguages.contains(shortCode)) {
-        return shortCode;
+    // Default to English
+    return Language::English;
+}
+
+QString TranslationManager::languageToCode(Language language) const
+{
+    switch (language) {
+        case Language::Auto: return "auto";
+        case Language::English: return "en";
+        case Language::Chinese: return "zh_CN";
+        case Language::Spanish: return "es";
+        case Language::French: return "fr";
+        case Language::German: return "de";
+        case Language::Japanese: return "ja";
+        case Language::Korean: return "ko";
+        case Language::Russian: return "ru";
+        case Language::Portuguese: return "pt";
+        case Language::Italian: return "it";
     }
-    
-    // 默认返回英语
     return "en";
 }
 
-QString TranslationManager::translate(const QString& key, const QString& defaultText) const
+TranslationManager::Language TranslationManager::codeToLanguage(const QString& code) const
 {
-    QString translated = QApplication::translate("", key.toUtf8().constData());
+    if (code == "auto") return Language::Auto;
+    if (code == "en") return Language::English;
+    if (code == "zh_CN" || code == "zh") return Language::Chinese;
+    if (code == "es") return Language::Spanish;
+    if (code == "fr") return Language::French;
+    if (code == "de") return Language::German;
+    if (code == "ja") return Language::Japanese;
+    if (code == "ko") return Language::Korean;
+    if (code == "ru") return Language::Russian;
+    if (code == "pt") return Language::Portuguese;
+    if (code == "it") return Language::Italian;
     
-    // 如果翻译失败，返回默认文本或键名
-    if (translated == key) {
-        return defaultText.isEmpty() ? key : defaultText;
-    }
-    
-    return translated;
-}
-
-void TranslationManager::onConfigLanguageChanged(const QString& language)
-{
-    setLanguage(language);
+    return Language::Auto;  // Unknown code
 }
 
 bool TranslationManager::loadTranslation(const QString& languageCode)
 {
-    // 创建翻译器
-    m_appTranslator = new QTranslator(this);
-    m_qtTranslator = new QTranslator(this);
+    QString translationFile = getTranslationFilePath(languageCode);
     
-    bool appLoaded = false;
-    bool qtLoaded = false;
+    qDebug() << "Loading translation file:" << translationFile;
     
-    // 加载应用程序翻译
-    QString appTranslationFile = getTranslationFilePath(languageCode);
-    if (QFile::exists(appTranslationFile)) {
-        appLoaded = m_appTranslator->load(appTranslationFile);
-        if (appLoaded) {
-            QApplication::installTranslator(m_appTranslator);
-            qDebug() << "App translation loaded:" << appTranslationFile;
-        } else {
-            qWarning() << "Failed to load app translation:" << appTranslationFile;
-        }
-    } else {
-        qDebug() << "App translation file not found:" << appTranslationFile;
-        // 对于英语，这是正常的，因为源代码就是英语
-        if (languageCode == "en") {
-            appLoaded = true;
-        }
+    if (!QFileInfo::exists(translationFile)) {
+        qWarning() << "Translation file not found:" << translationFile;
+        emit translationLoadFailed(languageCode, "Translation file not found");
+        return false;
     }
-    
-    // 加载Qt翻译
+
+    // Load application translation
+    if (!m_translator->load(translationFile)) {
+        qWarning() << "Failed to load translation:" << translationFile;
+        emit translationLoadFailed(languageCode, "Failed to load translation file");
+        return false;
+    }
+
+    // Install application translator
+    if (!QCoreApplication::installTranslator(m_translator.get())) {
+        qWarning() << "Failed to install translator for:" << languageCode;
+        emit translationLoadFailed(languageCode, "Failed to install translator");
+        return false;
+    }
+
+    // Load Qt's built-in translations
     QString qtTranslationFile = QString("qt_%1").arg(languageCode);
-    QString qtTranslationPath = QLibraryInfo::location(QLibraryInfo::TranslationsPath);
+    QString qtTranslationPath = QLibraryInfo::path(QLibraryInfo::TranslationsPath);
     
-    qtLoaded = m_qtTranslator->load(qtTranslationFile, qtTranslationPath);
-    if (qtLoaded) {
-        QApplication::installTranslator(m_qtTranslator);
-        qDebug() << "Qt translation loaded:" << qtTranslationFile;
+    if (m_qtTranslator->load(qtTranslationFile, qtTranslationPath)) {
+        QCoreApplication::installTranslator(m_qtTranslator.get());
+        qDebug() << "Loaded Qt translation:" << qtTranslationFile;
     } else {
-        qDebug() << "Qt translation not found or failed to load:" << qtTranslationFile;
-        // Qt翻译不是必需的
-        qtLoaded = true;
+        qDebug() << "Qt translation not available for:" << languageCode;
     }
-    
-    return appLoaded && qtLoaded;
+
+    qDebug() << "Successfully loaded translation for:" << languageCode;
+    return true;
 }
 
-void TranslationManager::unloadCurrentTranslation()
+void TranslationManager::unloadTranslation()
 {
-    if (m_appTranslator) {
-        QApplication::removeTranslator(m_appTranslator);
-        m_appTranslator->deleteLater();
-        m_appTranslator = nullptr;
+    if (m_translator) {
+        QCoreApplication::removeTranslator(m_translator.get());
     }
     
     if (m_qtTranslator) {
-        QApplication::removeTranslator(m_qtTranslator);
-        m_qtTranslator->deleteLater();
-        m_qtTranslator = nullptr;
+        QCoreApplication::removeTranslator(m_qtTranslator.get());
     }
 }
 
 QString TranslationManager::getTranslationFilePath(const QString& languageCode) const
 {
-    return QString(":/translations/jitsi_%1.qm").arg(languageCode);
+    return QString("%1/jitsimeet_%2.qm").arg(m_translationsPath, languageCode);
 }
 
-void TranslationManager::initializeAvailableLanguages()
+bool TranslationManager::translationFileExists(const QString& languageCode) const
 {
-    // 初始化可用语言列表
-    m_availableLanguages << "en" << "zh_CN" << "zh_TW" << "ja" << "ko" 
-                        << "fr" << "de" << "es" << "ru";
-    
-    // 初始化语言显示名称
-    m_languageNames["en"] = "English";
-    m_languageNames["zh_CN"] = "简体中文";
-    m_languageNames["zh_TW"] = "繁體中文";
-    m_languageNames["ja"] = "日本語";
-    m_languageNames["ko"] = "한국어";
-    m_languageNames["fr"] = "Français";
-    m_languageNames["de"] = "Deutsch";
-    m_languageNames["es"] = "Español";
-    m_languageNames["ru"] = "Русский";
-    
-    qDebug() << "Available languages:" << m_availableLanguages;
+    return QFileInfo::exists(getTranslationFilePath(languageCode));
+}
+
+void TranslationManager::initializeLanguageInfo()
+{
+    m_languageInfo = {
+        {Language::English, "en", "English", "English", true},
+        {Language::Chinese, "zh_CN", "中文", "Chinese", false},
+        {Language::Spanish, "es", "Español", "Spanish", false},
+        {Language::French, "fr", "Français", "French", false},
+        {Language::German, "de", "Deutsch", "German", false},
+        {Language::Japanese, "ja", "日本語", "Japanese", false},
+        {Language::Korean, "ko", "한국어", "Korean", false},
+        {Language::Russian, "ru", "Русский", "Russian", false},
+        {Language::Portuguese, "pt", "Português", "Portuguese", false},
+        {Language::Italian, "it", "Italiano", "Italian", false}
+    };
+}
+
+void TranslationManager::updateAvailableLanguages()
+{
+    for (auto& info : m_languageInfo) {
+        if (info.language != Language::English) {
+            info.available = translationFileExists(info.code);
+            qDebug() << "Language" << info.code << "available:" << info.available;
+        }
+    }
 }

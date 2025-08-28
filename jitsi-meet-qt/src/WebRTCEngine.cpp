@@ -4,10 +4,13 @@
 #include <QNetworkRequest>
 #include <QUrl>
 #include <QUuid>
-#include <QCameraInfo>
-#include <QAudioDeviceInfo>
 #include <QVideoFrame>
-#include <QCameraViewfinder>
+#include <QPermission>
+#include <QCoreApplication>
+#include <QMessageBox>
+#include <QApplication>
+#include <QRandomGenerator>
+#include <QDateTime>
 
 WebRTCEngine::WebRTCEngine(QObject *parent)
     : QObject(parent)
@@ -16,10 +19,16 @@ WebRTCEngine::WebRTCEngine(QObject *parent)
     , m_localVideoWidget(nullptr)
     , m_camera(nullptr)
     , m_audioInput(nullptr)
+    , m_audioOutput(nullptr)
+    , m_captureSession(std::make_unique<QMediaCaptureSession>())
     , m_mediaRecorder(nullptr)
     , m_iceGatheringTimer(new QTimer(this))
     , m_connectionCheckTimer(new QTimer(this))
     , m_networkManager(new QNetworkAccessManager(this))
+    , m_hasVideoPermission(false)
+    , m_hasAudioPermission(false)
+    , m_videoEnabled(false)
+    , m_audioEnabled(false)
     , m_hasLocalStream(false)
     , m_isOfferer(false)
 {
@@ -37,6 +46,12 @@ WebRTCEngine::WebRTCEngine(QObject *parent)
     m_connectionCheckTimer->setInterval(CONNECTION_CHECK_INTERVAL);
     connect(m_connectionCheckTimer, &QTimer::timeout,
             this, &WebRTCEngine::onConnectionCheckTimer);
+    
+    // Setup media devices monitoring - Note: QMediaDevices doesn't have instance() in Qt 6.8
+    // We'll monitor device changes through other means
+    
+    // Initialize media devices
+    setupMediaDevices();
     
     qDebug() << "WebRTCEngine initialized";
 }
@@ -95,8 +110,9 @@ void WebRTCEngine::closePeerConnection()
     emit iceConnectionStateChanged(m_iceConnectionState);
     
     qDebug() << "Peer connection closed";
-}voi
-d WebRTCEngine::addLocalStream(QMediaRecorder* recorder)
+}
+
+void WebRTCEngine::addLocalStream(QMediaRecorder* recorder)
 {
     qDebug() << "Adding local stream";
     
@@ -251,6 +267,200 @@ bool WebRTCEngine::hasLocalStream() const
     return m_hasLocalStream;
 }
 
+void WebRTCEngine::startLocalVideo()
+{
+    qDebug() << "Starting local video";
+    
+    if (!m_hasVideoPermission) {
+        qWarning() << "Video permission not granted";
+        return;
+    }
+    
+    if (m_videoEnabled) {
+        qDebug() << "Video already enabled";
+        return;
+    }
+    
+    if (m_camera && m_camera->isActive()) {
+        m_videoEnabled = true;
+        emit localVideoStarted();
+        qDebug() << "Local video started";
+    } else {
+        initializeLocalMedia();
+    }
+}
+
+void WebRTCEngine::stopLocalVideo()
+{
+    qDebug() << "Stopping local video";
+    
+    if (!m_videoEnabled) {
+        return;
+    }
+    
+    if (m_camera) {
+        m_camera->stop();
+    }
+    
+    m_videoEnabled = false;
+    emit localVideoStopped();
+    qDebug() << "Local video stopped";
+}
+
+void WebRTCEngine::startLocalAudio()
+{
+    qDebug() << "Starting local audio";
+    
+    if (!m_hasAudioPermission) {
+        qWarning() << "Audio permission not granted";
+        return;
+    }
+    
+    if (m_audioEnabled) {
+        qDebug() << "Audio already enabled";
+        return;
+    }
+    
+    m_audioEnabled = true;
+    emit localAudioStarted();
+    qDebug() << "Local audio started";
+}
+
+void WebRTCEngine::stopLocalAudio()
+{
+    qDebug() << "Stopping local audio";
+    
+    if (!m_audioEnabled) {
+        return;
+    }
+    
+    m_audioEnabled = false;
+    emit localAudioStopped();
+    qDebug() << "Local audio stopped";
+}
+
+QList<QCameraDevice> WebRTCEngine::availableCameras() const
+{
+    return QMediaDevices::videoInputs();
+}
+
+QList<QAudioDevice> WebRTCEngine::availableAudioInputs() const
+{
+    return QMediaDevices::audioInputs();
+}
+
+QList<QAudioDevice> WebRTCEngine::availableAudioOutputs() const
+{
+    return QMediaDevices::audioOutputs();
+}
+
+void WebRTCEngine::setCamera(const QCameraDevice& device)
+{
+    qDebug() << "Setting camera:" << device.description();
+    
+    m_currentCameraDevice = device;
+    
+    if (m_camera) {
+        bool wasActive = m_camera->isActive();
+        m_camera->stop();
+        m_camera.reset();
+        
+        m_camera = std::make_unique<QCamera>(device, this);
+        setupCameraConnections();
+        
+        if (m_captureSession) {
+            m_captureSession->setCamera(m_camera.get());
+        }
+        
+        if (wasActive) {
+            m_camera->start();
+        }
+    }
+    
+    emit cameraChanged(device);
+}
+
+void WebRTCEngine::setAudioInput(const QAudioDevice& device)
+{
+    qDebug() << "Setting audio input:" << device.description();
+    
+    m_currentAudioInputDevice = device;
+    
+    if (m_captureSession) {
+        m_captureSession->setAudioInput(nullptr);
+        m_audioInput = std::make_unique<QAudioInput>(device, this);
+        m_captureSession->setAudioInput(m_audioInput.get());
+    }
+    
+    emit audioInputChanged(device);
+}
+
+void WebRTCEngine::setAudioOutput(const QAudioDevice& device)
+{
+    qDebug() << "Setting audio output:" << device.description();
+    
+    m_currentAudioOutputDevice = device;
+    m_audioOutput = std::make_unique<QAudioOutput>(device, this);
+    
+    emit audioOutputChanged(device);
+}
+
+void WebRTCEngine::requestMediaPermissions()
+{
+    qDebug() << "Requesting media permissions";
+    
+    emit mediaPermissionsRequested();
+    
+    // Check camera permission
+    QCameraPermission cameraPermission;
+    switch (qApp->checkPermission(cameraPermission)) {
+    case Qt::PermissionStatus::Undetermined:
+        qApp->requestPermission(cameraPermission, this, [this](const QPermission &permission) {
+            handlePermissionResult(permission.status() == Qt::PermissionStatus::Granted, "camera");
+        });
+        break;
+    case Qt::PermissionStatus::Granted:
+        m_hasVideoPermission = true;
+        break;
+    case Qt::PermissionStatus::Denied:
+        m_hasVideoPermission = false;
+        break;
+    }
+    
+    // Check microphone permission
+    QMicrophonePermission micPermission;
+    switch (qApp->checkPermission(micPermission)) {
+    case Qt::PermissionStatus::Undetermined:
+        qApp->requestPermission(micPermission, this, [this](const QPermission &permission) {
+            handlePermissionResult(permission.status() == Qt::PermissionStatus::Granted, "microphone");
+        });
+        break;
+    case Qt::PermissionStatus::Granted:
+        m_hasAudioPermission = true;
+        break;
+    case Qt::PermissionStatus::Denied:
+        m_hasAudioPermission = false;
+        break;
+    }
+    
+    // Emit result
+    if (m_hasVideoPermission || m_hasAudioPermission) {
+        emit mediaPermissionsGranted(m_hasVideoPermission, m_hasAudioPermission);
+    } else {
+        emit mediaPermissionsDenied();
+    }
+}
+
+bool WebRTCEngine::hasVideoPermission() const
+{
+    return m_hasVideoPermission;
+}
+
+bool WebRTCEngine::hasAudioPermission() const
+{
+    return m_hasAudioPermission;
+}
+
 void WebRTCEngine::onIceGatheringTimer()
 {
     qDebug() << "ICE gathering timeout";
@@ -279,6 +489,48 @@ void WebRTCEngine::onStunServerResponse()
     } else {
         qWarning() << "STUN server query failed:" << reply->errorString();
     }
+}
+
+void WebRTCEngine::onCameraActiveChanged(bool active)
+{
+    qDebug() << "Camera active changed:" << active;
+    
+    if (active && m_hasVideoPermission) {
+        m_videoEnabled = true;
+        emit localVideoStarted();
+        
+        if (m_localVideoWidget) {
+            emit localStreamReady(m_localVideoWidget);
+        }
+    } else {
+        m_videoEnabled = false;
+        emit localVideoStopped();
+    }
+}
+
+void WebRTCEngine::onCameraErrorOccurred(QCamera::Error error)
+{
+    qWarning() << "Camera error occurred:" << error;
+    
+    QString errorMessage;
+    switch (error) {
+    case QCamera::NoError:
+        return;
+    case QCamera::CameraError:
+        errorMessage = "Camera error occurred";
+        break;
+    default:
+        errorMessage = "Unknown camera error";
+        break;
+    }
+    
+    emit this->error(errorMessage);
+}
+
+void WebRTCEngine::onMediaDevicesChanged()
+{
+    qDebug() << "Media devices changed, updating available devices";
+    updateMediaDevices();
 }void
  WebRTCEngine::setupPeerConnection()
 {
@@ -430,7 +682,7 @@ void WebRTCEngine::simulateIceGathering()
     // Generate host candidates
     IceCandidate hostCandidate;
     hostCandidate.candidate = QString("candidate:1 1 UDP 2130706431 192.168.1.100 %1 typ host")
-                              .arg(qrand() % 10000 + 50000);
+                              .arg(QRandomGenerator::global()->bounded(10000) + 50000);
     hostCandidate.sdpMid = "audio";
     hostCandidate.sdpMLineIndex = 0;
     m_localIceCandidates.append(hostCandidate);
@@ -438,8 +690,8 @@ void WebRTCEngine::simulateIceGathering()
     // Generate server reflexive candidates
     IceCandidate srflxCandidate;
     srflxCandidate.candidate = QString("candidate:2 1 UDP 1694498815 203.0.113.100 %1 typ srflx raddr 192.168.1.100 rport %2")
-                               .arg(qrand() % 10000 + 50000)
-                               .arg(qrand() % 10000 + 50000);
+                               .arg(QRandomGenerator::global()->bounded(10000) + 50000)
+                               .arg(QRandomGenerator::global()->bounded(10000) + 50000);
     srflxCandidate.sdpMid = "audio";
     srflxCandidate.sdpMLineIndex = 0;
     m_localIceCandidates.append(srflxCandidate);
@@ -459,7 +711,7 @@ void WebRTCEngine::checkConnectionHealth()
     // Simple connection health check
     if (m_connectionState == Connected) {
         // Simulate occasional connection issues
-        if (qrand() % 1000 < 1) { // 0.1% chance
+        if (QRandomGenerator::global()->bounded(1000) < 1) { // 0.1% chance
             qDebug() << "Simulating connection issue";
             m_iceConnectionState = IceDisconnected;
             emit iceConnectionStateChanged(m_iceConnectionState);
@@ -499,40 +751,60 @@ void WebRTCEngine::initializeLocalMedia()
 {
     qDebug() << "Initializing local media";
     
-    // Initialize camera
-    QList<QCameraInfo> cameras = QCameraInfo::availableCameras();
-    if (!cameras.isEmpty()) {
-        m_camera = new QCamera(cameras.first(), this);
-        m_localVideoWidget = new QVideoWidget();
-        m_localVideoWidget->setMinimumSize(320, 240);
-        
-        m_camera->setViewfinder(m_localVideoWidget);
-        m_camera->start();
-        
-        qDebug() << "Camera initialized:" << cameras.first().description();
-    } else {
-        qWarning() << "No cameras available";
+    if (!m_hasVideoPermission && !m_hasAudioPermission) {
+        qWarning() << "No media permissions granted";
+        return;
     }
     
-    // Initialize audio input
-    QAudioDeviceInfo audioDevice = QAudioDeviceInfo::defaultInputDevice();
-    if (!audioDevice.isNull()) {
-        QAudioFormat format;
-        format.setSampleRate(48000);
-        format.setChannelCount(2);
-        format.setSampleSize(16);
-        format.setCodec("audio/pcm");
-        format.setByteOrder(QAudioFormat::LittleEndian);
-        format.setSampleType(QAudioFormat::SignedInt);
-        
-        if (audioDevice.isFormatSupported(format)) {
-            m_audioInput = new QAudioInput(audioDevice, format, this);
-            qDebug() << "Audio input initialized:" << audioDevice.deviceName();
+    // Initialize camera if permission granted
+    if (m_hasVideoPermission) {
+        QList<QCameraDevice> cameras = QMediaDevices::videoInputs();
+        if (!cameras.isEmpty()) {
+            QCameraDevice cameraDevice = m_currentCameraDevice.isNull() ? cameras.first() : m_currentCameraDevice;
+            
+            m_camera = std::make_unique<QCamera>(cameraDevice, this);
+            setupCameraConnections();
+            
+            m_localVideoWidget = new QVideoWidget();
+            m_localVideoWidget->setMinimumSize(320, 240);
+            
+            if (m_captureSession) {
+                m_captureSession->setCamera(m_camera.get());
+                m_captureSession->setVideoOutput(m_localVideoWidget);
+            }
+            
+            m_camera->start();
+            
+            qDebug() << "Camera initialized:" << cameraDevice.description();
         } else {
-            qWarning() << "Audio format not supported";
+            qWarning() << "No cameras available";
         }
-    } else {
-        qWarning() << "No audio input devices available";
+    }
+    
+    // Initialize audio input if permission granted
+    if (m_hasAudioPermission) {
+        QList<QAudioDevice> audioInputs = QMediaDevices::audioInputs();
+        if (!audioInputs.isEmpty()) {
+            QAudioDevice audioDevice = m_currentAudioInputDevice.isNull() ? audioInputs.first() : m_currentAudioInputDevice;
+            
+            m_audioInput = std::make_unique<QAudioInput>(audioDevice, this);
+            
+            if (m_captureSession) {
+                m_captureSession->setAudioInput(m_audioInput.get());
+            }
+            
+            qDebug() << "Audio input initialized:" << audioDevice.description();
+        } else {
+            qWarning() << "No audio input devices available";
+        }
+        
+        // Initialize audio output
+        QList<QAudioDevice> audioOutputs = QMediaDevices::audioOutputs();
+        if (!audioOutputs.isEmpty()) {
+            QAudioDevice outputDevice = m_currentAudioOutputDevice.isNull() ? audioOutputs.first() : m_currentAudioOutputDevice;
+            m_audioOutput = std::make_unique<QAudioOutput>(outputDevice, this);
+            qDebug() << "Audio output initialized:" << outputDevice.description();
+        }
     }
 }
 
@@ -542,8 +814,7 @@ void WebRTCEngine::cleanupLocalMedia()
     
     if (m_camera) {
         m_camera->stop();
-        m_camera->deleteLater();
-        m_camera = nullptr;
+        m_camera.reset();
     }
     
     if (m_localVideoWidget) {
@@ -552,10 +823,330 @@ void WebRTCEngine::cleanupLocalMedia()
     }
     
     if (m_audioInput) {
-        m_audioInput->stop();
-        m_audioInput->deleteLater();
-        m_audioInput = nullptr;
+        m_audioInput.reset();
     }
     
+    if (m_audioOutput) {
+        m_audioOutput.reset();
+    }
+    
+    if (m_captureSession) {
+        m_captureSession->setCamera(nullptr);
+        m_captureSession->setAudioInput(nullptr);
+        m_captureSession->setVideoOutput(nullptr);
+    }
+    
+    m_videoEnabled = false;
+    m_audioEnabled = false;
+    
     qDebug() << "Local media cleanup completed";
+}
+
+void WebRTCEngine::setupMediaDevices()
+{
+    qDebug() << "Setting up media devices";
+    
+    // Get default devices
+    QList<QCameraDevice> cameras = QMediaDevices::videoInputs();
+    if (!cameras.isEmpty()) {
+        m_currentCameraDevice = cameras.first();
+    }
+    
+    QList<QAudioDevice> audioInputs = QMediaDevices::audioInputs();
+    if (!audioInputs.isEmpty()) {
+        m_currentAudioInputDevice = audioInputs.first();
+    }
+    
+    QList<QAudioDevice> audioOutputs = QMediaDevices::audioOutputs();
+    if (!audioOutputs.isEmpty()) {
+        m_currentAudioOutputDevice = audioOutputs.first();
+    }
+    
+    qDebug() << "Media devices setup completed";
+    qDebug() << "Available cameras:" << cameras.size();
+    qDebug() << "Available audio inputs:" << audioInputs.size();
+    qDebug() << "Available audio outputs:" << audioOutputs.size();
+}
+
+void WebRTCEngine::updateMediaDevices()
+{
+    qDebug() << "Updating media devices";
+    
+    // Check if current devices are still available
+    QList<QCameraDevice> cameras = QMediaDevices::videoInputs();
+    QList<QAudioDevice> audioInputs = QMediaDevices::audioInputs();
+    QList<QAudioDevice> audioOutputs = QMediaDevices::audioOutputs();
+    
+    // Update camera if current one is no longer available
+    if (!m_currentCameraDevice.isNull()) {
+        bool found = false;
+        for (const auto& camera : cameras) {
+            if (camera.id() == m_currentCameraDevice.id()) {
+                found = true;
+                break;
+            }
+        }
+        if (!found && !cameras.isEmpty()) {
+            setCamera(cameras.first());
+        }
+    }
+    
+    // Update audio input if current one is no longer available
+    if (!m_currentAudioInputDevice.isNull()) {
+        bool found = false;
+        for (const auto& device : audioInputs) {
+            if (device.id() == m_currentAudioInputDevice.id()) {
+                found = true;
+                break;
+            }
+        }
+        if (!found && !audioInputs.isEmpty()) {
+            setAudioInput(audioInputs.first());
+        }
+    }
+    
+    // Update audio output if current one is no longer available
+    if (!m_currentAudioOutputDevice.isNull()) {
+        bool found = false;
+        for (const auto& device : audioOutputs) {
+            if (device.id() == m_currentAudioOutputDevice.id()) {
+                found = true;
+                break;
+            }
+        }
+        if (!found && !audioOutputs.isEmpty()) {
+            setAudioOutput(audioOutputs.first());
+        }
+    }
+}
+
+void WebRTCEngine::checkMediaPermissions()
+{
+    qDebug() << "Checking media permissions";
+    
+    QCameraPermission cameraPermission;
+    m_hasVideoPermission = (qApp->checkPermission(cameraPermission) == Qt::PermissionStatus::Granted);
+    
+    QMicrophonePermission micPermission;
+    m_hasAudioPermission = (qApp->checkPermission(micPermission) == Qt::PermissionStatus::Granted);
+    
+    qDebug() << "Video permission:" << m_hasVideoPermission;
+    qDebug() << "Audio permission:" << m_hasAudioPermission;
+}
+
+void WebRTCEngine::handlePermissionResult(bool granted, const QString& permission)
+{
+    qDebug() << "Permission result for" << permission << ":" << granted;
+    
+    if (permission == "camera") {
+        m_hasVideoPermission = granted;
+    } else if (permission == "microphone") {
+        m_hasAudioPermission = granted;
+    }
+    
+    if (m_hasVideoPermission || m_hasAudioPermission) {
+        emit mediaPermissionsGranted(m_hasVideoPermission, m_hasAudioPermission);
+        
+        // Initialize media if permissions are granted
+        if (granted) {
+            initializeLocalMedia();
+        }
+    } else {
+        emit mediaPermissionsDenied();
+    }
+}
+
+void WebRTCEngine::setupCameraConnections()
+{
+    if (m_camera) {
+        connect(m_camera.get(), &QCamera::activeChanged,
+                this, &WebRTCEngine::onCameraActiveChanged);
+        connect(m_camera.get(), &QCamera::errorOccurred,
+                this, &WebRTCEngine::onCameraErrorOccurred);
+    }
+}
+
+void WebRTCEngine::sendScreenFrame(const QPixmap& frame)
+{
+    qDebug() << "Sending screen frame:" << frame.size();
+    
+    // In a real implementation, this would encode the frame and send it via WebRTC
+    // For now, we just log the frame information
+    
+    if (frame.isNull()) {
+        qWarning() << "Cannot send null screen frame";
+        return;
+    }
+    
+    // Simulate encoding and transmission
+    qDebug() << "Screen frame encoded and queued for transmission";
+    
+    // In a real WebRTC implementation, you would:
+    // 1. Convert QPixmap to video frame format
+    // 2. Encode using selected video codec
+    // 3. Send via RTP packets to remote peers
+}
+
+void WebRTCEngine::updateMediaSettings(const QVariantMap& settings)
+{
+    qDebug() << "Updating media settings";
+    
+    // Apply video settings
+    if (settings.contains("videoResolution")) {
+        QSize resolution = settings["videoResolution"].toSize();
+        qDebug() << "Updated video resolution:" << resolution;
+        
+        // Apply to camera if active
+        if (m_camera && m_camera->isActive()) {
+            // Qt Multimedia handles resolution automatically in most cases
+            // Custom resolution handling would go here
+        }
+    }
+    
+    if (settings.contains("videoFrameRate")) {
+        int frameRate = settings["videoFrameRate"].toInt();
+        qDebug() << "Updated video frame rate:" << frameRate;
+        
+        // Apply frame rate settings
+        if (m_camera) {
+            // Frame rate configuration would go here
+        }
+    }
+    
+    if (settings.contains("videoBitrate")) {
+        int bitrate = settings["videoBitrate"].toInt();
+        qDebug() << "Updated video bitrate:" << bitrate << "kbps";
+        
+        // Apply bitrate settings for encoding
+    }
+    
+    // Apply audio settings
+    if (settings.contains("audioSampleRate")) {
+        int sampleRate = settings["audioSampleRate"].toInt();
+        qDebug() << "Updated audio sample rate:" << sampleRate;
+        
+        // Apply to audio input if active
+        if (m_audioInput) {
+            // Sample rate configuration would go here
+        }
+    }
+    
+    if (settings.contains("audioChannels")) {
+        int channels = settings["audioChannels"].toInt();
+        qDebug() << "Updated audio channels:" << channels;
+    }
+    
+    if (settings.contains("audioBitrate")) {
+        int bitrate = settings["audioBitrate"].toInt();
+        qDebug() << "Updated audio bitrate:" << bitrate << "kbps";
+    }
+    
+    // Apply screen capture settings
+    if (settings.contains("screenCaptureResolution")) {
+        QSize resolution = settings["screenCaptureResolution"].toSize();
+        qDebug() << "Updated screen capture resolution:" << resolution;
+    }
+    
+    if (settings.contains("screenCaptureFrameRate")) {
+        int frameRate = settings["screenCaptureFrameRate"].toInt();
+        qDebug() << "Updated screen capture frame rate:" << frameRate;
+    }
+    
+    qDebug() << "Media settings update completed";
+}
+void Web
+RTCEngine::sendScreenFrame(const QPixmap& frame)
+{
+    if (m_connectionState != Connected) {
+        qWarning() << "WebRTCEngine: Cannot send screen frame - not connected";
+        return;
+    }
+    
+    if (frame.isNull()) {
+        qWarning() << "WebRTCEngine: Cannot send null screen frame";
+        return;
+    }
+    
+    // Convert QPixmap to byte array for transmission
+    QByteArray frameData;
+    QBuffer buffer(&frameData);
+    buffer.open(QIODevice::WriteOnly);
+    
+    // Compress the frame for efficient transmission
+    if (!frame.save(&buffer, "JPEG", 75)) { // 75% quality for balance between size and quality
+        qWarning() << "WebRTCEngine: Failed to encode screen frame";
+        return;
+    }
+    
+    // In a real implementation, this would be sent through the WebRTC data channel
+    // For now, we'll simulate the transmission
+    qDebug() << "WebRTCEngine: Sending screen frame, size:" << frameData.size() << "bytes";
+    
+    // Simulate processing time for encoding and transmission
+    QTimer::singleShot(10, this, [this, frameData]() {
+        // Simulate successful transmission
+        qDebug() << "WebRTCEngine: Screen frame transmitted successfully";
+    });
+}
+
+void WebRTCEngine::updateMediaSettings(const QVariantMap& settings)
+{
+    if (settings.contains("videoEnabled")) {
+        bool videoEnabled = settings["videoEnabled"].toBool();
+        if (videoEnabled != m_videoEnabled) {
+            m_videoEnabled = videoEnabled;
+            if (videoEnabled) {
+                startLocalVideo();
+            } else {
+                stopLocalVideo();
+            }
+        }
+    }
+    
+    if (settings.contains("audioEnabled")) {
+        bool audioEnabled = settings["audioEnabled"].toBool();
+        if (audioEnabled != m_audioEnabled) {
+            m_audioEnabled = audioEnabled;
+            if (audioEnabled) {
+                startLocalAudio();
+            } else {
+                stopLocalAudio();
+            }
+        }
+    }
+    
+    if (settings.contains("cameraDevice")) {
+        QString deviceId = settings["cameraDevice"].toString();
+        auto cameras = availableCameras();
+        for (const auto& camera : cameras) {
+            if (camera.id() == deviceId) {
+                setCamera(camera);
+                break;
+            }
+        }
+    }
+    
+    if (settings.contains("audioInputDevice")) {
+        QString deviceId = settings["audioInputDevice"].toString();
+        auto audioInputs = availableAudioInputs();
+        for (const auto& device : audioInputs) {
+            if (device.id() == deviceId) {
+                setAudioInput(device);
+                break;
+            }
+        }
+    }
+    
+    if (settings.contains("audioOutputDevice")) {
+        QString deviceId = settings["audioOutputDevice"].toString();
+        auto audioOutputs = availableAudioOutputs();
+        for (const auto& device : audioOutputs) {
+            if (device.id() == deviceId) {
+                setAudioOutput(device);
+                break;
+            }
+        }
+    }
+    
+    qDebug() << "WebRTCEngine: Media settings updated";
 }

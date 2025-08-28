@@ -12,31 +12,41 @@
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QJsonObject>
+#include <optional>
+#include <string_view>
+#include <memory>
+#include <algorithm>
+#include <functional>
+#include <type_traits>
+#include <tuple>
 
 ConfigurationManager::ConfigurationManager(QObject* parent)
     : QObject(parent)
-    , m_settings(nullptr)
     , m_configLoaded(false)
-    , m_windowStateManager(nullptr)
 {
     // 创建配置目录
     QString configDir = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
     QDir().mkpath(configDir);
     
-    // 创建QSettings实例
+    // 创建QSettings实例 (使用 C++17 std::make_unique)
     QString configFile = configDir + "/config.ini";
-    m_settings = new QSettings(configFile, QSettings::IniFormat, this);
+    m_settings = std::make_unique<QSettings>(configFile, QSettings::IniFormat);
     
     qDebug() << "Configuration file:" << configFile;
     
     // 设置默认值
     setDefaults();
     
-    // 加载配置
-    m_config = loadConfiguration();
+    // 加载配置 (使用 C++17 std::optional)
+    if (auto config = loadConfiguration()) {
+        m_config = *config;
+    } else {
+        qWarning() << "Failed to load configuration, using defaults";
+        m_config = ApplicationSettings{};
+    }
     
-    // 创建窗口状态管理器
-    m_windowStateManager = new WindowStateManager(this, this);
+    // 创建窗口状态管理器 (使用 C++17 std::make_unique)
+    m_windowStateManager = std::make_unique<WindowStateManager>(this, this);
 }
 
 ConfigurationManager::~ConfigurationManager()
@@ -47,14 +57,14 @@ ConfigurationManager::~ConfigurationManager()
     }
 }
 
-ApplicationSettings ConfigurationManager::loadConfiguration()
+std::optional<ApplicationSettings> ConfigurationManager::loadConfiguration()
 {
-    ApplicationSettings config;
-    
     if (!m_settings) {
-        qWarning() << "Settings not initialized, using defaults";
-        return config;
+        qWarning() << "Settings not initialized";
+        return std::nullopt;
     }
+    
+    ApplicationSettings config;
     
     // 加载服务器配置
     config.defaultServerUrl = m_settings->value(JitsiConstants::ConfigKeys::SERVER_URL, 
@@ -85,6 +95,12 @@ ApplicationSettings ConfigurationManager::loadConfiguration()
     
     // 验证并修复配置
     config = validateAndFixSettings(config);
+    
+    // 验证最终配置的有效性
+    if (!config.isValid()) {
+        qWarning() << "Loaded configuration is invalid";
+        return std::nullopt;
+    }
     
     m_configLoaded = true;
     
@@ -138,17 +154,24 @@ QString ConfigurationManager::serverUrl() const
     return m_config.defaultServerUrl;
 }
 
-void ConfigurationManager::setServerUrl(const QString& url)
+bool ConfigurationManager::setServerUrl(std::string_view url)
 {
-    if (m_config.defaultServerUrl != url && validateServerUrl(url)) {
-        m_config.defaultServerUrl = url;
-        if (m_settings) {
-            m_settings->setValue(JitsiConstants::ConfigKeys::SERVER_URL, url);
-            m_settings->sync();
+    // 使用 C++17 std::optional 进行验证
+    if (auto validUrl = validateServerUrl(url)) {
+        if (m_config.defaultServerUrl != *validUrl) {
+            m_config.defaultServerUrl = *validUrl;
+            if (m_settings) {
+                m_settings->setValue(JitsiConstants::ConfigKeys::SERVER_URL, *validUrl);
+                m_settings->sync();
+            }
+            emit serverUrlChanged(*validUrl);
+            emit configurationChanged();
         }
-        emit serverUrlChanged(url);
-        emit configurationChanged();
+        return true;
     }
+    
+    qWarning() << "Invalid server URL:" << QString::fromUtf8(url.data(), url.size());
+    return false;
 }
 
 QString ConfigurationManager::language() const
@@ -176,7 +199,8 @@ QStringList ConfigurationManager::recentUrls() const
 
 void ConfigurationManager::addRecentUrl(const QString& url)
 {
-    if (url.isEmpty() || !validateServerUrl(url)) {
+    // 使用 C++17 std::optional 进行验证
+    if (url.isEmpty() || !validateServerUrl(url.toStdString())) {
         qWarning() << "Invalid URL, not adding to recent list:" << url;
         return;
     }
@@ -273,12 +297,36 @@ void ConfigurationManager::setDefaults()
     m_config.resetToDefaults();
 }
 
-bool ConfigurationManager::validateServerUrl(const QString& url) const
+std::optional<QString> ConfigurationManager::validateServerUrl(std::string_view url) const
 {
-    if (url.isEmpty()) return false;
+    // 使用 C++17 std::string_view 提高效率
+    if (url.empty()) {
+        return std::nullopt;
+    }
     
-    QUrl qurl(url);
-    return qurl.isValid() && (qurl.scheme() == "http" || qurl.scheme() == "https");
+    QString qurl = QString::fromUtf8(url.data(), url.size());
+    QUrl parsedUrl(qurl);
+    
+    // 验证URL格式
+    if (!parsedUrl.isValid()) {
+        return std::nullopt;
+    }
+    
+    // 验证协议
+    const QString scheme = parsedUrl.scheme().toLower();
+    if (scheme != "http" && scheme != "https") {
+        return std::nullopt;
+    }
+    
+    // 验证主机名
+    if (parsedUrl.host().isEmpty()) {
+        return std::nullopt;
+    }
+    
+    // 规范化URL（移除尾部斜杠等）
+    QString normalizedUrl = parsedUrl.toString(QUrl::RemoveFragment | QUrl::StripTrailingSlash);
+    
+    return normalizedUrl;
 }
 
 QRect ConfigurationManager::validateWindowGeometry(const QRect& geometry) const
@@ -324,17 +372,20 @@ ApplicationSettings ConfigurationManager::validateAndFixSettings(const Applicati
 {
     ApplicationSettings validSettings = settings;
     
-    // 验证并修复服务器URL
-    if (!validateServerUrl(validSettings.defaultServerUrl)) {
+    // 验证并修复服务器URL (使用 C++17 std::optional)
+    if (auto validUrl = validateServerUrl(validSettings.defaultServerUrl.toStdString())) {
+        validSettings.defaultServerUrl = *validUrl;
+    } else {
         qWarning() << "Invalid server URL, using default:" << validSettings.defaultServerUrl;
         validSettings.defaultServerUrl = JitsiConstants::DEFAULT_SERVER_URL;
     }
     
-    // 验证并修复服务器超时
-    if (validSettings.serverTimeout <= 0 || validSettings.serverTimeout > 300) {
-        qWarning() << "Invalid server timeout, using default:" << validSettings.serverTimeout;
-        validSettings.serverTimeout = JitsiConstants::DEFAULT_SERVER_TIMEOUT;
-    }
+    // 验证并修复服务器超时 (使用 C++17 模板和 if constexpr)
+    validSettings.serverTimeout = validateValue<int>(
+        validSettings.serverTimeout,
+        JitsiConstants::DEFAULT_SERVER_TIMEOUT,
+        [](const int& timeout) { return timeout > 0 && timeout <= 300; }
+    );
     
     // 验证并修复语言设置
     if (validSettings.language.isEmpty()) {
@@ -345,17 +396,18 @@ ApplicationSettings ConfigurationManager::validateAndFixSettings(const Applicati
     // 验证并修复窗口几何
     validSettings.windowGeometry = validateWindowGeometry(validSettings.windowGeometry);
     
-    // 验证并修复最大最近项目数
-    if (validSettings.maxRecentItems < 0 || validSettings.maxRecentItems > 100) {
-        qWarning() << "Invalid max recent items, using default:" << validSettings.maxRecentItems;
-        validSettings.maxRecentItems = JitsiConstants::MAX_RECENT_ITEMS;
-    }
+    // 验证并修复最大最近项目数 (使用 C++17 模板和 if constexpr)
+    validSettings.maxRecentItems = validateValue<int>(
+        validSettings.maxRecentItems,
+        JitsiConstants::MAX_RECENT_ITEMS,
+        [](const int& maxItems) { return maxItems >= 0 && maxItems <= 100; }
+    );
     
-    // 验证并清理最近URL列表
+    // 验证并清理最近URL列表 (使用 C++17 算法和 std::optional)
     QStringList validRecentUrls;
     for (const QString& url : validSettings.recentUrls) {
-        if (validateServerUrl(url)) {
-            validRecentUrls.append(url);
+        if (auto validUrl = validateServerUrl(url.toStdString())) {
+            validRecentUrls.append(*validUrl);
         } else {
             qWarning() << "Removing invalid recent URL:" << url;
         }
@@ -394,29 +446,29 @@ ApplicationSettings ConfigurationManager::currentConfiguration() const
 bool ConfigurationManager::validateConfiguration() const
 {
     if (!m_settings) {
+        qWarning() << "Settings not initialized";
         return false;
     }
     
-    // 检查配置文件是否可读写
-    if (!m_settings->isWritable()) {
-        qWarning() << "Configuration file is not writable";
-        return false;
+    // 使用 C++17 结构化绑定进行全面验证
+    auto [isValid, errors] = performComprehensiveValidation();
+    
+    if (!isValid) {
+        qWarning() << "Configuration validation failed:";
+        for (const QString& error : errors) {
+            qWarning() << "  -" << error;
+        }
     }
     
-    // 验证当前配置
-    if (!m_config.isValid()) {
-        qWarning() << "Current configuration is invalid";
-        return false;
-    }
-    
-    return true;
+    return isValid;
 }
 
 WindowStateManager* ConfigurationManager::windowStateManager() const
 {
-    return m_windowStateManager;
-}QL
-ist<RecentItem> ConfigurationManager::recentItems() const
+    return m_windowStateManager.get();
+}
+
+QList<RecentItem> ConfigurationManager::recentItems() const
 {
     QList<RecentItem> items;
     
@@ -557,4 +609,56 @@ void ConfigurationManager::setMaxRecentItems(int maxItems)
     
     saveConfiguration(m_config);
     emit configurationChanged();
+}
+
+std::tuple<bool, QStringList> ConfigurationManager::performComprehensiveValidation() const
+{
+    QStringList errors;
+    
+    // 使用 C++17 结构化绑定验证各个配置项
+    
+    // 验证服务器URL
+    if (!validateServerUrl(m_config.defaultServerUrl.toStdString())) {
+        errors << QString("Invalid server URL: %1").arg(m_config.defaultServerUrl);
+    }
+    
+    // 验证服务器超时
+    if (m_config.serverTimeout <= 0 || m_config.serverTimeout > 300) {
+        errors << QString("Invalid server timeout: %1 (must be 1-300 seconds)").arg(m_config.serverTimeout);
+    }
+    
+    // 验证窗口几何
+    const auto& geometry = m_config.windowGeometry;
+    if (geometry.width() < JitsiConstants::MIN_WINDOW_WIDTH || 
+        geometry.height() < JitsiConstants::MIN_WINDOW_HEIGHT) {
+        errors << QString("Invalid window size: %1x%2 (minimum: %3x%4)")
+                  .arg(geometry.width()).arg(geometry.height())
+                  .arg(JitsiConstants::MIN_WINDOW_WIDTH).arg(JitsiConstants::MIN_WINDOW_HEIGHT);
+    }
+    
+    // 验证最大最近项目数
+    if (m_config.maxRecentItems < 0 || m_config.maxRecentItems > 100) {
+        errors << QString("Invalid max recent items: %1 (must be 0-100)").arg(m_config.maxRecentItems);
+    }
+    
+    // 验证语言设置
+    if (m_config.language.isEmpty()) {
+        errors << "Language setting is empty";
+    }
+    
+    // 验证最近URL列表
+    for (const QString& url : m_config.recentUrls) {
+        if (!validateServerUrl(url.toStdString())) {
+            errors << QString("Invalid recent URL: %1").arg(url);
+        }
+    }
+    
+    // 验证配置文件访问权限
+    if (m_settings && !m_settings->isWritable()) {
+        errors << "Configuration file is not writable";
+    }
+    
+    // 使用 C++17 结构化绑定返回结果
+    bool isValid = errors.isEmpty();
+    return std::make_tuple(isValid, errors);
 }

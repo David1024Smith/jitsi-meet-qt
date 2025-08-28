@@ -6,7 +6,7 @@
 #include <QDir>
 #include <QDateTime>
 #include <QDebug>
-#include <QWebEngineView>
+// #include <QWebEngineView> // Not needed for core functionality
 #include <QPushButton>
 
 Q_LOGGING_CATEGORY(errorRecovery, "jitsi.error.recovery")
@@ -349,23 +349,23 @@ void ErrorRecoveryManager::onRetryTimer()
 {
     qCDebug(errorRecovery) << "Retry timer triggered, attempting recovery";
     
-    if (m_lastError.type() != ErrorType::NetworkError) {
+    if (!m_lastError.has_value() || m_lastError->type() != ErrorType::NetworkError) {
         return;
     }
     
     // 重试最后的操作
-    RecoveryResult result = attemptRecovery(m_lastError.type());
+    RecoveryResult result = attemptRecovery(m_lastError->type());
     
     if (result.success) {
-        emit recoverySuccessful(m_lastError.type(), result.strategy);
+        emit recoverySuccessful(m_lastError->type(), result.strategy);
     } else {
         // 如果还有重试次数，继续重试
-        int& retryCount = m_retryCount[m_lastError.type()];
+        int& retryCount = m_retryCount[m_lastError->type()];
         if (retryCount < m_maxRetryCount) {
             retryCount++;
             m_retryTimer->start(5000 * retryCount); // 递增延迟
         } else {
-            emit recoveryFailed(m_lastError.type(), "Max retry count exceeded");
+            emit recoveryFailed(m_lastError->type(), "Max retry count exceeded");
         }
     }
 }
@@ -588,7 +588,7 @@ void ErrorRecoveryManager::initializeLogging()
     
     if (m_logFile->open(QIODevice::WriteOnly | QIODevice::Append)) {
         m_logStream = new QTextStream(m_logFile);
-        m_logStream->setCodec("UTF-8");
+        // Note: setCodec is not available in Qt 6, UTF-8 is default
         
         // 写入启动标记
         writeToLogFile(QString("=== Error Recovery Manager Started at %1 ===")

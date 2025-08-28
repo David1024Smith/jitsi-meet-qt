@@ -5,6 +5,12 @@
 #include <QSettings>
 #include <QRect>
 #include <QStringList>
+#include <optional>
+#include <string_view>
+#include <memory>
+#include <functional>
+#include <type_traits>
+#include <tuple>
 #include "models/ApplicationSettings.h"
 #include "models/RecentItem.h"
 
@@ -31,10 +37,10 @@ public:
     ~ConfigurationManager();
     
     /**
-     * @brief 加载配置
-     * @return 应用程序配置
+     * @brief 加载配置 (使用 C++17 std::optional)
+     * @return 应用程序配置，如果加载失败则返回 std::nullopt
      */
-    ApplicationSettings loadConfiguration();
+    std::optional<ApplicationSettings> loadConfiguration();
     
     /**
      * @brief 保存配置
@@ -49,10 +55,11 @@ public:
     QString serverUrl() const;
     
     /**
-     * @brief 设置服务器URL
+     * @brief 设置服务器URL (使用 C++17 std::string_view 提高效率)
      * @param url 服务器URL
+     * @return 是否设置成功
      */
-    void setServerUrl(const QString& url);
+    bool setServerUrl(std::string_view url);
     
     /**
      * @brief 获取语言设置
@@ -182,6 +189,12 @@ public:
      * @return 窗口状态管理器实例
      */
     WindowStateManager* windowStateManager() const;
+    
+    /**
+     * @brief 执行全面的配置验证 (使用 C++17 结构化绑定)
+     * @return 验证结果 {是否有效, 错误消息列表}
+     */
+    std::tuple<bool, QStringList> performComprehensiveValidation() const;
 
 signals:
     /**
@@ -219,11 +232,11 @@ private:
     void setDefaults();
     
     /**
-     * @brief 验证服务器URL
+     * @brief 验证服务器URL (使用 C++17 std::optional 和 std::string_view)
      * @param url 要验证的URL
-     * @return 是否有效
+     * @return 验证结果，如果有效则返回规范化的URL，否则返回 std::nullopt
      */
-    bool validateServerUrl(const QString& url) const;
+    std::optional<QString> validateServerUrl(std::string_view url) const;
     
     /**
      * @brief 验证窗口几何信息
@@ -238,12 +251,30 @@ private:
      * @return 验证后的配置
      */
     ApplicationSettings validateAndFixSettings(const ApplicationSettings& settings) const;
+    
+    /**
+     * @brief 模板验证函数 (使用 C++17 if constexpr)
+     * @tparam T 要验证的类型
+     * @param value 要验证的值
+     * @param defaultValue 默认值
+     * @param validator 验证函数
+     * @return 验证后的值
+     */
+    template<typename T>
+    T validateValue(const T& value, const T& defaultValue, 
+                   std::function<bool(const T&)> validator) const {
+        if constexpr (std::is_arithmetic_v<T>) {
+            return validator(value) ? value : defaultValue;
+        } else {
+            return validator(value) ? value : defaultValue;
+        }
+    }
 
 private:
-    QSettings* m_settings;
+    std::unique_ptr<QSettings> m_settings;
     ApplicationSettings m_config;
     bool m_configLoaded;
-    WindowStateManager* m_windowStateManager;
+    std::unique_ptr<WindowStateManager> m_windowStateManager;
 };
 
 #endif // CONFIGURATIONMANAGER_H

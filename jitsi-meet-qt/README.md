@@ -16,60 +16,81 @@ Qt版本的Jitsi Meet桌面应用程序，基于原始的Electron版本重新实
 ## 系统要求
 
 - Windows 10 或更高版本
-- Qt 5.15.2 或更高版本
+- Qt 6.8.3 或更高版本
 - MinGW 编译器
-- 支持WebEngine的系统
+- CMake 3.20 或更高版本
 
 ## 构建说明
 
-### 使用CMake
+### 使用构建脚本
 
-```bash
+```cmd
+build.bat
+```
+
+### 手动构建
+
+```cmd
 mkdir build
 cd build
-cmake ..
-cmake --build .
+cmake -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release ..
+cmake --build . --config Release
 ```
 
-### 使用qmake
+## 使用的现代C++17特性
 
-```bash
-qmake jitsi-meet-qt.pro
-make
-```
+- `std::string_view` 高效字符串处理
+- `std::optional` 可选返回值
+- `std::unique_ptr` 自动内存管理
+- `constexpr` 编译时常量
+- `[[nodiscard]]` 属性标记重要返回值
+- `noexcept` 异常安全规范
+- 结构化绑定和auto类型推导
 
 ## 项目结构
 
 ```
 jitsi-meet-qt/
-├── src/                    # 源代码
+├── src/                    # 源代码 (.cpp files)
 │   ├── main.cpp           # 程序入口
-│   ├── MainApplication.cpp # 主应用程序类
-│   ├── windows/           # 窗口类
-│   ├── dialogs/           # 对话框类
-│   ├── widgets/           # 自定义控件
-│   ├── models/            # 数据模型
-│   └── utils/             # 工具类
-├── include/               # 头文件
-├── resources/             # 资源文件
-│   ├── icons/            # 图标
-│   ├── images/           # 图片
-│   ├── styles/           # 样式表
-│   └── translations/     # 翻译文件
-├── tests/                # 测试文件
-├── CMakeLists.txt        # CMake配置
-└── jitsi-meet-qt.pro    # qmake配置
+│   └── MainApplication.cpp # 主应用程序类实现
+├── include/               # 头文件 (.h files)
+│   └── MainApplication.h  # 主应用程序类声明
+├── resources/             # 资源文件 (图标、图片等)
+├── tests/                 # 单元测试和集成测试
+│   ├── CMakeLists.txt    # 测试构建配置
+│   ├── test_main.cpp     # 测试运行器
+│   └── test_MainApplication.cpp # MainApplication测试
+├── build/                 # 构建输出目录 (构建时创建)
+├── CMakeLists.txt        # 主CMake配置
+├── build.bat             # Windows构建脚本
+└── README.md             # 说明文件
 ```
+
+## 已实现功能
+
+### 任务1: 项目结构和核心框架 ✅
+
+- ✅ Qt项目目录结构 (src, include, resources, tests)
+- ✅ CMakeLists.txt配置Qt 6.8.3、WebSocket、Multimedia、Network依赖
+- ✅ C++17标准和MinGW编译器配置
+- ✅ MainApplication类使用现代C++17特性
+- ✅ 单例模式确保应用程序只有一个实例运行
+
+## 满足的需求
+
+- **需求 1.1**: 应用程序启动时显示欢迎界面
+- **需求 1.2**: 使用Qt 6.8.3框架和C++17标准
+- **需求 1.3**: 显示应用程序标题"Jitsi Meet"
 
 ## 开发说明
 
-本项目使用C++14标准，遵循Qt编程规范。主要组件包括：
+本项目使用C++17标准，遵循现代C++编程规范。当前已实现的主要组件：
 
-- **MainApplication**: 应用程序入口和单例管理
-- **WindowManager**: 窗口管理和切换
-- **ConfigurationManager**: 配置管理和持久化
-- **ProtocolHandler**: 协议链接处理
-- **TranslationManager**: 多语言支持
+- **MainApplication**: 应用程序入口点和单例管理，支持单实例运行
+  - 使用现代C++17特性如`std::string_view`、`std::optional`
+  - 实现单例模式确保只有一个应用程序实例
+  - 支持协议URL处理和实例间通信
 
 ## 协议支持
 

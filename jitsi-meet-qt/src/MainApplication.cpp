@@ -1,235 +1,327 @@
 #include "MainApplication.h"
-#include "WindowManager.h"
-#include "ConfigurationManager.h"
 #include "ProtocolHandler.h"
+#include "WindowManager.h"
 #include "TranslationManager.h"
+#include "ConfigurationManager.h"
+#include "ConferenceManager.h"
+#include "MediaManager.h"
+#include "ChatManager.h"
+#include "ScreenShareManager.h"
+#include "AuthenticationManager.h"
+#include "ErrorRecoveryManager.h"
+#include "ThemeManager.h"
 #include "PerformanceManager.h"
-#include "MemoryLeakDetector.h"
-#include "StartupOptimizer.h"
-#include "OptimizedRecentManager.h"
-#include "MemoryProfiler.h"
-#include "JitsiConstants.h"
-
-#include <QDir>
-#include <QStandardPaths>
-#include <QLocalSocket>
-#include <QTimer>
-#include <QDebug>
 #include <QCommandLineParser>
-#include <QCommandLineOption>
+#include <QStandardPaths>
+#include <QDir>
+#include <QDebug>
+#include <QMessageBox>
+#include <algorithm>
+#include <string>
 
-// 静态成员初始化
+// Static member initialization
 MainApplication* MainApplication::s_instance = nullptr;
 
 MainApplication::MainApplication(int argc, char *argv[])
     : QApplication(argc, argv)
-    , m_localServer(nullptr)
-    , m_isFirstInstance(false)
-    , m_windowManager(nullptr)
-    , m_configManager(nullptr)
+    , m_serverName(QString::fromUtf8(SERVER_NAME.data(), static_cast<int>(SERVER_NAME.size())))
     , m_protocolHandler(nullptr)
+    , m_windowManager(nullptr)
     , m_translationManager(nullptr)
+    , m_configurationManager(nullptr)
+    , m_conferenceManager(nullptr)
+    , m_mediaManager(nullptr)
+    , m_chatManager(nullptr)
+    , m_screenShareManager(nullptr)
+    , m_authenticationManager(nullptr)
+    , m_errorRecoveryManager(nullptr)
+    , m_themeManager(nullptr)
     , m_performanceManager(nullptr)
-    , m_memoryLeakDetector(nullptr)
-    , m_startupOptimizer(nullptr)
-    , m_recentManager(nullptr)
-    , m_memoryProfiler(nullptr)
-    , m_showWelcome(true)
 {
-    // 设置应用程序信息
-    setApplicationName(JitsiConstants::APP_NAME);
-    setApplicationVersion(JitsiConstants::APP_VERSION);
-    setOrganizationName(JitsiConstants::APP_ORGANIZATION);
-    setOrganizationDomain(JitsiConstants::APP_DOMAIN);
-    
-    // 设置单例实例
+    // Set singleton instance
     s_instance = this;
     
-    // 解析命令行参数
-    parseCommandLineArguments();
+    // Set application properties
+    setApplicationName(QString::fromUtf8(applicationTitle().data(), 
+                                       static_cast<int>(applicationTitle().size())));
+    setApplicationVersion("1.0.0");
+    setOrganizationName("Jitsi Meet Qt");
+    setOrganizationDomain("jitsi.org");
     
-    // 设置单例模式
-    m_isFirstInstance = setupSingleInstance();
-    
-    if (m_isFirstInstance) {
-        // 第一个实例，初始化应用程序
-        initializeManagers();
-        registerProtocolHandler();
-        
-        // 连接退出信号
-        connect(this, &QApplication::aboutToQuit, this, &MainApplication::onAboutToQuit);
-        
-        qDebug() << "MainApplication initialized as first instance";
-    } else {
-        // 不是第一个实例，发送消息给第一个实例然后退出
-        QString message = m_startupUrl.isEmpty() ? "activate" : m_startupUrl;
-        if (sendMessageToFirstInstance(message)) {
-            qDebug() << "Message sent to first instance:" << message;
+    // Setup single instance mechanism
+    if (!setupSingleInstance()) {
+        // This is a second instance, try to communicate with primary
+        if (auto protocolUrl = parseCommandLineArguments(); protocolUrl.has_value()) {
+            sendToPrimaryInstance(protocolUrl.value());
+        } else {
+            sendToPrimaryInstance("activate");
         }
         
-        // 延迟退出，确保消息发送完成
+        // Exit second instance
         QTimer::singleShot(100, this, &QApplication::quit);
-    }
-}
-
-MainApplication::~MainApplication()
-{
-    if (m_localServer) {
-        m_localServer->close();
-        delete m_localServer;
-    }
-    
-    s_instance = nullptr;
-}
-
-MainApplication* MainApplication::instance()
-{
-    return s_instance;
-}
-
-void MainApplication::handleProtocolUrl(const QString& url)
-{
-    if (!m_windowManager) {
-        qWarning() << "WindowManager not initialized";
         return;
     }
     
-    qDebug() << "Handling protocol URL:" << url;
+    // Initialize primary instance
+    initializeApplication();
     
-    if (m_protocolHandler && m_protocolHandler->isValidProtocolUrl(url)) {
-        QString parsedUrl = m_protocolHandler->parseProtocolUrl(url);
-        if (!parsedUrl.isEmpty()) {
-            // 显示会议窗口并加载URL
-            QVariantMap data;
-            data["url"] = parsedUrl;
-            m_windowManager->showWindow(WindowManager::ConferenceWindow, data);
-        } else {
-            // URL解析失败，显示欢迎窗口
-            m_windowManager->showWindow(WindowManager::WelcomeWindow);
-        }
-    } else {
-        // 无效的协议URL，显示欢迎窗口
-        m_windowManager->showWindow(WindowManager::WelcomeWindow);
+    // Handle command line arguments for primary instance
+    if (auto protocolUrl = parseCommandLineArguments(); protocolUrl.has_value()) {
+        QTimer::singleShot(100, [this, url = protocolUrl.value()]() {
+            handleProtocolUrl(url.toStdString());
+        });
     }
 }
 
-WindowManager* MainApplication::windowManager() const
-{
-    return m_windowManager;
-}
-
-ConfigurationManager* MainApplication::configurationManager() const
-{
-    return m_configManager;
-}
-
-ProtocolHandler* MainApplication::protocolHandler() const
-{
-    return m_protocolHandler;
-}
-
-TranslationManager* MainApplication::translationManager() const
-{
-    return m_translationManager;
-}
-
-void MainApplication::onSecondInstance(const QString& arguments)
-{
-    qDebug() << "Second instance detected with arguments:" << arguments;
+MainApplication::~MainApplication() {
+    qDebug() << "MainApplication destructor called";
     
-    if (arguments == "activate") {
-        // 激活当前窗口
-        if (m_windowManager) {
-            auto currentWindow = m_windowManager->currentWindow();
-            if (currentWindow) {
-                currentWindow->raise();
-                currentWindow->activateWindow();
-            }
-        }
-    } else {
-        // 处理协议URL
-        handleProtocolUrl(arguments);
-    }
-}
-
-void MainApplication::onAboutToQuit()
-{
-    qDebug() << "Application about to quit";
-    
-    // 保存配置
-    if (m_configManager) {
-        // 配置会在析构时自动保存
-    }
-    
-    // 清理资源
     if (m_localServer) {
         m_localServer->close();
+        QLocalServer::removeServer(m_serverName);
     }
-}
-
-void MainApplication::onNewConnection()
-{
-    QLocalSocket* socket = m_localServer->nextPendingConnection();
-    if (socket) {
-        connect(socket, &QLocalSocket::readyRead, this, &MainApplication::onSocketReadyRead);
-        connect(socket, &QLocalSocket::disconnected, socket, &QLocalSocket::deleteLater);
+    
+    // Clean up managers in reverse order of creation
+    if (m_performanceManager) {
+        delete m_performanceManager;
+        m_performanceManager = nullptr;
     }
+    
+    if (m_themeManager) {
+        delete m_themeManager;
+        m_themeManager = nullptr;
+    }
+    
+    if (m_errorRecoveryManager) {
+        delete m_errorRecoveryManager;
+        m_errorRecoveryManager = nullptr;
+    }
+    
+    if (m_authenticationManager) {
+        delete m_authenticationManager;
+        m_authenticationManager = nullptr;
+    }
+    
+    if (m_screenShareManager) {
+        delete m_screenShareManager;
+        m_screenShareManager = nullptr;
+    }
+    
+    if (m_chatManager) {
+        delete m_chatManager;
+        m_chatManager = nullptr;
+    }
+    
+    if (m_mediaManager) {
+        delete m_mediaManager;
+        m_mediaManager = nullptr;
+    }
+    
+    if (m_conferenceManager) {
+        delete m_conferenceManager;
+        m_conferenceManager = nullptr;
+    }
+    
+    if (m_windowManager) {
+        delete m_windowManager;
+        m_windowManager = nullptr;
+    }
+    
+    if (m_configurationManager) {
+        delete m_configurationManager;
+        m_configurationManager = nullptr;
+    }
+    
+    if (m_translationManager) {
+        delete m_translationManager;
+        m_translationManager = nullptr;
+    }
+    
+    if (m_protocolHandler) {
+        m_protocolHandler->unregisterProtocol();
+        delete m_protocolHandler;
+        m_protocolHandler = nullptr;
+    }
+    
+    s_instance = nullptr;
+    qDebug() << "MainApplication destroyed";
 }
 
-void MainApplication::onSocketReadyRead()
-{
-    QLocalSocket* socket = qobject_cast<QLocalSocket*>(sender());
-    if (!socket) return;
-    
-    QByteArray data = socket->readAll();
-    QString message = QString::fromUtf8(data);
-    
-    qDebug() << "Received message from second instance:" << message;
-    
-    // 处理消息
-    onSecondInstance(message);
-    
-    socket->disconnectFromServer();
+MainApplication* MainApplication::instance() noexcept {
+    return s_instance;
 }
 
-bool MainApplication::setupSingleInstance()
-{
-    m_serverName = QString("%1_SingleInstance_%2")
-                   .arg(applicationName())
-                   .arg(QDir::home().absolutePath().replace('/', '_').replace('\\', '_'));
+void MainApplication::handleProtocolUrl(std::string_view url) {
+    if (!isValidProtocolUrl(url)) {
+        qWarning() << "Invalid protocol URL:" << QString::fromUtf8(url.data(), 
+                                                                  static_cast<int>(url.size()));
+        return;
+    }
     
-    // 尝试连接到现有服务器
-    QLocalSocket socket;
-    socket.connectToServer(m_serverName);
+    const QString qUrl = QString::fromUtf8(url.data(), static_cast<int>(url.size()));
+    emit protocolUrlReceived(qUrl);
+}
+
+bool MainApplication::setupSingleInstance() {
+    // Try to connect to existing instance first
+    m_localSocket = std::make_unique<QLocalSocket>();
+    m_localSocket->connectToServer(m_serverName);
     
-    if (socket.waitForConnected(1000)) {
-        // 服务器已存在，说明已有实例在运行
-        socket.disconnectFromServer();
+    if (m_localSocket->waitForConnected(CONNECTION_TIMEOUT_MS)) {
+        // Another instance is already running
+        m_isPrimaryInstance = false;
         return false;
     }
     
-    // 创建本地服务器
-    m_localServer = new QLocalServer(this);
+    // No existing instance, create server
+    m_localServer = std::make_unique<QLocalServer>();
     
-    // 清理可能存在的旧服务器
+    // Remove any stale server
     QLocalServer::removeServer(m_serverName);
     
     if (!m_localServer->listen(m_serverName)) {
-        qWarning() << "Failed to create local server:" << m_localServer->errorString();
-        delete m_localServer;
-        m_localServer = nullptr;
+        qCritical() << "Failed to create local server:" << m_localServer->errorString();
         return false;
     }
     
-    connect(m_localServer, &QLocalServer::newConnection, this, &MainApplication::onNewConnection);
+    // Connect server signals
+    connect(m_localServer.get(), &QLocalServer::newConnection,
+            this, &MainApplication::onNewConnection);
     
+    m_isPrimaryInstance = true;
     return true;
 }
 
-void MainApplication::registerProtocolHandler()
-{
-    if (m_protocolHandler) {
-        if (m_protocolHandler->registerProtocol()) {
+void MainApplication::initializeApplication() {
+    qDebug() << "Initializing Jitsi Meet Qt application...";
+    
+    // Set application icon and window properties
+    setQuitOnLastWindowClosed(true);
+    
+    // Enable high DPI scaling
+    setAttribute(Qt::AA_EnableHighDpiScaling, true);
+    setAttribute(Qt::AA_UseHighDpiPixmaps, true);
+    
+    // Initialize all manager components
+    initializeManagers();
+    
+    // Setup component connections
+    setupComponentConnections();
+    
+    // Initialize user interface
+    initializeUserInterface();
+    
+    qDebug() << "Jitsi Meet Qt application initialized successfully";
+    qDebug() << "Qt version:" << qVersion();
+    qDebug() << "C++ standard:" << __cplusplus;
+}
+
+std::optional<QString> MainApplication::parseCommandLineArguments() const {
+    QCommandLineParser parser;
+    parser.setApplicationDescription("Jitsi Meet Qt Desktop Application");
+    parser.addHelpOption();
+    parser.addVersionOption();
+    
+    // Add protocol URL option
+    QCommandLineOption urlOption(QStringList() << "u" << "url",
+                                "Join conference from URL",
+                                "url");
+    parser.addOption(urlOption);
+    
+    // Process arguments
+    parser.process(*this);
+    
+    // Check for protocol URL
+    if (parser.isSet(urlOption)) {
+        return parser.value(urlOption);
+    }
+    
+    // Check positional arguments for protocol URL
+    const auto args = parser.positionalArguments();
+    for (const auto& arg : args) {
+        if (isValidProtocolUrl(arg.toStdString())) {
+            return arg;
+        }
+    }
+    
+    return std::nullopt;
+}
+
+bool MainApplication::isValidProtocolUrl(std::string_view url) noexcept {
+    constexpr std::string_view PROTOCOL_PREFIX = "jitsi-meet://";
+    
+    if (url.size() <= PROTOCOL_PREFIX.size()) {
+        return false;
+    }
+    
+    return url.substr(0, PROTOCOL_PREFIX.size()) == PROTOCOL_PREFIX;
+}
+
+bool MainApplication::sendToPrimaryInstance(const QString& message) {
+    if (!m_localSocket || m_localSocket->state() != QLocalSocket::ConnectedState) {
+        return false;
+    }
+    
+    const QByteArray data = message.toUtf8();
+    const qint64 written = m_localSocket->write(data);
+    
+    if (written != data.size()) {
+        qWarning() << "Failed to send complete message to primary instance";
+        return false;
+    }
+    
+    return m_localSocket->waitForBytesWritten(CONNECTION_TIMEOUT_MS);
+}
+
+void MainApplication::onNewConnection() {
+    if (!m_localServer) {
+        return;
+    }
+    
+    auto* socket = m_localServer->nextPendingConnection();
+    if (!socket) {
+        return;
+    }
+    
+    connect(socket, &QLocalSocket::readyRead, [this, socket]() {
+        const QByteArray data = socket->readAll();
+        const QString message = QString::fromUtf8(data);
+        
+        if (message == "activate") {
+            emit secondInstanceDetected(QString());
+        } else if (isValidProtocolUrl(message.toStdString())) {
+            emit protocolUrlReceived(message);
+        }
+        
+        socket->disconnectFromServer();
+    });
+    
+    connect(socket, &QLocalSocket::disconnected, socket, &QLocalSocket::deleteLater);
+}
+
+void MainApplication::onSecondInstanceData() {
+    auto* socket = qobject_cast<QLocalSocket*>(sender());
+    if (!socket) {
+        return;
+    }
+    
+    const QByteArray data = socket->readAll();
+    const QString message = QString::fromUtf8(data);
+    
+    emit secondInstanceDetected(message);
+}
+
+void MainApplication::initializeProtocolHandler() {
+    if (!m_protocolHandler) {
+        m_protocolHandler = new ProtocolHandler(this);
+        
+        // Connect protocol handler signals
+        connect(m_protocolHandler, &ProtocolHandler::protocolUrlReceived,
+                this, &MainApplication::onProtocolUrlReceived);
+        
+        // Register the protocol
+        bool registered = m_protocolHandler->registerProtocol();
+        if (registered) {
             qDebug() << "Protocol handler registered successfully";
         } else {
             qWarning() << "Failed to register protocol handler";
@@ -237,306 +329,244 @@ void MainApplication::registerProtocolHandler()
     }
 }
 
-void MainApplication::initializeManagers()
-{
-    qDebug() << "Initializing all application managers...";
-    
-    // 创建启动优化器并开始优化
-    m_startupOptimizer = new StartupOptimizer(this);
-    m_startupOptimizer->setOptimizationLevel(StartupOptimizer::Moderate);
-    m_startupOptimizer->enableFastStartup();
-    
-    // 创建性能管理器
-    m_performanceManager = new PerformanceManager(this);
-    m_performanceManager->startStartupTimer();
-    
-    // 创建内存泄漏检测器（仅在调试模式下）
-#ifdef QT_DEBUG
-    m_memoryLeakDetector = new MemoryLeakDetector(this);
-    m_memoryLeakDetector->startLeakDetection();
-    
-    // 创建内存分析器（仅在调试模式下）
-    m_memoryProfiler = new MemoryProfiler(this);
-    m_memoryProfiler->startProfiling();
-#endif
-    
-    // 创建配置管理器（必须首先创建，其他组件依赖它）
-    m_configManager = new ConfigurationManager(this);
-    qDebug() << "ConfigurationManager initialized";
-    
-    // 创建优化的最近项目管理器
-    m_recentManager = new OptimizedRecentManager(this);
-    m_recentManager->loadRecentItemsAsync();
-    
-    // 创建翻译管理器
-    m_translationManager = new TranslationManager(this);
-    qDebug() << "TranslationManager initialized";
-    
-    // 创建协议处理器
-    m_protocolHandler = new ProtocolHandler(this);
-    qDebug() << "ProtocolHandler initialized";
-    
-    // 创建窗口管理器
-    m_windowManager = new WindowManager(this);
-    
-    // 设置窗口管理器的依赖组件
-    m_windowManager->setConfigurationManager(m_configManager);
-    m_windowManager->setTranslationManager(m_translationManager);
-    qDebug() << "WindowManager initialized and configured";
-    
-    // 建立核心信号连接
-    setupCoreConnections();
-    
-    // 初始化翻译系统
-    m_translationManager->initialize();
-    
-    // 连接性能管理器信号
-    if (m_performanceManager) {
-        connect(m_performanceManager, &PerformanceManager::memoryWarning,
-                this, &MainApplication::onMemoryWarning);
+void MainApplication::setWindowManager(WindowManager* windowManager) {
+    if (m_windowManager == windowManager) {
+        return; // Already set
     }
     
-    // 连接内存泄漏检测器信号
-#ifdef QT_DEBUG
-    if (m_memoryLeakDetector) {
-        connect(m_memoryLeakDetector, &MemoryLeakDetector::memoryLeakDetected,
-                this, &MainApplication::onMemoryLeakDetected);
+    m_windowManager = windowManager;
+    
+    if (m_windowManager) {
+        qDebug() << "WindowManager set in MainApplication";
     }
-#endif
-    
-    qDebug() << "All managers initialized successfully";
-    
-    // 标记启动完成
-    if (m_performanceManager) {
-        m_performanceManager->markStartupComplete();
-    }
-    
-    // 显示初始窗口
-    showInitialWindow();
 }
 
-void MainApplication::parseCommandLineArguments()
-{
-    QCommandLineParser parser;
-    parser.setApplicationDescription("Qt version of Jitsi Meet desktop application");
-    parser.addHelpOption();
-    parser.addVersionOption();
+void MainApplication::onProtocolUrlReceived(const QString& url) {
+    qDebug() << "Protocol URL received:" << url;
     
-    // 添加URL参数选项
-    QCommandLineOption urlOption(QStringList() << "u" << "url",
-                                "Open specific meeting URL",
-                                "url");
-    parser.addOption(urlOption);
+    if (m_protocolHandler) {
+        QString parsedUrl = m_protocolHandler->parseProtocolUrl(url);
+        if (!parsedUrl.isEmpty()) {
+            emit protocolUrlReceived(parsedUrl);
+        } else {
+            qWarning() << "Failed to parse protocol URL:" << url;
+        }
+    }
+}void Mai
+nApplication::initializeTranslationManager() {
+    // Create translation manager
+    m_translationManager = new TranslationManager(this);
     
-    // 添加隐藏欢迎窗口选项
-    QCommandLineOption noWelcomeOption(QStringList() << "no-welcome",
-                                      "Don't show welcome window on startup");
-    parser.addOption(noWelcomeOption);
+    // Initialize translation system
+    if (m_translationManager->initialize()) {
+        qDebug() << "TranslationManager initialized successfully";
+        qDebug() << "Current language:" << m_translationManager->currentLanguageCode();
+        qDebug() << "System language:" << static_cast<int>(m_translationManager->systemLanguage());
+        
+        // Log available languages
+        auto availableLanguages = m_translationManager->availableLanguages();
+        qDebug() << "Available languages:" << availableLanguages.size();
+        for (const auto& langInfo : availableLanguages) {
+            qDebug() << "  -" << langInfo.code << "(" << langInfo.nativeName << ")";
+        }
+    } else {
+        qWarning() << "Failed to initialize TranslationManager";
+    }
+}
+
+void MainApplication::initializeManagers() {
+    qDebug() << "Initializing manager components...";
     
-    parser.process(*this);
+    // 1. Initialize configuration manager first (other components depend on it)
+    m_configurationManager = new ConfigurationManager(this);
+    qDebug() << "ConfigurationManager initialized";
     
-    // 解析URL参数
-    if (parser.isSet(urlOption)) {
-        m_startupUrl = parser.value(urlOption);
+    // 2. Initialize translation manager
+    initializeTranslationManager();
+    
+    // 3. Initialize theme manager
+    m_themeManager = new ThemeManager(this);
+    qDebug() << "ThemeManager initialized";
+    
+    // 4. Initialize performance manager
+    m_performanceManager = new PerformanceManager(this);
+    qDebug() << "PerformanceManager initialized";
+    
+    // 5. Initialize error recovery manager
+    m_errorRecoveryManager = new ErrorRecoveryManager(this);
+    qDebug() << "ErrorRecoveryManager initialized";
+    
+    // 6. Initialize authentication manager
+    m_authenticationManager = new AuthenticationManager(this);
+    qDebug() << "AuthenticationManager initialized";
+    
+    // 7. Initialize media manager
+    m_mediaManager = new MediaManager(this);
+    qDebug() << "MediaManager initialized";
+    
+    // 8. Initialize conference manager
+    m_conferenceManager = new ConferenceManager(this);
+    qDebug() << "ConferenceManager initialized";
+    
+    // 9. Initialize chat manager
+    m_chatManager = new ChatManager(this);
+    if (m_conferenceManager && m_conferenceManager->xmppClient()) {
+        m_chatManager->setXMPPClient(m_conferenceManager->xmppClient());
+    }
+    qDebug() << "ChatManager initialized";
+    
+    // 10. Initialize screen share manager
+    m_screenShareManager = new ScreenShareManager(this);
+    qDebug() << "ScreenShareManager initialized";
+    
+    // 11. Initialize window manager
+    m_windowManager = new WindowManager(this);
+    if (m_configurationManager) {
+        m_windowManager->setConfigurationManager(m_configurationManager);
+    }
+    if (m_translationManager) {
+        m_windowManager->setTranslationManager(m_translationManager);
+    }
+    qDebug() << "WindowManager initialized";
+    
+    // 12. Initialize protocol handler
+    initializeProtocolHandler();
+    
+    qDebug() << "All manager components initialized successfully";
+}
+
+void MainApplication::setupComponentConnections() {
+    qDebug() << "Setting up component connections...";
+    
+    if (!m_windowManager || !m_configurationManager || !m_conferenceManager) {
+        qWarning() << "Cannot setup connections: required components not initialized";
+        return;
     }
     
-    // 检查位置参数（协议URL）
-    const QStringList args = parser.positionalArguments();
-    if (!args.isEmpty()) {
-        QString firstArg = args.first();
-        if (firstArg.startsWith(JitsiConstants::PROTOCOL_PREFIX)) {
-            m_startupUrl = firstArg;
+    // Connect protocol URL handling to window manager
+    connect(this, &MainApplication::protocolUrlReceived,
+            m_windowManager, &WindowManager::onJoinConference);
+    
+    // Connect second instance detection to window manager
+    connect(this, &MainApplication::secondInstanceDetected,
+            [this](const QString& arguments) {
+                qDebug() << "Second instance detected, bringing window to front";
+                if (m_windowManager) {
+                    // Show welcome window and bring to front
+                    m_windowManager->showWindow(WindowManager::WelcomeWindow);
+                    if (auto* currentWindow = m_windowManager->currentWindow()) {
+                        currentWindow->raise();
+                        currentWindow->activateWindow();
+                    }
+                }
+            });
+    
+    // Connect conference manager to other components
+    if (m_conferenceManager && m_mediaManager) {
+        // Connect media manager to conference manager
+        connect(m_mediaManager, &MediaManager::localVideoStarted,
+                m_conferenceManager, [this]() {
+                    qDebug() << "Local video started, updating conference state";
+                });
+        
+        connect(m_mediaManager, &MediaManager::localAudioStarted,
+                m_conferenceManager, [this]() {
+                    qDebug() << "Local audio started, updating conference state";
+                });
+    }
+    
+    // Connect chat manager to conference manager
+    if (m_chatManager && m_conferenceManager) {
+        connect(m_conferenceManager, &ConferenceManager::conferenceJoined,
+                m_chatManager, [this](const ConferenceManager::ConferenceInfo& info) {
+                    qDebug() << "Conference joined, chat manager ready";
+                });
+    }
+    
+    // Connect screen share manager to conference manager
+    if (m_screenShareManager && m_conferenceManager) {
+        connect(m_conferenceManager, &ConferenceManager::conferenceJoined,
+                m_screenShareManager, [this](const ConferenceManager::ConferenceInfo& info) {
+                    qDebug() << "Conference joined, screen share manager ready";
+                });
+    }
+    
+    // Connect error recovery manager to all components
+    if (m_errorRecoveryManager) {
+        if (m_conferenceManager) {
+            connect(m_conferenceManager, &ConferenceManager::errorOccurred,
+                    m_errorRecoveryManager, &ErrorRecoveryManager::handleError);
+        }
+        if (m_mediaManager) {
+            // Media manager error handling will be connected when available
         }
     }
     
-    // 解析欢迎窗口选项
-    if (parser.isSet(noWelcomeOption)) {
-        m_showWelcome = false;
+    // Connect configuration changes to relevant components
+    if (m_configurationManager) {
+        connect(m_configurationManager, &ConfigurationManager::languageChanged,
+                [this](const QString& language) {
+                    qDebug() << "Language changed to:" << language;
+                    if (m_translationManager) {
+                        m_translationManager->setLanguage(language);
+                    }
+                });
+        
+        connect(m_configurationManager, &ConfigurationManager::darkModeChanged,
+                [this](bool darkMode) {
+                    qDebug() << "Dark mode changed to:" << darkMode;
+                    if (m_themeManager) {
+                        auto theme = darkMode ? ThemeManager::DarkTheme : ThemeManager::LightTheme;
+                        m_themeManager->setTheme(theme);
+                    }
+                });
     }
     
-    qDebug() << "Parsed command line - URL:" << m_startupUrl << "ShowWelcome:" << m_showWelcome;
+    qDebug() << "Component connections setup completed";
 }
 
-bool MainApplication::sendMessageToFirstInstance(const QString& message)
-{
-    QLocalSocket socket;
-    socket.connectToServer(m_serverName);
+void MainApplication::initializeUserInterface() {
+    qDebug() << "Initializing user interface...";
     
-    if (!socket.waitForConnected(1000)) {
-        qWarning() << "Failed to connect to first instance";
-        return false;
+    if (!m_windowManager) {
+        qWarning() << "Cannot initialize UI: WindowManager not available";
+        return;
     }
     
-    QByteArray data = message.toUtf8();
-    socket.write(data);
-    socket.flush();
+    // Set window manager in main application for protocol handling
+    setWindowManager(m_windowManager);
     
-    if (!socket.waitForBytesWritten(1000)) {
-        qWarning() << "Failed to send message to first instance";
-        return false;
+    // Apply theme settings
+    if (m_themeManager && m_configurationManager) {
+        bool darkMode = m_configurationManager->isDarkMode();
+        auto theme = darkMode ? ThemeManager::DarkTheme : ThemeManager::LightTheme;
+        m_themeManager->setTheme(theme);
+        qDebug() << "Applied theme settings, dark mode:" << darkMode;
     }
     
-    socket.disconnectFromServer();
-    return true;
+    // Show welcome window as the initial interface
+    QTimer::singleShot(100, [this]() {
+        if (m_windowManager) {
+            m_windowManager->showWindow(WindowManager::WelcomeWindow);
+            qDebug() << "Welcome window displayed";
+        }
+    });
+    
+    qDebug() << "User interface initialized";
 }
 
-void MainApplication::onWindowChanged(int type)
-{
-    qDebug() << "Window changed to type:" << type;
+void MainApplication::initializeProtocolHandler() {
+    // Create protocol handler
+    m_protocolHandler = new ProtocolHandler(this);
     
-    // 可以在这里添加窗口切换时的额外逻辑
-    // 例如更新系统托盘图标、保存状态等
-}
-
-void MainApplication::onWindowStateChanged(int type, int state)
-{
-    qDebug() << "Window state changed - Type:" << type << "State:" << state;
-    
-    // 可以在这里添加窗口状态改变时的额外逻辑
-    // 例如最小化到系统托盘等
-}
-
-void MainApplication::onConfigurationChanged()
-{
-    qDebug() << "Configuration changed, updating components";
-    
-    // 更新所有组件的配置
-    if (m_windowManager && m_configManager) {
-        // 通知窗口管理器配置已更改
-        // 窗口管理器会自动更新其管理的窗口
-    }
-    
-    if (m_translationManager && m_configManager) {
-        // 如果语言设置改变，翻译管理器会自动处理
-    }
-}
-
-void MainApplication::onMemoryWarning(qint64 memoryUsage)
-{
-    qWarning() << "Memory warning: Current usage" << memoryUsage / (1024*1024) << "MB";
-    
-    // 执行内存清理
-    if (m_performanceManager) {
-        m_performanceManager->performMemoryCleanup();
-    }
-    
-    // 通知窗口管理器进行内存优化
-    if (m_windowManager) {
-        // 窗口管理器可以清理不必要的缓存
-    }
-}
-
-void MainApplication::onMemoryLeakDetected(const QList<MemoryLeakDetector::AllocationInfo>& leaks)
-{
-    qWarning() << "Memory leaks detected:" << leaks.size() << "potential leaks";
-    
-#ifdef QT_DEBUG
-    // 在调试模式下生成详细报告
-    if (m_memoryLeakDetector) {
-        m_memoryLeakDetector->generateLeakReport();
-    }
-#endif
-}
-
-PerformanceManager* MainApplication::performanceManager() const
-{
-    return m_performanceManager;
-}
-
-OptimizedRecentManager* MainApplication::recentManager() const
-{
-    return m_recentManager;
-}
-
-void MainApplication::setupCoreConnections()
-{
-    qDebug() << "Setting up core signal connections...";
-    
-    // 协议处理器连接
-    connect(m_protocolHandler, &ProtocolHandler::protocolUrlReceived,
-            this, &MainApplication::handleProtocolUrl);
-    
-    // 配置管理器和翻译管理器连接
-    connect(m_configManager, &ConfigurationManager::languageChanged,
-            m_translationManager, &TranslationManager::onConfigLanguageChanged);
-    
-    // 窗口管理器信号连接
-    connect(m_windowManager, &WindowManager::windowChanged,
-            this, &MainApplication::onWindowChanged);
-    connect(m_windowManager, &WindowManager::windowStateChanged,
-            this, &MainApplication::onWindowStateChanged);
-    connect(m_windowManager, &WindowManager::dataTransferred,
-            this, &MainApplication::onDataTransferred);
-    connect(m_windowManager, &WindowManager::windowCreated,
-            this, &MainApplication::onWindowCreated);
-    connect(m_windowManager, &WindowManager::windowDestroyed,
-            this, &MainApplication::onWindowDestroyed);
-    
-    // 配置变更信号到窗口管理器
-    connect(m_configManager, &ConfigurationManager::configurationChanged,
-            this, &MainApplication::onConfigurationChanged);
-    
-    // 最近项目管理器连接
-    if (m_recentManager) {
-        connect(m_recentManager, &OptimizedRecentManager::recentItemsChanged,
-                this, &MainApplication::onRecentItemsChanged);
-    }
-    
-    qDebug() << "Core signal connections established";
-}
-
-void MainApplication::showInitialWindow()
-{
-    qDebug() << "Showing initial window...";
-    
-    if (!m_startupUrl.isEmpty()) {
-        qDebug() << "Starting with protocol URL:" << m_startupUrl;
-        handleProtocolUrl(m_startupUrl);
-    } else if (m_showWelcome) {
-        qDebug() << "Showing welcome window";
-        m_windowManager->showWindow(WindowManager::WelcomeWindow);
+    // Register protocol handler
+    if (m_protocolHandler->registerProtocol()) {
+        qDebug() << "Protocol handler registered successfully";
+        
+        // Connect protocol URL signals
+        connect(m_protocolHandler, &ProtocolHandler::protocolUrlReceived,
+                this, &MainApplication::onProtocolUrlReceived);
     } else {
-        qDebug() << "No initial window to show";
-    }
-}
-
-void MainApplication::onDataTransferred(int fromType, int toType, const QVariantMap& data)
-{
-    qDebug() << "Data transferred from window type" << fromType << "to type" << toType 
-             << "with" << data.size() << "data items";
-    
-    // 可以在这里添加数据传递的额外处理逻辑
-    // 例如记录用户行为、更新统计信息等
-}
-
-void MainApplication::onWindowCreated(int type)
-{
-    qDebug() << "Window created - type:" << type;
-    
-    // 窗口创建后的额外处理
-    if (m_performanceManager) {
-        m_performanceManager->recordWindowCreation(type);
-    }
-}
-
-void MainApplication::onWindowDestroyed(int type)
-{
-    qDebug() << "Window destroyed - type:" << type;
-    
-    // 窗口销毁后的清理工作
-    if (m_performanceManager) {
-        m_performanceManager->recordWindowDestruction(type);
-    }
-}
-
-void MainApplication::onRecentItemsChanged()
-{
-    qDebug() << "Recent items changed, notifying windows";
-    
-    // 通知相关窗口更新最近项目列表
-    if (m_windowManager && m_windowManager->hasWindow(WindowManager::WelcomeWindow)) {
-        QVariantMap data;
-        data["action"] = "refreshRecentItems";
-        m_windowManager->sendDataToWindow(WindowManager::WelcomeWindow, data);
+        qWarning() << "Failed to register protocol handler";
     }
 }

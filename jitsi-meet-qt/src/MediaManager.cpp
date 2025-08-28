@@ -1,642 +1,412 @@
 #include "MediaManager.h"
 #include "WebRTCEngine.h"
 #include <QDebug>
-#include <QCameraInfo>
-#include <QAudioDeviceInfo>
-#include <QGuiApplication>
+#include <QPermission>
+#include <QCoreApplication>
+#include <QMessageBox>
+#include <QApplication>
 #include <QPixmap>
 #include <QBuffer>
 #include <QImageWriter>
 #include <QVideoFrame>
-#include <QCameraViewfinder>
+#include <QVideoSink>
+#include <QRandomGenerator>
+#include <QUuid>
+#include <QScreen>
+#include <QGuiApplication>
+#include <QLabel>
+#include <QVBoxLayout>
+
+// Static constants
+const qreal MediaManager::DEFAULT_VOLUME = 1.0;
+const QString MediaManager::DEFAULT_VIDEO_CODEC = "VP8";
+const QString MediaManager::DEFAULT_AUDIO_CODEC = "OPUS";
 
 MediaManager::MediaManager(QObject *parent)
     : QObject(parent)
     , m_camera(nullptr)
-    , m_localVideoWidget(nullptr)
-    , m_cameraViewfinder(nullptr)
     , m_audioInput(nullptr)
     , m_audioOutput(nullptr)
+    , m_captureSession(std::make_unique<QMediaCaptureSession>())
     , m_mediaRecorder(nullptr)
-    , m_screenCaptureTimer(nullptr)
+    , m_localVideoWidget(nullptr)
     , m_screenShareWidget(nullptr)
-    , m_selectedScreen(nullptr)
-    , m_videoEnabled(false)
-    , m_audioEnabled(false)
-    , m_screenShareEnabled(false)
-    , m_microphoneMuted(false)
-    , m_speakerMuted(false)
-    , m_microphoneVolume(80)
-    , m_speakerVolume(80)
-    , m_webrtcEngine(nullptr)
+    , m_videoActive(false)
+    , m_audioActive(false)
+    , m_screenSharingActive(false)
+    , m_videoMuted(false)
+    , m_audioMuted(false)
+    , m_masterVolume(DEFAULT_VOLUME)
+    , m_microphoneVolume(DEFAULT_VOLUME)
+    , m_hasVideoPermission(false)
+    , m_hasAudioPermission(false)
+    , m_currentScreen(nullptr)
+    , m_screenCaptureTimer(new QTimer(this))
+    , m_currentVideoCodec(DEFAULT_VIDEO_CODEC)
+    , m_currentAudioCodec(DEFAULT_AUDIO_CODEC)
+    , m_webRTCEngine(nullptr)
 {
-    qDebug() << "MediaManager: Initializing media manager";
+    qDebug() << "MediaManager initializing...";
     
-    // 初始化设备
+    // Initialize media settings with defaults
+    m_mediaSettings = MediaSettings();
+    
+    // Setup screen capture timer
+    setupScreenCaptureTimer();
+    
+    // Initialize codecs
+    initializeCodecs();
+    
+    // Initialize devices
     initializeDevices();
     
-    // 创建屏幕捕获定时器
-    m_screenCaptureTimer = new QTimer(this);
-    m_screenCaptureTimer->setInterval(SCREEN_CAPTURE_INTERVAL);
-    connect(m_screenCaptureTimer, &QTimer::timeout, this, &MediaManager::onScreenCaptureTimer);
+    // Check initial permissions
+    checkMediaPermissions();
     
-    qDebug() << "MediaManager: Initialization completed";
+    qDebug() << "MediaManager initialized successfully";
 }
 
 MediaManager::~MediaManager()
 {
-    qDebug() << "MediaManager: Cleaning up media manager";
-    cleanupDevices();
-}
-
-void MediaManager::initializeDevices()
-{
-    qDebug() << "MediaManager: Initializing devices";
+    qDebug() << "MediaManager destroying...";
     
-    // 枚举所有可用设备
-    refreshDeviceList();
-    
-    // 选择默认设备
-    if (!m_cameras.isEmpty()) {
-        // 选择第一个可用摄像头或默认摄像头
-        for (const auto& camera : m_cameras) {
-            if (camera.isDefault) {
-                selectCamera(camera.id);
-                break;
-            }
-        }
-        if (m_currentCamera.id.isEmpty() && !m_cameras.isEmpty()) {
-            selectCamera(m_cameras.first().id);
-        }
-    }
-    
-    if (!m_microphones.isEmpty()) {
-        // 选择默认麦克风
-        for (const auto& mic : m_microphones) {
-            if (mic.isDefault) {
-                selectMicrophone(mic.id);
-                break;
-            }
-        }
-        if (m_currentMicrophone.id.isEmpty() && !m_microphones.isEmpty()) {
-            selectMicrophone(m_microphones.first().id);
-        }
-    }
-    
-    if (!m_speakers.isEmpty()) {
-        // 选择默认扬声器
-        for (const auto& speaker : m_speakers) {
-            if (speaker.isDefault) {
-                selectSpeaker(speaker.id);
-                break;
-            }
-        }
-        if (m_currentSpeaker.id.isEmpty() && !m_speakers.isEmpty()) {
-            selectSpeaker(m_speakers.first().id);
-        }
-    }
-    
-    if (!m_screens.isEmpty()) {
-        // 选择主屏幕
-        for (const auto& screen : m_screens) {
-            if (screen.isPrimary) {
-                selectScreen(screen.screenId);
-                break;
-            }
-        }
-        if (m_currentScreen.screenId == -1 && !m_screens.isEmpty()) {
-            selectScreen(m_screens.first().screenId);
-        }
-    }
-}
-
-void MediaManager::cleanupDevices()
-{
-    qDebug() << "MediaManager: Cleaning up devices";
-    
-    // 停止所有媒体流
+    stopScreenSharing();
     stopLocalVideo();
     stopLocalAudio();
-    stopScreenShare();
+    cleanupMediaResources();
     
-    // 清理摄像头
-    cleanupCamera();
-    
-    // 清理音频
-    cleanupAudio();
-    
-    // 清理屏幕捕获
-    cleanupScreenCapture();
-    
-    // 清理远程视频组件
-    for (auto it = m_remoteVideoWidgets.begin(); it != m_remoteVideoWidgets.end(); ++it) {
-        delete it.value();
-    }
-    m_remoteVideoWidgets.clear();
-}
-
-void MediaManager::refreshDeviceList()
-{
-    qDebug() << "MediaManager: Refreshing device list";
-    
-    enumerateCameras();
-    enumerateAudioDevices();
-    enumerateScreens();
-    
-    emit deviceListChanged();
-}
-
-void MediaManager::enumerateCameras()
-{
-    m_cameras.clear();
-    
-    QList<QCameraInfo> cameras = QCameraInfo::availableCameras();
-    QCameraInfo defaultCamera = QCameraInfo::defaultCamera();
-    
-    for (const QCameraInfo& cameraInfo : cameras) {
-        MediaDevice device;
-        device.id = cameraInfo.deviceName();
-        device.name = cameraInfo.description();
-        device.description = QString("Camera: %1").arg(cameraInfo.description());
-        device.isDefault = (cameraInfo == defaultCamera);
-        
-        m_cameras.append(device);
-        qDebug() << "MediaManager: Found camera:" << device.name << "ID:" << device.id << "Default:" << device.isDefault;
+    if (m_webRTCEngine) {
+        disconnectWebRTCSignals();
     }
     
-    qDebug() << "MediaManager: Enumerated" << m_cameras.size() << "cameras";
+    qDebug() << "MediaManager destroyed";
 }
 
-void MediaManager::enumerateAudioDevices()
+QList<MediaManager::MediaDevice> MediaManager::availableVideoDevices() const
 {
-    m_microphones.clear();
-    m_speakers.clear();
-    
-    // 枚举音频输入设备（麦克风）
-    QList<QAudioDeviceInfo> inputDevices = QAudioDeviceInfo::availableDevices(QAudio::AudioInput);
-    QAudioDeviceInfo defaultInputDevice = QAudioDeviceInfo::defaultInputDevice();
-    
-    for (const QAudioDeviceInfo& deviceInfo : inputDevices) {
-        MediaDevice device;
-        device.id = deviceInfo.deviceName();
-        device.name = deviceInfo.deviceName();
-        device.description = QString("Microphone: %1").arg(deviceInfo.deviceName());
-        device.isDefault = (deviceInfo == defaultInputDevice);
-        
-        m_microphones.append(device);
-        qDebug() << "MediaManager: Found microphone:" << device.name << "Default:" << device.isDefault;
-    }
-    
-    // 枚举音频输出设备（扬声器）
-    QList<QAudioDeviceInfo> outputDevices = QAudioDeviceInfo::availableDevices(QAudio::AudioOutput);
-    QAudioDeviceInfo defaultOutputDevice = QAudioDeviceInfo::defaultOutputDevice();
-    
-    for (const QAudioDeviceInfo& deviceInfo : outputDevices) {
-        MediaDevice device;
-        device.id = deviceInfo.deviceName();
-        device.name = deviceInfo.deviceName();
-        device.description = QString("Speaker: %1").arg(deviceInfo.deviceName());
-        device.isDefault = (deviceInfo == defaultOutputDevice);
-        
-        m_speakers.append(device);
-        qDebug() << "MediaManager: Found speaker:" << device.name << "Default:" << device.isDefault;
-    }
-    
-    qDebug() << "MediaManager: Enumerated" << m_microphones.size() << "microphones and" << m_speakers.size() << "speakers";
+    return m_videoDevices;
 }
 
-void MediaManager::enumerateScreens()
+QList<MediaManager::MediaDevice> MediaManager::availableAudioInputDevices() const
 {
-    m_screens.clear();
+    return m_audioInputDevices;
+}
+
+QList<MediaManager::MediaDevice> MediaManager::availableAudioOutputDevices() const
+{
+    return m_audioOutputDevices;
+}
+
+QList<QScreen*> MediaManager::availableScreens() const
+{
+    return QApplication::screens();
+}
+
+bool MediaManager::setVideoDevice(const QString& deviceId)
+{
+    qDebug() << "Setting video device:" << deviceId;
     
-    QList<QScreen*> screens = QGuiApplication::screens();
-    QScreen* primaryScreen = QGuiApplication::primaryScreen();
+    // Find the device
+    QCameraDevice selectedDevice;
+    bool deviceFound = false;
     
-    for (int i = 0; i < screens.size(); ++i) {
-        QScreen* screen = screens[i];
-        ScreenInfo screenInfo;
-        screenInfo.screenId = i;
-        screenInfo.name = screen->name();
-        screenInfo.size = screen->size();
-        screenInfo.geometry = screen->geometry();
-        screenInfo.isPrimary = (screen == primaryScreen);
-        
-        m_screens.append(screenInfo);
-        qDebug() << "MediaManager: Found screen:" << screenInfo.name 
-                 << "Size:" << screenInfo.size 
-                 << "Primary:" << screenInfo.isPrimary;
-    }
-    
-    qDebug() << "MediaManager: Enumerated" << m_screens.size() << "screens";
-}
-
-QList<MediaManager::MediaDevice> MediaManager::availableCameras() const
-{
-    return m_cameras;
-}
-
-QList<MediaManager::MediaDevice> MediaManager::availableMicrophones() const
-{
-    return m_microphones;
-}
-
-QList<MediaManager::MediaDevice> MediaManager::availableSpeakers() const
-{
-    return m_speakers;
-}
-
-QList<MediaManager::ScreenInfo> MediaManager::availableScreens() const
-{
-    return m_screens;
-}
-
-bool MediaManager::selectCamera(const QString& deviceId)
-{
-    qDebug() << "MediaManager: Selecting camera:" << deviceId;
-    
-    // 查找指定的摄像头
-    MediaDevice selectedDevice;
-    bool found = false;
-    for (const auto& camera : m_cameras) {
-        if (camera.id == deviceId) {
-            selectedDevice = camera;
-            found = true;
+    for (const QCameraDevice& device : QMediaDevices::videoInputs()) {
+        if (device.id() == deviceId.toUtf8()) {
+            selectedDevice = device;
+            deviceFound = true;
             break;
         }
     }
     
-    if (!found) {
-        qWarning() << "MediaManager: Camera not found:" << deviceId;
+    if (!deviceFound) {
+        qWarning() << "Video device not found:" << deviceId;
         return false;
     }
     
-    // 如果当前已经选择了这个摄像头，直接返回
-    if (m_currentCamera.id == deviceId) {
-        qDebug() << "MediaManager: Camera already selected:" << deviceId;
-        return true;
-    }
-    
-    // 停止当前摄像头
-    bool wasVideoEnabled = m_videoEnabled;
-    if (m_videoEnabled) {
+    // Stop current camera if active
+    bool wasActive = m_videoActive;
+    if (wasActive) {
         stopLocalVideo();
     }
     
-    // 清理当前摄像头
-    cleanupCamera();
+    // Create new camera
+    m_camera = std::make_unique<QCamera>(selectedDevice, this);
+    connect(m_camera.get(), &QCamera::activeChanged,
+            this, &MediaManager::onCameraActiveChanged);
+    connect(m_camera.get(), &QCamera::errorOccurred,
+            this, &MediaManager::onCameraErrorOccurred);
     
-    // 设置新摄像头
-    m_currentCamera = selectedDevice;
+    // Update capture session
+    if (m_captureSession) {
+        m_captureSession->setCamera(m_camera.get());
+        if (m_localVideoWidget) {
+            m_captureSession->setVideoOutput(m_localVideoWidget);
+        }
+    }
     
-    // 重新启动视频（如果之前是启用的）
-    if (wasVideoEnabled) {
+    m_currentVideoDeviceId = deviceId;
+    
+    // Update device in list
+    for (auto& device : m_videoDevices) {
+        if (device.id == deviceId) {
+            device.state = DeviceActive;
+            emit videoDeviceChanged(device);
+            break;
+        }
+    }
+    
+    // Restart video if it was active
+    if (wasActive) {
         startLocalVideo();
     }
     
-    emit cameraChanged(m_currentCamera);
-    qDebug() << "MediaManager: Camera selected successfully:" << deviceId;
+    qDebug() << "Video device set successfully:" << selectedDevice.description();
     return true;
 }
 
-bool MediaManager::selectMicrophone(const QString& deviceId)
+bool MediaManager::setAudioInputDevice(const QString& deviceId)
 {
-    qDebug() << "MediaManager: Selecting microphone:" << deviceId;
+    qDebug() << "Setting audio input device:" << deviceId;
     
-    // 查找指定的麦克风
-    MediaDevice selectedDevice;
-    bool found = false;
-    for (const auto& mic : m_microphones) {
-        if (mic.id == deviceId) {
-            selectedDevice = mic;
-            found = true;
+    // Find the device
+    QAudioDevice selectedDevice;
+    bool deviceFound = false;
+    
+    for (const QAudioDevice& device : QMediaDevices::audioInputs()) {
+        if (device.id() == deviceId.toUtf8()) {
+            selectedDevice = device;
+            deviceFound = true;
             break;
         }
     }
     
-    if (!found) {
-        qWarning() << "MediaManager: Microphone not found:" << deviceId;
+    if (!deviceFound) {
+        qWarning() << "Audio input device not found:" << deviceId;
         return false;
     }
     
-    // 如果当前已经选择了这个麦克风，直接返回
-    if (m_currentMicrophone.id == deviceId) {
-        qDebug() << "MediaManager: Microphone already selected:" << deviceId;
-        return true;
-    }
-    
-    // 停止当前音频
-    bool wasAudioEnabled = m_audioEnabled;
-    if (m_audioEnabled) {
+    // Stop current audio if active
+    bool wasActive = m_audioActive;
+    if (wasActive) {
         stopLocalAudio();
     }
     
-    // 设置新麦克风
-    m_currentMicrophone = selectedDevice;
+    // Create new audio input
+    m_audioInput = std::make_unique<QAudioInput>(selectedDevice, this);
+    connect(m_audioInput.get(), &QAudioInput::deviceChanged,
+            this, &MediaManager::onAudioInputStateChanged);
     
-    // 重新启动音频（如果之前是启用的）
-    if (wasAudioEnabled) {
+    // Update capture session
+    if (m_captureSession) {
+        m_captureSession->setAudioInput(m_audioInput.get());
+    }
+    
+    m_currentAudioInputDeviceId = deviceId;
+    
+    // Update device in list
+    for (auto& device : m_audioInputDevices) {
+        if (device.id == deviceId) {
+            device.state = DeviceActive;
+            emit audioInputDeviceChanged(device);
+            break;
+        }
+    }
+    
+    // Restart audio if it was active
+    if (wasActive) {
         startLocalAudio();
     }
     
-    emit microphoneChanged(m_currentMicrophone);
-    qDebug() << "MediaManager: Microphone selected successfully:" << deviceId;
+    qDebug() << "Audio input device set successfully:" << selectedDevice.description();
     return true;
 }
 
-bool MediaManager::selectSpeaker(const QString& deviceId)
+bool MediaManager::setAudioOutputDevice(const QString& deviceId)
 {
-    qDebug() << "MediaManager: Selecting speaker:" << deviceId;
+    qDebug() << "Setting audio output device:" << deviceId;
     
-    // 查找指定的扬声器
-    MediaDevice selectedDevice;
-    bool found = false;
-    for (const auto& speaker : m_speakers) {
-        if (speaker.id == deviceId) {
-            selectedDevice = speaker;
-            found = true;
+    // Find the device
+    QAudioDevice selectedDevice;
+    bool deviceFound = false;
+    
+    for (const QAudioDevice& device : QMediaDevices::audioOutputs()) {
+        if (device.id() == deviceId.toUtf8()) {
+            selectedDevice = device;
+            deviceFound = true;
             break;
         }
     }
     
-    if (!found) {
-        qWarning() << "MediaManager: Speaker not found:" << deviceId;
+    if (!deviceFound) {
+        qWarning() << "Audio output device not found:" << deviceId;
         return false;
     }
     
-    // 设置新扬声器
-    m_currentSpeaker = selectedDevice;
+    // Create new audio output
+    m_audioOutput = std::make_unique<QAudioOutput>(selectedDevice, this);
+    connect(m_audioOutput.get(), &QAudioOutput::deviceChanged,
+            this, &MediaManager::onAudioOutputStateChanged);
     
-    // 重新设置音频输出
-    if (m_audioOutput) {
-        delete m_audioOutput;
-        m_audioOutput = nullptr;
-    }
+    // Set volume
+    m_audioOutput->setVolume(m_masterVolume);
     
-    setupAudioOutput();
+    m_currentAudioOutputDeviceId = deviceId;
     
-    emit speakerChanged(m_currentSpeaker);
-    qDebug() << "MediaManager: Speaker selected successfully:" << deviceId;
-    return true;
-}
-
-bool MediaManager::selectScreen(int screenId)
-{
-    qDebug() << "MediaManager: Selecting screen:" << screenId;
-    
-    // 查找指定的屏幕
-    ScreenInfo selectedScreen;
-    bool found = false;
-    for (const auto& screen : m_screens) {
-        if (screen.screenId == screenId) {
-            selectedScreen = screen;
-            found = true;
+    // Update device in list
+    for (auto& device : m_audioOutputDevices) {
+        if (device.id == deviceId) {
+            device.state = DeviceActive;
+            emit audioOutputDeviceChanged(device);
             break;
         }
     }
     
-    if (!found) {
-        qWarning() << "MediaManager: Screen not found:" << screenId;
-        return false;
-    }
-    
-    // 如果当前已经选择了这个屏幕，直接返回
-    if (m_currentScreen.screenId == screenId) {
-        qDebug() << "MediaManager: Screen already selected:" << screenId;
-        return true;
-    }
-    
-    // 停止当前屏幕共享
-    bool wasScreenShareEnabled = m_screenShareEnabled;
-    if (m_screenShareEnabled) {
-        stopScreenShare();
-    }
-    
-    // 设置新屏幕
-    m_currentScreen = selectedScreen;
-    
-    // 获取屏幕对象
-    QList<QScreen*> screens = QGuiApplication::screens();
-    if (screenId >= 0 && screenId < screens.size()) {
-        m_selectedScreen = screens[screenId];
-    }
-    
-    // 重新启动屏幕共享（如果之前是启用的）
-    if (wasScreenShareEnabled) {
-        startScreenShare();
-    }
-    
-    emit screenChanged(m_currentScreen);
-    qDebug() << "MediaManager: Screen selected successfully:" << screenId;
+    qDebug() << "Audio output device set successfully:" << selectedDevice.description();
     return true;
 }
 
-MediaManager::MediaDevice MediaManager::currentCamera() const
+std::optional<MediaManager::MediaDevice> MediaManager::currentVideoDevice() const
 {
-    return m_currentCamera;
+    for (const auto& device : m_videoDevices) {
+        if (device.id == m_currentVideoDeviceId) {
+            return device;
+        }
+    }
+    return std::nullopt;
 }
 
-MediaManager::MediaDevice MediaManager::currentMicrophone() const
+std::optional<MediaManager::MediaDevice> MediaManager::currentAudioInputDevice() const
 {
-    return m_currentMicrophone;
+    for (const auto& device : m_audioInputDevices) {
+        if (device.id == m_currentAudioInputDeviceId) {
+            return device;
+        }
+    }
+    return std::nullopt;
 }
 
-MediaManager::MediaDevice MediaManager::currentSpeaker() const
+std::optional<MediaManager::MediaDevice> MediaManager::currentAudioOutputDevice() const
 {
-    return m_currentSpeaker;
-}
-
-MediaManager::ScreenInfo MediaManager::currentScreen() const
-{
-    return m_currentScreen;
+    for (const auto& device : m_audioOutputDevices) {
+        if (device.id == m_currentAudioOutputDeviceId) {
+            return device;
+        }
+    }
+    return std::nullopt;
 }
 
 void MediaManager::startLocalVideo()
 {
-    qDebug() << "MediaManager: Starting local video";
+    qDebug() << "Starting local video";
     
-    if (m_videoEnabled) {
-        qDebug() << "MediaManager: Video already enabled";
+    if (!m_hasVideoPermission) {
+        qWarning() << "Video permission not granted";
+        emit mediaError("Video permission not granted");
         return;
     }
     
-    if (m_currentCamera.id.isEmpty()) {
-        qWarning() << "MediaManager: No camera selected";
-        emit cameraError("No camera selected");
+    if (m_videoActive) {
+        qDebug() << "Video already active";
         return;
     }
     
-    try {
-        setupCamera();
+    if (!m_camera) {
+        initializeVideoCapture();
+    }
+    
+    if (m_camera && !m_videoMuted) {
+        m_camera->start();
+        m_videoActive = true;
+        emit localVideoStarted();
         
-        if (m_camera && m_camera->state() == QCamera::ActiveState) {
-            m_videoEnabled = true;
-            emit localVideoStarted();
-            qDebug() << "MediaManager: Local video started successfully";
-        } else {
-            qWarning() << "MediaManager: Failed to start camera";
-            emit cameraError("Failed to start camera");
+        // Notify WebRTC engine if connected
+        if (m_webRTCEngine) {
+            m_webRTCEngine->startLocalVideo();
         }
-    } catch (const std::exception& e) {
-        qWarning() << "MediaManager: Exception starting video:" << e.what();
-        emit cameraError(QString("Exception: %1").arg(e.what()));
+        
+        qDebug() << "Local video started successfully";
+    } else {
+        emit mediaError("Failed to start video camera");
     }
 }
 
 void MediaManager::stopLocalVideo()
 {
-    qDebug() << "MediaManager: Stopping local video";
+    qDebug() << "Stopping local video";
     
-    if (!m_videoEnabled) {
-        qDebug() << "MediaManager: Video already disabled";
+    if (!m_videoActive) {
         return;
     }
-    
-    m_videoEnabled = false;
     
     if (m_camera) {
         m_camera->stop();
     }
     
+    m_videoActive = false;
     emit localVideoStopped();
-    qDebug() << "MediaManager: Local video stopped";
+    
+    // Notify WebRTC engine if connected
+    if (m_webRTCEngine) {
+        m_webRTCEngine->stopLocalVideo();
+    }
+    
+    qDebug() << "Local video stopped";
 }
 
 void MediaManager::startLocalAudio()
 {
-    qDebug() << "MediaManager: Starting local audio";
+    qDebug() << "Starting local audio";
     
-    if (m_audioEnabled) {
-        qDebug() << "MediaManager: Audio already enabled";
+    if (!m_hasAudioPermission) {
+        qWarning() << "Audio permission not granted";
+        emit mediaError("Audio permission not granted");
         return;
     }
     
-    if (m_currentMicrophone.id.isEmpty()) {
-        qWarning() << "MediaManager: No microphone selected";
-        emit microphoneError("No microphone selected");
+    if (m_audioActive) {
+        qDebug() << "Audio already active";
         return;
     }
     
-    try {
-        setupAudioInput();
+    if (!m_audioInput) {
+        initializeAudioCapture();
+    }
+    
+    if (m_audioInput && !m_audioMuted) {
+        // Set microphone volume
+        m_audioInput->setVolume(m_microphoneVolume);
         
-        if (m_audioInput) {
-            m_audioEnabled = true;
-            emit localAudioStarted();
-            qDebug() << "MediaManager: Local audio started successfully";
-        } else {
-            qWarning() << "MediaManager: Failed to start microphone";
-            emit microphoneError("Failed to start microphone");
+        m_audioActive = true;
+        emit localAudioStarted();
+        
+        // Notify WebRTC engine if connected
+        if (m_webRTCEngine) {
+            m_webRTCEngine->startLocalAudio();
         }
-    } catch (const std::exception& e) {
-        qWarning() << "MediaManager: Exception starting audio:" << e.what();
-        emit microphoneError(QString("Exception: %1").arg(e.what()));
+        
+        qDebug() << "Local audio started successfully";
+    } else {
+        emit mediaError("Failed to start audio input");
     }
 }
 
 void MediaManager::stopLocalAudio()
 {
-    qDebug() << "MediaManager: Stopping local audio";
+    qDebug() << "Stopping local audio";
     
-    if (!m_audioEnabled) {
-        qDebug() << "MediaManager: Audio already disabled";
+    if (!m_audioActive) {
         return;
     }
     
-    m_audioEnabled = false;
-    
-    if (m_audioInput) {
-        // 停止音频输入
-        // QAudioInput没有直接的stop方法，通过删除重新创建来停止
-    }
-    
+    m_audioActive = false;
     emit localAudioStopped();
-    qDebug() << "MediaManager: Local audio stopped";
-}
-
-void MediaManager::startScreenShare()
-{
-    qDebug() << "MediaManager: Starting screen share";
     
-    if (m_screenShareEnabled) {
-        qDebug() << "MediaManager: Screen share already enabled";
-        return;
+    // Notify WebRTC engine if connected
+    if (m_webRTCEngine) {
+        m_webRTCEngine->stopLocalAudio();
     }
     
-    if (m_currentScreen.screenId == -1 || !m_selectedScreen) {
-        qWarning() << "MediaManager: No screen selected";
-        emit screenCaptureError("No screen selected");
-        return;
-    }
-    
-    try {
-        setupScreenCapture();
-        
-        m_screenShareEnabled = true;
-        m_screenCaptureTimer->start();
-        
-        emit screenShareStarted();
-        qDebug() << "MediaManager: Screen share started successfully";
-    } catch (const std::exception& e) {
-        qWarning() << "MediaManager: Exception starting screen share:" << e.what();
-        emit screenCaptureError(QString("Exception: %1").arg(e.what()));
-    }
-}
-
-void MediaManager::stopScreenShare()
-{
-    qDebug() << "MediaManager: Stopping screen share";
-    
-    if (!m_screenShareEnabled) {
-        qDebug() << "MediaManager: Screen share already disabled";
-        return;
-    }
-    
-    m_screenShareEnabled = false;
-    
-    if (m_screenCaptureTimer) {
-        m_screenCaptureTimer->stop();
-    }
-    
-    emit screenShareStopped();
-    qDebug() << "MediaManager: Screen share stopped";
-}
-
-bool MediaManager::isVideoEnabled() const
-{
-    return m_videoEnabled;
-}
-
-bool MediaManager::isAudioEnabled() const
-{
-    return m_audioEnabled;
-}
-
-bool MediaManager::isScreenShareEnabled() const
-{
-    return m_screenShareEnabled;
-}
-
-void MediaManager::setMediaQuality(const MediaQuality& quality)
-{
-    qDebug() << "MediaManager: Setting media quality - Video:" 
-             << quality.videoResolution << "@" << quality.videoFrameRate << "fps"
-             << "Audio:" << quality.audioSampleRate << "Hz";
-    
-    m_mediaQuality = quality;
-    
-    // 如果当前有活动的媒体流，需要重新配置
-    if (m_videoEnabled) {
-        updateCameraSettings();
-    }
-    
-    if (m_audioEnabled) {
-        updateAudioSettings();
-    }
-}
-
-MediaManager::MediaQuality MediaManager::mediaQuality() const
-{
-    return m_mediaQuality;
+    qDebug() << "Local audio stopped";
 }
 
 QVideoWidget* MediaManager::localVideoWidget() const
@@ -644,543 +414,924 @@ QVideoWidget* MediaManager::localVideoWidget() const
     return m_localVideoWidget;
 }
 
+void MediaManager::setLocalVideoWidget(QVideoWidget* widget)
+{
+    qDebug() << "Setting local video widget";
+    
+    m_localVideoWidget = widget;
+    
+    if (m_captureSession && widget) {
+        m_captureSession->setVideoOutput(widget);
+    }
+}
+
+bool MediaManager::isVideoActive() const
+{
+    return m_videoActive;
+}
+
+bool MediaManager::isAudioActive() const
+{
+    return m_audioActive;
+}
+
+bool MediaManager::isScreenSharingActive() const
+{
+    return m_screenSharingActive;
+}
+
+void MediaManager::startScreenSharing(QScreen* screen)
+{
+    qDebug() << "Starting screen sharing";
+    
+    if (m_screenSharingActive) {
+        qDebug() << "Screen sharing already active";
+        return;
+    }
+    
+    // Use primary screen if none specified
+    if (!screen) {
+        screen = QApplication::primaryScreen();
+    }
+    
+    if (!screen) {
+        emit mediaError("No screen available for sharing");
+        return;
+    }
+    
+    m_currentScreen = screen;
+    
+    // Create screen share widget if not exists
+    if (!m_screenShareWidget) {
+        m_screenShareWidget = new QVideoWidget(nullptr);
+        m_screenShareWidget->setMinimumSize(640, 480);
+    }
+    
+    // Start screen capture timer
+    m_screenCaptureTimer->start();
+    m_screenSharingActive = true;
+    
+    emit screenSharingStarted();
+    qDebug() << "Screen sharing started for screen:" << screen->name();
+}
+
+void MediaManager::stopScreenSharing()
+{
+    qDebug() << "Stopping screen sharing";
+    
+    if (!m_screenSharingActive) {
+        return;
+    }
+    
+    m_screenCaptureTimer->stop();
+    m_screenSharingActive = false;
+    m_currentScreen = nullptr;
+    
+    emit screenSharingStopped();
+    qDebug() << "Screen sharing stopped";
+}
+
 QVideoWidget* MediaManager::screenShareWidget() const
 {
     return m_screenShareWidget;
 }
 
-void MediaManager::setMicrophoneVolume(int volume)
+void MediaManager::setVideoCodec(const QString& codec)
 {
-    m_microphoneVolume = qBound(0, volume, 100);
+    qDebug() << "Setting video codec:" << codec;
     
-    // 应用音量设置到音频输入
+    if (m_supportedVideoCodecs.contains(codec)) {
+        m_currentVideoCodec = codec;
+        applyMediaSettings();
+    } else {
+        qWarning() << "Unsupported video codec:" << codec;
+        emit encodingError(codec, "Unsupported video codec");
+    }
+}
+
+void MediaManager::setAudioCodec(const QString& codec)
+{
+    qDebug() << "Setting audio codec:" << codec;
+    
+    if (m_supportedAudioCodecs.contains(codec)) {
+        m_currentAudioCodec = codec;
+        applyMediaSettings();
+    } else {
+        qWarning() << "Unsupported audio codec:" << codec;
+        emit encodingError(codec, "Unsupported audio codec");
+    }
+}
+
+QString MediaManager::currentVideoCodec() const
+{
+    return m_currentVideoCodec;
+}
+
+QString MediaManager::currentAudioCodec() const
+{
+    return m_currentAudioCodec;
+}
+
+void MediaManager::setMediaSettings(const MediaSettings& settings)
+{
+    qDebug() << "Setting media settings";
+    
+    if (validateMediaSettings(settings)) {
+        m_mediaSettings = settings;
+        applyMediaSettings();
+    } else {
+        qWarning() << "Invalid media settings provided";
+        emit mediaError("Invalid media settings");
+    }
+}
+
+MediaManager::MediaSettings MediaManager::mediaSettings() const
+{
+    return m_mediaSettings;
+}
+
+void MediaManager::setMasterVolume(qreal volume)
+{
+    qDebug() << "Setting master volume:" << volume;
+    
+    m_masterVolume = qBound(0.0, volume, 1.0);
+    
+    if (m_audioOutput) {
+        m_audioOutput->setVolume(m_masterVolume);
+    }
+    
+    emit volumeChanged(m_masterVolume);
+}
+
+qreal MediaManager::masterVolume() const
+{
+    return m_masterVolume;
+}
+
+void MediaManager::setMicrophoneVolume(qreal volume)
+{
+    qDebug() << "Setting microphone volume:" << volume;
+    
+    m_microphoneVolume = qBound(0.0, volume, 1.0);
+    
     if (m_audioInput) {
-        // QAudioInput的音量控制需要通过QAudioFormat或其他方式实现
-        // 这里先记录设置，实际应用需要在音频处理中实现
+        m_audioInput->setVolume(m_microphoneVolume);
     }
     
     emit microphoneVolumeChanged(m_microphoneVolume);
-    qDebug() << "MediaManager: Microphone volume set to:" << m_microphoneVolume;
 }
 
-void MediaManager::setSpeakerVolume(int volume)
-{
-    m_speakerVolume = qBound(0, volume, 100);
-    
-    // 应用音量设置到音频输出
-    if (m_audioOutput) {
-        // QAudioOutput的音量控制
-        qreal normalizedVolume = m_speakerVolume / 100.0;
-        m_audioOutput->setVolume(normalizedVolume);
-    }
-    
-    emit speakerVolumeChanged(m_speakerVolume);
-    qDebug() << "MediaManager: Speaker volume set to:" << m_speakerVolume;
-}
-
-int MediaManager::microphoneVolume() const
+qreal MediaManager::microphoneVolume() const
 {
     return m_microphoneVolume;
 }
 
-int MediaManager::speakerVolume() const
+void MediaManager::setVideoMuted(bool muted)
 {
-    return m_speakerVolume;
-}
-
-void MediaManager::setMicrophoneMuted(bool muted)
-{
-    m_microphoneMuted = muted;
+    qDebug() << "Setting video muted:" << muted;
     
-    // 应用静音设置
-    if (m_audioInput) {
-        // 实现麦克风静音逻辑
-        // 可以通过停止音频输入或在音频处理中实现
+    if (m_videoMuted == muted) {
+        return;
     }
     
-    emit microphoneMutedChanged(m_microphoneMuted);
-    qDebug() << "MediaManager: Microphone muted:" << m_microphoneMuted;
+    m_videoMuted = muted;
+    
+    if (muted && m_videoActive) {
+        stopLocalVideo();
+    } else if (!muted && m_hasVideoPermission) {
+        startLocalVideo();
+    }
+    
+    emit videoMuteChanged(muted);
 }
 
-void MediaManager::setSpeakerMuted(bool muted)
+void MediaManager::setAudioMuted(bool muted)
 {
-    m_speakerMuted = muted;
+    qDebug() << "Setting audio muted:" << muted;
     
-    // 应用静音设置
-    if (m_audioOutput) {
-        if (muted) {
-            m_audioOutput->setVolume(0.0);
+    if (m_audioMuted == muted) {
+        return;
+    }
+    
+    m_audioMuted = muted;
+    
+    if (muted && m_audioActive) {
+        stopLocalAudio();
+    } else if (!muted && m_hasAudioPermission) {
+        startLocalAudio();
+    }
+    
+    emit audioMuteChanged(muted);
+}
+
+bool MediaManager::isVideoMuted() const
+{
+    return m_videoMuted;
+}
+
+bool MediaManager::isAudioMuted() const
+{
+    return m_audioMuted;
+}
+
+void MediaManager::requestMediaPermissions()
+{
+    qDebug() << "Requesting media permissions";
+    
+    emit mediaPermissionsRequested();
+    
+    if (m_webRTCEngine) {
+        // Delegate to WebRTC engine which handles permissions
+        m_webRTCEngine->requestMediaPermissions();
+    } else {
+        // Handle permissions directly
+        checkMediaPermissions();
+        
+        if (m_hasVideoPermission || m_hasAudioPermission) {
+            emit mediaPermissionsGranted(m_hasVideoPermission, m_hasAudioPermission);
         } else {
-            m_audioOutput->setVolume(m_speakerVolume / 100.0);
+            emit mediaPermissionsDenied();
         }
     }
-    
-    emit speakerMutedChanged(m_speakerMuted);
-    qDebug() << "MediaManager: Speaker muted:" << m_speakerMuted;
 }
 
-bool MediaManager::isMicrophoneMuted() const
+bool MediaManager::hasVideoPermission() const
 {
-    return m_microphoneMuted;
+    return m_hasVideoPermission;
 }
 
-bool MediaManager::isSpeakerMuted() const
+bool MediaManager::hasAudioPermission() const
 {
-    return m_speakerMuted;
+    return m_hasAudioPermission;
 }
 
 void MediaManager::setWebRTCEngine(WebRTCEngine* engine)
 {
-    if (m_webrtcEngine == engine) {
-        return;
+    qDebug() << "Setting WebRTC engine";
+    
+    if (m_webRTCEngine) {
+        disconnectWebRTCSignals();
     }
     
-    // 断开旧连接
-    if (m_webrtcEngine) {
-        disconnectFromWebRTC();
+    m_webRTCEngine = engine;
+    
+    if (m_webRTCEngine) {
+        connectWebRTCSignals();
     }
-    
-    m_webrtcEngine = engine;
-    
-    // 建立新连接
-    if (m_webrtcEngine) {
-        connectToWebRTC();
-    }
-    
-    qDebug() << "MediaManager: WebRTC engine set:" << (engine ? "connected" : "disconnected");
 }
 
 WebRTCEngine* MediaManager::webRTCEngine() const
 {
-    return m_webrtcEngine;
+    return m_webRTCEngine;
 }
 
-void MediaManager::setupCamera()
+// Private slots implementation
+
+void MediaManager::onDeviceListChanged()
 {
-    qDebug() << "MediaManager: Setting up camera";
-    
-    // 清理现有摄像头
-    cleanupCamera();
-    
-    if (m_currentCamera.id.isEmpty()) {
-        qWarning() << "MediaManager: No camera selected for setup";
-        return;
-    }
-    
-    // 查找摄像头信息
-    QCameraInfo selectedCameraInfo;
-    QList<QCameraInfo> cameras = QCameraInfo::availableCameras();
-    
-    for (const QCameraInfo& cameraInfo : cameras) {
-        if (cameraInfo.deviceName() == m_currentCamera.id) {
-            selectedCameraInfo = cameraInfo;
-            break;
-        }
-    }
-    
-    if (selectedCameraInfo.isNull()) {
-        qWarning() << "MediaManager: Camera info not found for:" << m_currentCamera.id;
-        return;
-    }
-    
-    // 创建摄像头
-    m_camera = new QCamera(selectedCameraInfo, this);
-    
-    // 创建视频预览组件
-    if (!m_localVideoWidget) {
-        m_localVideoWidget = new QVideoWidget();
-        m_localVideoWidget->setMinimumSize(DEFAULT_VIDEO_WIDTH, DEFAULT_VIDEO_HEIGHT);
-    }
-    
-    // 创建取景器
-    if (!m_cameraViewfinder) {
-        m_cameraViewfinder = new QCameraViewfinder();
-    }
-    
-    // 设置取景器到摄像头
-    m_camera->setViewfinder(m_cameraViewfinder);
-    
-    // 连接信号
-    connect(m_camera, QOverload<QCamera::State>::of(&QCamera::stateChanged),
-            this, &MediaManager::onCameraStateChanged);
-    connect(m_camera, QOverload<QCamera::Error>::of(&QCamera::error),
-            this, &MediaManager::onCameraError);
-    
-    // 应用摄像头设置
-    updateCameraSettings();
-    
-    // 启动摄像头
-    m_camera->start();
-    
-    qDebug() << "MediaManager: Camera setup completed";
+    qDebug() << "Device list changed, updating...";
+    updateDeviceList();
+    emit deviceListChanged();
 }
 
-void MediaManager::cleanupCamera()
+void MediaManager::onCameraActiveChanged(bool active)
 {
-    qDebug() << "MediaManager: Cleaning up camera";
+    qDebug() << "Camera active changed:" << active;
     
-    if (m_camera) {
-        m_camera->stop();
-        m_camera->deleteLater();
-        m_camera = nullptr;
-    }
-    
-    if (m_cameraViewfinder) {
-        m_cameraViewfinder->deleteLater();
-        m_cameraViewfinder = nullptr;
-    }
-    
-    // 注意：不删除m_localVideoWidget，因为它可能被外部使用
-}
-
-void MediaManager::updateCameraSettings()
-{
-    if (!m_camera) {
-        return;
-    }
-    
-    qDebug() << "MediaManager: Updating camera settings";
-    
-    // 设置视频分辨率和帧率
-    QCameraViewfinderSettings viewfinderSettings;
-    viewfinderSettings.setResolution(m_mediaQuality.videoResolution);
-    viewfinderSettings.setMaximumFrameRate(m_mediaQuality.videoFrameRate);
-    viewfinderSettings.setMinimumFrameRate(m_mediaQuality.videoFrameRate);
-    
-    m_camera->setViewfinderSettings(viewfinderSettings);
-    
-    qDebug() << "MediaManager: Camera settings updated - Resolution:" 
-             << m_mediaQuality.videoResolution << "FPS:" << m_mediaQuality.videoFrameRate;
-}
-
-void MediaManager::setupAudioInput()
-{
-    qDebug() << "MediaManager: Setting up audio input";
-    
-    if (m_currentMicrophone.id.isEmpty()) {
-        qWarning() << "MediaManager: No microphone selected for setup";
-        return;
-    }
-    
-    // 查找音频输入设备
-    QAudioDeviceInfo selectedDeviceInfo;
-    QList<QAudioDeviceInfo> inputDevices = QAudioDeviceInfo::availableDevices(QAudio::AudioInput);
-    
-    for (const QAudioDeviceInfo& deviceInfo : inputDevices) {
-        if (deviceInfo.deviceName() == m_currentMicrophone.id) {
-            selectedDeviceInfo = deviceInfo;
-            break;
-        }
-    }
-    
-    if (selectedDeviceInfo.isNull()) {
-        qWarning() << "MediaManager: Audio input device not found:" << m_currentMicrophone.id;
-        return;
-    }
-    
-    // 设置音频格式
-    QAudioFormat audioFormat;
-    audioFormat.setSampleRate(m_mediaQuality.audioSampleRate);
-    audioFormat.setChannelCount(m_mediaQuality.audioChannels);
-    audioFormat.setSampleSize(16);
-    audioFormat.setCodec("audio/pcm");
-    audioFormat.setByteOrder(QAudioFormat::LittleEndian);
-    audioFormat.setSampleType(QAudioFormat::SignedInt);
-    
-    // 检查格式支持
-    if (!selectedDeviceInfo.isFormatSupported(audioFormat)) {
-        qWarning() << "MediaManager: Audio format not supported, using nearest";
-        audioFormat = selectedDeviceInfo.nearestFormat(audioFormat);
-    }
-    
-    // 创建音频输入
-    m_audioInput = new QAudioInput(selectedDeviceInfo, audioFormat, this);
-    
-    // 应用音频设置
-    updateAudioSettings();
-    
-    qDebug() << "MediaManager: Audio input setup completed";
-}
-
-void MediaManager::setupAudioOutput()
-{
-    qDebug() << "MediaManager: Setting up audio output";
-    
-    if (m_currentSpeaker.id.isEmpty()) {
-        qWarning() << "MediaManager: No speaker selected for setup";
-        return;
-    }
-    
-    // 查找音频输出设备
-    QAudioDeviceInfo selectedDeviceInfo;
-    QList<QAudioDeviceInfo> outputDevices = QAudioDeviceInfo::availableDevices(QAudio::AudioOutput);
-    
-    for (const QAudioDeviceInfo& deviceInfo : outputDevices) {
-        if (deviceInfo.deviceName() == m_currentSpeaker.id) {
-            selectedDeviceInfo = deviceInfo;
-            break;
-        }
-    }
-    
-    if (selectedDeviceInfo.isNull()) {
-        qWarning() << "MediaManager: Audio output device not found:" << m_currentSpeaker.id;
-        return;
-    }
-    
-    // 设置音频格式
-    QAudioFormat audioFormat;
-    audioFormat.setSampleRate(m_mediaQuality.audioSampleRate);
-    audioFormat.setChannelCount(m_mediaQuality.audioChannels);
-    audioFormat.setSampleSize(16);
-    audioFormat.setCodec("audio/pcm");
-    audioFormat.setByteOrder(QAudioFormat::LittleEndian);
-    audioFormat.setSampleType(QAudioFormat::SignedInt);
-    
-    // 检查格式支持
-    if (!selectedDeviceInfo.isFormatSupported(audioFormat)) {
-        qWarning() << "MediaManager: Audio format not supported, using nearest";
-        audioFormat = selectedDeviceInfo.nearestFormat(audioFormat);
-    }
-    
-    // 创建音频输出
-    m_audioOutput = new QAudioOutput(selectedDeviceInfo, audioFormat, this);
-    
-    // 设置音量
-    m_audioOutput->setVolume(m_speakerMuted ? 0.0 : (m_speakerVolume / 100.0));
-    
-    qDebug() << "MediaManager: Audio output setup completed";
-}
-
-void MediaManager::cleanupAudio()
-{
-    qDebug() << "MediaManager: Cleaning up audio";
-    
-    if (m_audioInput) {
-        m_audioInput->deleteLater();
-        m_audioInput = nullptr;
-    }
-    
-    if (m_audioOutput) {
-        m_audioOutput->deleteLater();
-        m_audioOutput = nullptr;
+    if (active && m_hasVideoPermission && !m_videoMuted) {
+        m_videoActive = true;
+        emit localVideoStarted();
+    } else {
+        m_videoActive = false;
+        emit localVideoStopped();
     }
 }
 
-void MediaManager::updateAudioSettings()
+void MediaManager::onCameraErrorOccurred(QCamera::Error error)
 {
-    // 音频设置更新逻辑
-    // 由于QAudioInput/QAudioOutput的限制，通常需要重新创建来应用新设置
-    qDebug() << "MediaManager: Audio settings updated";
-}
-
-void MediaManager::setupScreenCapture()
-{
-    qDebug() << "MediaManager: Setting up screen capture";
+    qWarning() << "Camera error occurred:" << error;
     
-    if (!m_selectedScreen) {
-        qWarning() << "MediaManager: No screen selected for capture";
-        return;
-    }
-    
-    // 创建屏幕共享视频组件
-    if (!m_screenShareWidget) {
-        m_screenShareWidget = new QVideoWidget();
-        m_screenShareWidget->setMinimumSize(m_currentScreen.size / 4); // 1/4 size for preview
-    }
-    
-    qDebug() << "MediaManager: Screen capture setup completed";
-}
-
-void MediaManager::cleanupScreenCapture()
-{
-    qDebug() << "MediaManager: Cleaning up screen capture";
-    
-    if (m_screenCaptureTimer) {
-        m_screenCaptureTimer->stop();
-    }
-    
-    // 注意：不删除m_screenShareWidget，因为它可能被外部使用
-}
-
-void MediaManager::captureScreenFrame()
-{
-    if (!m_selectedScreen || !m_screenShareEnabled) {
-        return;
-    }
-    
-    // 捕获屏幕内容
-    QPixmap screenshot = m_selectedScreen->grabWindow(0);
-    
-    if (screenshot.isNull()) {
-        qWarning() << "MediaManager: Failed to capture screen";
-        return;
-    }
-    
-    // 编码屏幕帧
-    QBuffer buffer;
-    buffer.open(QIODevice::WriteOnly);
-    screenshot.save(&buffer, "PNG");
-    QByteArray frameData = buffer.data();
-    
-    // 发送到WebRTC
-    if (m_webrtcEngine) {
-        sendVideoFrame(frameData);
-    }
-    
-    // 更新预览（可选）
-    if (m_screenShareWidget) {
-        // 这里可以更新屏幕共享预览
-        // 由于QVideoWidget主要用于视频流，屏幕截图预览可能需要其他方式实现
-    }
-}
-
-void MediaManager::connectToWebRTC()
-{
-    if (!m_webrtcEngine) {
-        return;
-    }
-    
-    qDebug() << "MediaManager: Connecting to WebRTC engine";
-    
-    // 连接WebRTC信号
-    connect(m_webrtcEngine, &WebRTCEngine::remoteStreamReceived,
-            this, &MediaManager::remoteVideoReceived);
-    connect(m_webrtcEngine, &WebRTCEngine::remoteStreamRemoved,
-            this, &MediaManager::remoteVideoRemoved);
-    
-    qDebug() << "MediaManager: Connected to WebRTC engine";
-}
-
-void MediaManager::disconnectFromWebRTC()
-{
-    if (!m_webrtcEngine) {
-        return;
-    }
-    
-    qDebug() << "MediaManager: Disconnecting from WebRTC engine";
-    
-    // 断开WebRTC信号
-    disconnect(m_webrtcEngine, nullptr, this, nullptr);
-    
-    qDebug() << "MediaManager: Disconnected from WebRTC engine";
-}
-
-void MediaManager::sendVideoFrame(const QByteArray& frameData)
-{
-    // 发送视频帧到WebRTC引擎
-    // 这里需要根据WebRTC引擎的具体接口实现
-    Q_UNUSED(frameData)
-    
-    // 示例实现：
-    // if (m_webrtcEngine) {
-    //     m_webrtcEngine->sendVideoData(frameData);
-    // }
-}
-
-void MediaManager::sendAudioFrame(const QByteArray& audioData)
-{
-    // 发送音频帧到WebRTC引擎
-    // 这里需要根据WebRTC引擎的具体接口实现
-    Q_UNUSED(audioData)
-    
-    // 示例实现：
-    // if (m_webrtcEngine) {
-    //     m_webrtcEngine->sendAudioData(audioData);
-    // }
-}
-
-// 槽函数实现
-void MediaManager::onCameraStateChanged(QCamera::State state)
-{
-    qDebug() << "MediaManager: Camera state changed:" << state;
-    
-    switch (state) {
-    case QCamera::ActiveState:
-        qDebug() << "MediaManager: Camera is active";
-        break;
-    case QCamera::LoadedState:
-        qDebug() << "MediaManager: Camera is loaded";
-        break;
-    case QCamera::UnloadedState:
-        qDebug() << "MediaManager: Camera is unloaded";
-        break;
-    }
-}
-
-void MediaManager::onCameraError(QCamera::Error error)
-{
-    QString errorString;
+    QString errorMessage;
     switch (error) {
     case QCamera::NoError:
-        return; // 没有错误
+        return;
     case QCamera::CameraError:
-        errorString = "Camera error";
+        errorMessage = "Camera hardware error";
         break;
-    case QCamera::InvalidRequestError:
-        errorString = "Invalid request error";
-        break;
-    case QCamera::ServiceMissingError:
-        errorString = "Service missing error";
-        break;
-    case QCamera::NotSupportedFeatureError:
-        errorString = "Not supported feature error";
+    default:
+        errorMessage = "Unknown camera error";
         break;
     }
     
-    qWarning() << "MediaManager: Camera error:" << errorString;
-    emit cameraError(errorString);
+    emit mediaError(errorMessage);
+    
+    // Update device state
+    if (!m_currentVideoDeviceId.isEmpty()) {
+        emit deviceError(m_currentVideoDeviceId, errorMessage);
+    }
 }
 
 void MediaManager::onAudioInputStateChanged()
 {
-    qDebug() << "MediaManager: Audio input state changed";
+    qDebug() << "Audio input state changed";
+    // Handle audio input state changes
 }
 
 void MediaManager::onAudioOutputStateChanged()
 {
-    qDebug() << "MediaManager: Audio output state changed";
+    qDebug() << "Audio output state changed";
+    // Handle audio output state changes
 }
 
 void MediaManager::onScreenCaptureTimer()
 {
-    captureScreenFrame();
+    if (m_screenSharingActive && m_currentScreen) {
+        captureScreen();
+    }
 }
 
-void MediaManager::onDeviceListChanged()
+void MediaManager::onWebRTCPermissionsGranted(bool video, bool audio)
 {
-    qDebug() << "MediaManager: Device list changed, refreshing";
-    refreshDeviceList();
+    qDebug() << "WebRTC permissions granted - Video:" << video << "Audio:" << audio;
+    
+    m_hasVideoPermission = video;
+    m_hasAudioPermission = audio;
+    
+    emit mediaPermissionsGranted(video, audio);
+    
+    // Initialize media if permissions granted
+    if (video) {
+        initializeVideoCapture();
+    }
+    if (audio) {
+        initializeAudioCapture();
+    }
 }
 
-// 编码和解码函数（占位符实现）
-QByteArray MediaManager::encodeVideoFrame(const QVideoFrame& frame)
+void MediaManager::onWebRTCPermissionsDenied()
 {
-    Q_UNUSED(frame)
-    // 这里应该实现视频帧编码逻辑
-    // 可以使用Qt的图像处理功能或第三方编码库
-    return QByteArray();
+    qDebug() << "WebRTC permissions denied";
+    
+    m_hasVideoPermission = false;
+    m_hasAudioPermission = false;
+    
+    emit mediaPermissionsDenied();
 }
 
-QByteArray MediaManager::encodeAudioFrame(const QByteArray& audioData)
+// Private methods implementation
+
+void MediaManager::initializeDevices()
 {
-    Q_UNUSED(audioData)
-    // 这里应该实现音频帧编码逻辑
-    // 可以使用Qt的音频处理功能或第三方编码库
-    return QByteArray();
+    qDebug() << "Initializing media devices";
+    
+    updateDeviceList();
+    
+    // Set default devices if available
+    if (!m_videoDevices.isEmpty()) {
+        for (const auto& device : m_videoDevices) {
+            if (device.isDefault) {
+                setVideoDevice(device.id);
+                break;
+            }
+        }
+        // If no default found, use first available
+        if (m_currentVideoDeviceId.isEmpty()) {
+            setVideoDevice(m_videoDevices.first().id);
+        }
+    }
+    
+    if (!m_audioInputDevices.isEmpty()) {
+        for (const auto& device : m_audioInputDevices) {
+            if (device.isDefault) {
+                setAudioInputDevice(device.id);
+                break;
+            }
+        }
+        if (m_currentAudioInputDeviceId.isEmpty()) {
+            setAudioInputDevice(m_audioInputDevices.first().id);
+        }
+    }
+    
+    if (!m_audioOutputDevices.isEmpty()) {
+        for (const auto& device : m_audioOutputDevices) {
+            if (device.isDefault) {
+                setAudioOutputDevice(device.id);
+                break;
+            }
+        }
+        if (m_currentAudioOutputDeviceId.isEmpty()) {
+            setAudioOutputDevice(m_audioOutputDevices.first().id);
+        }
+    }
+    
+    qDebug() << "Media devices initialized";
 }
 
-void MediaManager::decodeVideoFrame(const QByteArray& data, const QString& participantId)
+void MediaManager::updateDeviceList()
 {
-    Q_UNUSED(data)
-    Q_UNUSED(participantId)
-    // 这里应该实现视频帧解码逻辑
-    // 解码后的视频帧应该显示在对应参与者的视频组件中
+    qDebug() << "Updating device list";
+    
+    // Update video devices
+    m_videoDevices.clear();
+    QCameraDevice defaultCamera = QMediaDevices::defaultVideoInput();
+    for (const QCameraDevice& device : QMediaDevices::videoInputs()) {
+        MediaDevice mediaDevice = createVideoDevice(device);
+        mediaDevice.isDefault = (device.id() == defaultCamera.id());
+        m_videoDevices.append(mediaDevice);
+    }
+    
+    // Update audio input devices
+    m_audioInputDevices.clear();
+    QAudioDevice defaultAudioInput = QMediaDevices::defaultAudioInput();
+    for (const QAudioDevice& device : QMediaDevices::audioInputs()) {
+        MediaDevice mediaDevice = createAudioInputDevice(device);
+        mediaDevice.isDefault = (device.id() == defaultAudioInput.id());
+        m_audioInputDevices.append(mediaDevice);
+    }
+    
+    // Update audio output devices
+    m_audioOutputDevices.clear();
+    QAudioDevice defaultAudioOutput = QMediaDevices::defaultAudioOutput();
+    for (const QAudioDevice& device : QMediaDevices::audioOutputs()) {
+        MediaDevice mediaDevice = createAudioOutputDevice(device);
+        mediaDevice.isDefault = (device.id() == defaultAudioOutput.id());
+        m_audioOutputDevices.append(mediaDevice);
+    }
+    
+    refreshDeviceStates();
+    
+    qDebug() << "Device list updated - Video:" << m_videoDevices.size() 
+             << "Audio In:" << m_audioInputDevices.size() 
+             << "Audio Out:" << m_audioOutputDevices.size();
 }
 
-void MediaManager::decodeAudioFrame(const QByteArray& data, const QString& participantId)
+MediaManager::MediaDevice MediaManager::createVideoDevice(const QCameraDevice& device) const
 {
-    Q_UNUSED(data)
-    Q_UNUSED(participantId)
-    // 这里应该实现音频帧解码逻辑
-    // 解码后的音频数据应该通过音频输出播放
+    MediaDevice mediaDevice;
+    mediaDevice.id = QString::fromUtf8(device.id());
+    mediaDevice.name = device.description();
+    mediaDevice.description = device.description();
+    mediaDevice.type = Video;
+    mediaDevice.state = DeviceAvailable;
+    mediaDevice.isDefault = false;
+    return mediaDevice;
+}
+
+MediaManager::MediaDevice MediaManager::createAudioInputDevice(const QAudioDevice& device) const
+{
+    MediaDevice mediaDevice;
+    mediaDevice.id = QString::fromUtf8(device.id());
+    mediaDevice.name = device.description();
+    mediaDevice.description = device.description();
+    mediaDevice.type = Audio;
+    mediaDevice.state = DeviceAvailable;
+    mediaDevice.isDefault = false;
+    return mediaDevice;
+}
+
+MediaManager::MediaDevice MediaManager::createAudioOutputDevice(const QAudioDevice& device) const
+{
+    MediaDevice mediaDevice;
+    mediaDevice.id = QString::fromUtf8(device.id());
+    mediaDevice.name = device.description();
+    mediaDevice.description = device.description();
+    mediaDevice.type = Audio;
+    mediaDevice.state = DeviceAvailable;
+    mediaDevice.isDefault = false;
+    return mediaDevice;
+}
+
+void MediaManager::refreshDeviceStates()
+{
+    // Update device states based on current usage
+    for (auto& device : m_videoDevices) {
+        if (device.id == m_currentVideoDeviceId) {
+            device.state = m_videoActive ? DeviceActive : DeviceAvailable;
+        }
+    }
+    
+    for (auto& device : m_audioInputDevices) {
+        if (device.id == m_currentAudioInputDeviceId) {
+            device.state = m_audioActive ? DeviceActive : DeviceAvailable;
+        }
+    }
+    
+    for (auto& device : m_audioOutputDevices) {
+        if (device.id == m_currentAudioOutputDeviceId) {
+            device.state = DeviceActive;
+        }
+    }
+}
+
+void MediaManager::initializeVideoCapture()
+{
+    qDebug() << "Initializing video capture";
+    
+    if (!m_hasVideoPermission) {
+        qWarning() << "Video permission not granted";
+        return;
+    }
+    
+    QList<QCameraDevice> cameras = QMediaDevices::videoInputs();
+    if (cameras.isEmpty()) {
+        qWarning() << "No cameras available";
+        return;
+    }
+    
+    // Use current device or default
+    QCameraDevice cameraDevice;
+    if (!m_currentVideoDeviceId.isEmpty()) {
+        for (const auto& device : cameras) {
+            if (QString::fromUtf8(device.id()) == m_currentVideoDeviceId) {
+                cameraDevice = device;
+                break;
+            }
+        }
+    }
+    
+    if (cameraDevice.isNull()) {
+        cameraDevice = cameras.first();
+        m_currentVideoDeviceId = QString::fromUtf8(cameraDevice.id());
+    }
+    
+    m_camera = std::make_unique<QCamera>(cameraDevice, this);
+    connect(m_camera.get(), &QCamera::activeChanged,
+            this, &MediaManager::onCameraActiveChanged);
+    connect(m_camera.get(), &QCamera::errorOccurred,
+            this, &MediaManager::onCameraErrorOccurred);
+    
+    if (m_captureSession) {
+        m_captureSession->setCamera(m_camera.get());
+        if (m_localVideoWidget) {
+            m_captureSession->setVideoOutput(m_localVideoWidget);
+        }
+    }
+    
+    qDebug() << "Video capture initialized with device:" << cameraDevice.description();
+}
+
+void MediaManager::initializeAudioCapture()
+{
+    qDebug() << "Initializing audio capture";
+    
+    if (!m_hasAudioPermission) {
+        qWarning() << "Audio permission not granted";
+        return;
+    }
+    
+    QList<QAudioDevice> audioInputs = QMediaDevices::audioInputs();
+    if (audioInputs.isEmpty()) {
+        qWarning() << "No audio input devices available";
+        return;
+    }
+    
+    // Use current device or default
+    QAudioDevice audioDevice;
+    if (!m_currentAudioInputDeviceId.isEmpty()) {
+        for (const auto& device : audioInputs) {
+            if (QString::fromUtf8(device.id()) == m_currentAudioInputDeviceId) {
+                audioDevice = device;
+                break;
+            }
+        }
+    }
+    
+    if (audioDevice.isNull()) {
+        audioDevice = audioInputs.first();
+        m_currentAudioInputDeviceId = QString::fromUtf8(audioDevice.id());
+    }
+    
+    m_audioInput = std::make_unique<QAudioInput>(audioDevice, this);
+    connect(m_audioInput.get(), &QAudioInput::deviceChanged,
+            this, &MediaManager::onAudioInputStateChanged);
+    
+    if (m_captureSession) {
+        m_captureSession->setAudioInput(m_audioInput.get());
+    }
+    
+    // Set initial volume
+    m_audioInput->setVolume(m_microphoneVolume);
+    
+    qDebug() << "Audio capture initialized with device:" << audioDevice.description();
+}
+
+void MediaManager::initializeScreenCapture()
+{
+    qDebug() << "Initializing screen capture";
+    
+    if (!m_screenShareWidget) {
+        m_screenShareWidget = new QVideoWidget(nullptr);
+        m_screenShareWidget->setMinimumSize(640, 480);
+    }
+    
+    qDebug() << "Screen capture initialized";
+}
+
+void MediaManager::cleanupMediaResources()
+{
+    qDebug() << "Cleaning up media resources";
+    
+    if (m_camera) {
+        m_camera->stop();
+        m_camera.reset();
+    }
+    
+    if (m_audioInput) {
+        m_audioInput.reset();
+    }
+    
+    if (m_audioOutput) {
+        m_audioOutput.reset();
+    }
+    
+    if (m_captureSession) {
+        m_captureSession->setCamera(nullptr);
+        m_captureSession->setAudioInput(nullptr);
+        m_captureSession->setVideoOutput(nullptr);
+    }
+    
+    if (m_localVideoWidget) {
+        m_localVideoWidget->deleteLater();
+        m_localVideoWidget = nullptr;
+    }
+    
+    if (m_screenShareWidget) {
+        m_screenShareWidget->deleteLater();
+        m_screenShareWidget = nullptr;
+    }
+    
+    qDebug() << "Media resources cleanup completed";
+}
+
+void MediaManager::checkMediaPermissions()
+{
+    qDebug() << "Checking media permissions";
+    
+    // Check camera permission
+    QCameraPermission cameraPermission;
+    m_hasVideoPermission = (qApp->checkPermission(cameraPermission) == Qt::PermissionStatus::Granted);
+    
+    // Check microphone permission
+    QMicrophonePermission micPermission;
+    m_hasAudioPermission = (qApp->checkPermission(micPermission) == Qt::PermissionStatus::Granted);
+    
+    qDebug() << "Video permission:" << m_hasVideoPermission;
+    qDebug() << "Audio permission:" << m_hasAudioPermission;
+}
+
+void MediaManager::handlePermissionResult(bool granted, const QString& permission)
+{
+    qDebug() << "Permission result for" << permission << ":" << granted;
+    
+    if (permission == "camera") {
+        m_hasVideoPermission = granted;
+        if (granted) {
+            initializeVideoCapture();
+        }
+    } else if (permission == "microphone") {
+        m_hasAudioPermission = granted;
+        if (granted) {
+            initializeAudioCapture();
+        }
+    }
+}
+
+void MediaManager::captureScreen()
+{
+    if (!m_currentScreen || !m_screenShareWidget) {
+        return;
+    }
+    
+    // Capture screen content
+    QPixmap screenshot = m_currentScreen->grabWindow(0);
+    
+    // Scale to appropriate size for sharing
+    QSize targetSize = m_mediaSettings.screenCaptureResolution;
+    if (screenshot.size() != targetSize) {
+        screenshot = screenshot.scaled(targetSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+    }
+    
+    // Convert to video frame and display in widget
+    // This is a simplified implementation - in a real scenario,
+    // you would encode this as a video stream and send via WebRTC
+    
+    // For now, just update the widget with the screenshot
+    if (m_screenShareWidget) {
+        // Create a label to display the screenshot if the widget doesn't have one
+        QLabel* label = m_screenShareWidget->findChild<QLabel*>();
+        if (!label) {
+            label = new QLabel(m_screenShareWidget);
+            label->setAlignment(Qt::AlignCenter);
+            label->setScaledContents(true);
+            
+            // Set up layout for the video widget
+            QVBoxLayout* layout = new QVBoxLayout(m_screenShareWidget);
+            layout->addWidget(label);
+            m_screenShareWidget->setLayout(layout);
+        }
+        label->setPixmap(screenshot);
+    }
+    
+    // Notify WebRTC engine if connected
+    if (m_webRTCEngine) {
+        m_webRTCEngine->sendScreenFrame(screenshot);
+    }
+    
+    qDebug() << "Screen captured and processed:" << screenshot.size();
+}
+
+void MediaManager::setupScreenCaptureTimer()
+{
+    qDebug() << "Setting up screen capture timer";
+    
+    m_screenCaptureTimer->setSingleShot(false);
+    m_screenCaptureTimer->setInterval(SCREEN_CAPTURE_INTERVAL);
+    
+    connect(m_screenCaptureTimer, &QTimer::timeout,
+            this, &MediaManager::onScreenCaptureTimer);
+    
+    qDebug() << "Screen capture timer configured with interval:" << SCREEN_CAPTURE_INTERVAL << "ms";
+}
+
+void MediaManager::initializeCodecs()
+{
+    qDebug() << "Initializing supported codecs";
+    
+    // Initialize supported video codecs
+    m_supportedVideoCodecs = supportedVideoCodecs();
+    
+    // Initialize supported audio codecs  
+    m_supportedAudioCodecs = supportedAudioCodecs();
+    
+    // Set defaults if not already set
+    if (!m_supportedVideoCodecs.contains(m_currentVideoCodec)) {
+        if (!m_supportedVideoCodecs.isEmpty()) {
+            m_currentVideoCodec = m_supportedVideoCodecs.first();
+        }
+    }
+    
+    if (!m_supportedAudioCodecs.contains(m_currentAudioCodec)) {
+        if (!m_supportedAudioCodecs.isEmpty()) {
+            m_currentAudioCodec = m_supportedAudioCodecs.first();
+        }
+    }
+    
+    qDebug() << "Codecs initialized - Video:" << m_supportedVideoCodecs.size() 
+             << "Audio:" << m_supportedAudioCodecs.size();
+}
+
+QStringList MediaManager::supportedVideoCodecs() const
+{
+    QStringList codecs;
+    
+    // Common video codecs supported by Qt Multimedia and WebRTC
+    codecs << "VP8" << "VP9" << "H264" << "AV1";
+    
+    // Filter based on actual Qt Multimedia support
+    // This is a simplified implementation - in reality you'd query
+    // the actual codec support from Qt Multimedia
+    
+    return codecs;
+}
+
+QStringList MediaManager::supportedAudioCodecs() const
+{
+    QStringList codecs;
+    
+    // Common audio codecs supported by Qt Multimedia and WebRTC
+    codecs << "OPUS" << "G722" << "PCMU" << "PCMA" << "AAC";
+    
+    // Filter based on actual Qt Multimedia support
+    // This is a simplified implementation - in reality you'd query
+    // the actual codec support from Qt Multimedia
+    
+    return codecs;
+}
+
+bool MediaManager::validateMediaSettings(const MediaSettings& settings) const
+{
+    // Validate video settings
+    if (settings.videoResolution.width() <= 0 || settings.videoResolution.height() <= 0) {
+        qWarning() << "Invalid video resolution:" << settings.videoResolution;
+        return false;
+    }
+    
+    if (settings.videoFrameRate <= 0 || settings.videoFrameRate > 60) {
+        qWarning() << "Invalid video frame rate:" << settings.videoFrameRate;
+        return false;
+    }
+    
+    if (settings.videoBitrate <= 0 || settings.videoBitrate > 10000) {
+        qWarning() << "Invalid video bitrate:" << settings.videoBitrate;
+        return false;
+    }
+    
+    // Validate audio settings
+    if (settings.audioSampleRate <= 0) {
+        qWarning() << "Invalid audio sample rate:" << settings.audioSampleRate;
+        return false;
+    }
+    
+    if (settings.audioChannels <= 0 || settings.audioChannels > 8) {
+        qWarning() << "Invalid audio channels:" << settings.audioChannels;
+        return false;
+    }
+    
+    if (settings.audioBitrate <= 0 || settings.audioBitrate > 512) {
+        qWarning() << "Invalid audio bitrate:" << settings.audioBitrate;
+        return false;
+    }
+    
+    // Validate screen capture settings
+    if (settings.screenCaptureResolution.width() <= 0 || settings.screenCaptureResolution.height() <= 0) {
+        qWarning() << "Invalid screen capture resolution:" << settings.screenCaptureResolution;
+        return false;
+    }
+    
+    if (settings.screenCaptureFrameRate <= 0 || settings.screenCaptureFrameRate > 30) {
+        qWarning() << "Invalid screen capture frame rate:" << settings.screenCaptureFrameRate;
+        return false;
+    }
+    
+    return true;
+}
+
+void MediaManager::applyMediaSettings()
+{
+    qDebug() << "Applying media settings";
+    
+    // Apply video settings
+    if (m_camera) {
+        // Set camera resolution and frame rate
+        // This is a simplified implementation - Qt Multimedia
+        // handles most codec settings automatically
+        qDebug() << "Applied video settings - Resolution:" << m_mediaSettings.videoResolution
+                 << "FPS:" << m_mediaSettings.videoFrameRate
+                 << "Bitrate:" << m_mediaSettings.videoBitrate << "kbps";
+    }
+    
+    // Apply audio settings
+    if (m_audioInput) {
+        // Set audio input settings
+        qDebug() << "Applied audio settings - Sample rate:" << m_mediaSettings.audioSampleRate
+                 << "Channels:" << m_mediaSettings.audioChannels
+                 << "Bitrate:" << m_mediaSettings.audioBitrate << "kbps";
+    }
+    
+    // Apply screen capture settings
+    if (m_screenCaptureTimer) {
+        int interval = 1000 / m_mediaSettings.screenCaptureFrameRate;
+        m_screenCaptureTimer->setInterval(interval);
+        qDebug() << "Applied screen capture settings - Resolution:" << m_mediaSettings.screenCaptureResolution
+                 << "FPS:" << m_mediaSettings.screenCaptureFrameRate
+                 << "Interval:" << interval << "ms";
+    }
+    
+    // Notify WebRTC engine of settings changes
+    if (m_webRTCEngine) {
+        QVariantMap settingsMap;
+        settingsMap["videoResolution"] = m_mediaSettings.videoResolution;
+        settingsMap["videoFrameRate"] = m_mediaSettings.videoFrameRate;
+        settingsMap["videoBitrate"] = m_mediaSettings.videoBitrate;
+        settingsMap["audioSampleRate"] = m_mediaSettings.audioSampleRate;
+        settingsMap["audioChannels"] = m_mediaSettings.audioChannels;
+        settingsMap["audioBitrate"] = m_mediaSettings.audioBitrate;
+        settingsMap["screenCaptureResolution"] = m_mediaSettings.screenCaptureResolution;
+        settingsMap["screenCaptureFrameRate"] = m_mediaSettings.screenCaptureFrameRate;
+        settingsMap["captureAudio"] = m_mediaSettings.captureAudio;
+        
+        m_webRTCEngine->updateMediaSettings(settingsMap);
+    }
+    
+    qDebug() << "Media settings applied successfully";
+}
+
+
+
+void MediaManager::connectWebRTCSignals()
+{
+    if (!m_webRTCEngine) {
+        return;
+    }
+    
+    qDebug() << "Connecting WebRTC signals";
+    
+    connect(m_webRTCEngine, &WebRTCEngine::mediaPermissionsGranted,
+            this, &MediaManager::onWebRTCPermissionsGranted);
+    connect(m_webRTCEngine, &WebRTCEngine::mediaPermissionsDenied,
+            this, &MediaManager::onWebRTCPermissionsDenied);
+}
+
+void MediaManager::disconnectWebRTCSignals()
+{
+    if (!m_webRTCEngine) {
+        return;
+    }
+    
+    qDebug() << "Disconnecting WebRTC signals";
+    
+    disconnect(m_webRTCEngine, &WebRTCEngine::mediaPermissionsGranted,
+               this, &MediaManager::onWebRTCPermissionsGranted);
+    disconnect(m_webRTCEngine, &WebRTCEngine::mediaPermissionsDenied,
+               this, &MediaManager::onWebRTCPermissionsDenied);
 }

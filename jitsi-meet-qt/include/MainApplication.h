@@ -1,228 +1,193 @@
-#ifndef MAINAPPLICATION_H
-#define MAINAPPLICATION_H
+#pragma once
 
 #include <QApplication>
 #include <QLocalServer>
 #include <QLocalSocket>
 #include <QTimer>
-
-class WindowManager;
-class ConfigurationManager;
-class ProtocolHandler;
-class TranslationManager;
-class PerformanceManager;
-class MemoryLeakDetector;
-class StartupOptimizer;
-class OptimizedRecentManager;
-class MemoryProfiler;
+#include <memory>
+#include <optional>
+#include <string_view>
 
 /**
- * @brief 主应用程序类，管理应用程序生命周期和单例模式
+ * @brief Main application class implementing singleton pattern
+ * 
+ * This class serves as the entry point for the Jitsi Meet Qt application.
+ * It ensures only one instance runs at a time and handles protocol URLs.
+ * Uses modern C++17 features for improved performance and safety.
  */
-class MainApplication : public QApplication
-{
+class MainApplication : public QApplication {
     Q_OBJECT
 
 public:
     /**
-     * @brief 构造函数
-     * @param argc 命令行参数数量
-     * @param argv 命令行参数数组
+     * @brief Construct the main application
+     * @param argc Command line argument count
+     * @param argv Command line arguments
      */
     MainApplication(int argc, char *argv[]);
     
     /**
-     * @brief 析构函数
+     * @brief Destructor
      */
-    ~MainApplication();
-    
-    /**
-     * @brief 获取应用程序单例实例
-     * @return MainApplication指针
-     */
-    static MainApplication* instance();
-    
-    /**
-     * @brief 处理协议URL
-     * @param url 协议URL字符串
-     */
-    void handleProtocolUrl(const QString& url);
-    
-    /**
-     * @brief 获取窗口管理器
-     * @return WindowManager指针
-     */
-    WindowManager* windowManager() const;
-    
-    /**
-     * @brief 获取配置管理器
-     * @return ConfigurationManager指针
-     */
-    ConfigurationManager* configurationManager() const;
-    
-    /**
-     * @brief 获取协议处理器
-     * @return ProtocolHandler指针
-     */
-    ProtocolHandler* protocolHandler() const;
-    
-    /**
-     * @brief 获取翻译管理器
-     * @return TranslationManager指针
-     */
-    TranslationManager* translationManager() const;
-    
-    /**
-     * @brief 获取性能管理器
-     * @return PerformanceManager指针
-     */
-    PerformanceManager* performanceManager() const;
-    
-    /**
-     * @brief 获取优化的最近项目管理器
-     * @return OptimizedRecentManager指针
-     */
-    OptimizedRecentManager* recentManager() const;
+    ~MainApplication() override;
 
-public slots:
     /**
-     * @brief 处理第二个实例启动
-     * @param arguments 命令行参数
+     * @brief Get the singleton instance
+     * @return Pointer to the application instance, nullptr if not created
      */
-    void onSecondInstance(const QString& arguments);
-    
+    [[nodiscard]] static MainApplication* instance() noexcept;
+
     /**
-     * @brief 应用程序退出处理
+     * @brief Handle protocol URL from external source
+     * @param url The jitsi-meet:// protocol URL
      */
-    void onAboutToQuit();
-    
+    void handleProtocolUrl(std::string_view url);
+
     /**
-     * @brief 处理窗口改变事件
-     * @param type 新的窗口类型
+     * @brief Set the window manager for protocol URL handling
+     * @param windowManager Pointer to the window manager
      */
-    void onWindowChanged(int type);
-    
+    void setWindowManager(class WindowManager* windowManager);
+
     /**
-     * @brief 处理窗口状态改变事件
-     * @param type 窗口类型
-     * @param state 新的窗口状态
+     * @brief Get the translation manager
+     * @return Pointer to the translation manager
      */
-    void onWindowStateChanged(int type, int state);
-    
+    [[nodiscard]] class TranslationManager* translationManager() const noexcept { return m_translationManager; }
+
     /**
-     * @brief 处理配置改变事件
+     * @brief Check if this is the primary instance
+     * @return true if this is the primary instance, false otherwise
      */
-    void onConfigurationChanged();
-    
+    [[nodiscard]] bool isPrimaryInstance() const noexcept { return m_isPrimaryInstance; }
+
     /**
-     * @brief 处理内存警告事件
-     * @param memoryUsage 当前内存使用量
+     * @brief Get the application title
+     * @return Application title string
      */
-    void onMemoryWarning(qint64 memoryUsage);
-    
+    [[nodiscard]] static constexpr std::string_view applicationTitle() noexcept {
+        return "Jitsi Meet";
+    }
+
     /**
-     * @brief 处理内存泄漏检测事件
-     * @param leaks 检测到的内存泄漏信息
+     * @brief Get the minimum window size
+     * @return Minimum window size as QSize
      */
-    void onMemoryLeakDetected(const QVariantList& leaks);
-    
+    [[nodiscard]] static constexpr QSize minimumWindowSize() noexcept {
+        return QSize(800, 600);
+    }
+
+signals:
     /**
-     * @brief 处理窗口间数据传递事件
-     * @param fromType 源窗口类型
-     * @param toType 目标窗口类型
-     * @param data 传递的数据
+     * @brief Emitted when a protocol URL is received
+     * @param url The protocol URL
      */
-    void onDataTransferred(int fromType, int toType, const QVariantMap& data);
-    
+    void protocolUrlReceived(const QString& url);
+
     /**
-     * @brief 处理窗口创建事件
-     * @param type 窗口类型
+     * @brief Emitted when a second instance attempts to start
+     * @param arguments Command line arguments from the second instance
      */
-    void onWindowCreated(int type);
-    
-    /**
-     * @brief 处理窗口销毁事件
-     * @param type 窗口类型
-     */
-    void onWindowDestroyed(int type);
-    
-    /**
-     * @brief 处理最近项目变更事件
-     */
-    void onRecentItemsChanged();
+    void secondInstanceDetected(const QString& arguments);
 
 private slots:
     /**
-     * @brief 处理本地服务器新连接
+     * @brief Handle new connection from second instance
      */
     void onNewConnection();
-    
+
     /**
-     * @brief 处理本地套接字数据
+     * @brief Handle data from second instance
      */
-    void onSocketReadyRead();
+    void onSecondInstanceData();
+
+    /**
+     * @brief Handle protocol URL received from ProtocolHandler
+     * @param url The protocol URL
+     */
+    void onProtocolUrlReceived(const QString& url);
 
 private:
     /**
-     * @brief 设置单例模式
-     * @return 如果是第一个实例返回true，否则返回false
+     * @brief Setup single instance mechanism
+     * @return true if setup successful, false otherwise
      */
     bool setupSingleInstance();
-    
+
     /**
-     * @brief 注册协议处理器
+     * @brief Initialize application components
      */
-    void registerProtocolHandler();
-    
+    void initializeApplication();
+
     /**
-     * @brief 初始化管理器组件
+     * @brief Initialize all manager components
      */
     void initializeManagers();
-    
-    /**
-     * @brief 解析命令行参数
-     */
-    void parseCommandLineArguments();
-    
-    /**
-     * @brief 发送消息到第一个实例
-     * @param message 要发送的消息
-     * @return 发送成功返回true
-     */
-    bool sendMessageToFirstInstance(const QString& message);
-    
-    /**
-     * @brief 设置核心组件间的信号连接
-     */
-    void setupCoreConnections();
-    
-    /**
-     * @brief 显示初始窗口
-     */
-    void showInitialWindow();
 
-private:
+    /**
+     * @brief Setup component connections
+     */
+    void setupComponentConnections();
+
+    /**
+     * @brief Initialize user interface
+     */
+    void initializeUserInterface();
+
+    /**
+     * @brief Initialize translation manager
+     */
+    void initializeTranslationManager();
+
+    /**
+     * @brief Initialize protocol handler
+     */
+    void initializeProtocolHandler();
+
+    /**
+     * @brief Parse command line arguments
+     * @return Optional protocol URL if found
+     */
+    [[nodiscard]] std::optional<QString> parseCommandLineArguments() const;
+
+    /**
+     * @brief Validate protocol URL format
+     * @param url URL to validate
+     * @return true if valid jitsi-meet:// URL
+     */
+    [[nodiscard]] static bool isValidProtocolUrl(std::string_view url) noexcept;
+
+    /**
+     * @brief Send message to primary instance
+     * @param message Message to send
+     * @return true if message sent successfully
+     */
+    bool sendToPrimaryInstance(const QString& message);
+
+    // Static instance pointer for singleton pattern
     static MainApplication* s_instance;
-    
-    // 单例相关
-    QLocalServer* m_localServer;
-    QString m_serverName;
-    bool m_isFirstInstance;
-    
-    // 管理器组件
-    WindowManager* m_windowManager;
-    ConfigurationManager* m_configManager;
-    ProtocolHandler* m_protocolHandler;
-    TranslationManager* m_translationManager;
-    PerformanceManager* m_performanceManager;
-    MemoryLeakDetector* m_memoryLeakDetector;
-    StartupOptimizer* m_startupOptimizer;
-    OptimizedRecentManager* m_recentManager;
-    MemoryProfiler* m_memoryProfiler;
-    
-    // 启动参数
-    QString m_startupUrl;
-    bool m_showWelcome;
-};
 
-#endif // MAINAPPLICATION_H
+    // Single instance management
+    std::unique_ptr<QLocalServer> m_localServer;
+    std::unique_ptr<QLocalSocket> m_localSocket;
+    bool m_isPrimaryInstance{false};
+    
+    // Application components
+    class ProtocolHandler* m_protocolHandler;
+    class WindowManager* m_windowManager;
+    class TranslationManager* m_translationManager;
+    class ConfigurationManager* m_configurationManager;
+    class ConferenceManager* m_conferenceManager;
+    class MediaManager* m_mediaManager;
+    class ChatManager* m_chatManager;
+    class ScreenShareManager* m_screenShareManager;
+    class AuthenticationManager* m_authenticationManager;
+    class ErrorRecoveryManager* m_errorRecoveryManager;
+    class ThemeManager* m_themeManager;
+    class PerformanceManager* m_performanceManager;
+    
+    // Application state
+    QString m_serverName;
+    static constexpr std::string_view SERVER_NAME = "JitsiMeetQt_SingleInstance";
+    static constexpr int CONNECTION_TIMEOUT_MS = 1000;
+};

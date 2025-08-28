@@ -3,126 +3,85 @@
 
 #include <QObject>
 #include <QString>
+#include <QStringList>
 #include <QApplication>
+#include <memory>
+
+class QSettings;
 
 /**
- * @brief Manages application themes and styling
+ * @brief The ThemeManager class handles application theming and style management
  * 
- * The ThemeManager class handles loading and switching between different
- * visual themes (light/dark) for the Jitsi Meet Qt application.
+ * This class provides functionality to:
+ * - Load and apply different themes (light, dark, modern)
+ * - Manage theme persistence across application sessions
+ * - Provide theme switching capabilities
+ * - Handle system theme detection
  */
 class ThemeManager : public QObject
 {
     Q_OBJECT
 
 public:
-    enum Theme {
-        LightTheme,
-        DarkTheme,
-        ModernTheme,
-        SystemTheme  // Follow system preference
+    enum class Theme {
+        Light,
+        Dark,
+        Modern,
+        System  // Follow system theme
     };
+    Q_ENUM(Theme)
 
     explicit ThemeManager(QObject *parent = nullptr);
     ~ThemeManager();
 
-    /**
-     * @brief Get the singleton instance
-     * @return ThemeManager instance
-     */
-    static ThemeManager* instance();
-
-    /**
-     * @brief Get current theme
-     * @return Current theme enum
-     */
-    Theme currentTheme() const;
-
-    /**
-     * @brief Set the application theme
-     * @param theme Theme to apply
-     */
+    // Theme management
     void setTheme(Theme theme);
-
-    /**
-     * @brief Load theme from configuration
-     */
-    void loadThemeFromConfig();
-
-    /**
-     * @brief Save current theme to configuration
-     */
-    void saveThemeToConfig();
-
-    /**
-     * @brief Check if system supports dark mode detection
-     * @return True if system dark mode can be detected
-     */
-    bool systemSupportsDarkMode() const;
-
-    /**
-     * @brief Detect system theme preference
-     * @return Detected system theme
-     */
-    Theme detectSystemTheme() const;
-
-    /**
-     * @brief Get theme name as string
-     * @param theme Theme enum
-     * @return Theme name
-     */
+    Theme currentTheme() const;
+    QString currentThemeName() const;
+    
+    // Available themes
+    QStringList availableThemes() const;
     static QString themeToString(Theme theme);
-
-    /**
-     * @brief Parse theme from string
-     * @param themeStr Theme string
-     * @return Theme enum
-     */
-    static Theme themeFromString(const QString& themeStr);
+    static Theme stringToTheme(const QString& themeString);
+    
+    // System theme detection
+    bool isSystemDarkMode() const;
+    void enableSystemThemeDetection(bool enabled);
+    bool isSystemThemeDetectionEnabled() const;
+    
+    // Style management
+    void applyTheme(Theme theme);
+    void reloadCurrentTheme();
+    QString getStyleSheet(Theme theme) const;
+    
+    // Icon management
+    QString getThemedIcon(const QString& iconName) const;
+    QString getThemedIcon(const QString& iconName, Theme theme) const;
 
 signals:
-    /**
-     * @brief Emitted when theme changes
-     * @param theme New theme
-     */
-    void themeChanged(Theme theme);
+    void themeChanged(Theme newTheme);
+    void systemThemeChanged(bool isDark);
 
 private slots:
-    /**
-     * @brief Handle system theme changes (Windows/macOS)
-     */
     void onSystemThemeChanged();
 
 private:
-    /**
-     * @brief Apply stylesheet to application
-     * @param theme Theme to apply
-     */
-    void applyStyleSheet(Theme theme);
-
-    /**
-     * @brief Load stylesheet from resources
-     * @param stylesheetPath Path to QSS file
-     * @return Stylesheet content
-     */
-    QString loadStyleSheet(const QString& stylesheetPath);
-
-    /**
-     * @brief Setup system theme monitoring
-     */
-    void setupSystemThemeMonitoring();
-
-    /**
-     * @brief Update icon theme based on current theme
-     */
-    void updateIconTheme();
-
+    void loadThemeSettings();
+    void saveThemeSettings();
+    void setupSystemThemeWatcher();
+    QString loadStyleSheetFromResource(const QString& resourcePath) const;
+    void applyStyleSheet(const QString& styleSheet);
+    
     Theme m_currentTheme;
-    static ThemeManager* s_instance;
-
-#ifdef Q_OS_WIN
-    void* m_systemThemeWatcher; // Windows theme change watcher
-#endif
+    bool m_systemThemeDetectionEnabled;
+    std::unique_ptr<QSettings> m_settings;
+    
+    // Style sheet cache
+    mutable QHash<Theme, QString> m_styleSheetCache;
+    
+    static const QString SETTINGS_GROUP;
+    static const QString THEME_KEY;
+    static const QString SYSTEM_DETECTION_KEY;
 };
 
 #endif // THEMEMANAGER_H

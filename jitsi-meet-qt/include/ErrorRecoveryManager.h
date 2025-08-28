@@ -8,6 +8,7 @@
 #include <QTextStream>
 #include <QFile>
 #include <QMutex>
+#include <optional>
 #include "JitsiError.h"
 
 Q_DECLARE_LOGGING_CATEGORY(errorRecovery)
@@ -251,7 +252,7 @@ private:
     QMap<ErrorType, int> m_errorStats;
     
     // 最后的错误和操作
-    JitsiError m_lastError;
+    std::optional<JitsiError> m_lastError;
     QString m_lastOperation;
     QVariantMap m_lastOperationData;
     

@@ -1,7 +1,7 @@
 #include "ErrorDialog.h"
 #include <QApplication>
 #include <QStyle>
-#include <QScreen>
+#include <QGuiApplication>
 #include <QShowEvent>
 #include <QCloseEvent>
 #include <QSpacerItem>
@@ -33,7 +33,7 @@ ErrorDialog::ErrorDialog(const JitsiError& error, QWidget* parent)
     if (parent) {
         move(parent->geometry().center() - rect().center());
     } else {
-        QScreen* screen = QApplication::primaryScreen();
+        auto* screen = QGuiApplication::primaryScreen();
         if (screen) {
             move(screen->geometry().center() - rect().center());
         }

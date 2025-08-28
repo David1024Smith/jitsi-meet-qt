@@ -1,275 +1,499 @@
 #include "StyleHelper.h"
-#include "ThemeManager.h"
+#include <QPushButton>
+#include <QLabel>
+#include <QLineEdit>
 #include <QIcon>
-#include <QGraphicsDropShadowEffect>
+#include <QPainter>
+#include <QPixmap>
 #include <QApplication>
+#include <QScreen>
+#include <QDebug>
 
-void StyleHelper::applyConferenceButtonStyle(QPushButton* button, const QString& iconPath, bool isToggleable)
+// Static member initialization
+StyleHelper::ColorScheme StyleHelper::s_lightScheme;
+StyleHelper::ColorScheme StyleHelper::s_darkScheme;
+StyleHelper::ColorScheme StyleHelper::s_modernScheme;
+bool StyleHelper::s_schemesInitialized = false;
+
+StyleHelper::ColorScheme StyleHelper::getLightColorScheme()
+{
+    if (!s_schemesInitialized) {
+        initializeColorSchemes();
+    }
+    return s_lightScheme;
+}
+
+StyleHelper::ColorScheme StyleHelper::getDarkColorScheme()
+{
+    if (!s_schemesInitialized) {
+        initializeColorSchemes();
+    }
+    return s_darkScheme;
+}
+
+StyleHelper::ColorScheme StyleHelper::getModernColorScheme()
+{
+    if (!s_schemesInitialized) {
+        initializeColorSchemes();
+    }
+    return s_modernScheme;
+}
+
+void StyleHelper::styleButton(QPushButton* button, ButtonStyle style)
 {
     if (!button) return;
-
-    // Set icon if provided
-    if (!iconPath.isEmpty()) {
-        button->setIcon(QIcon(iconPath));
-        button->setIconSize(QSize(24, 24));
-    }
-
-    // Apply base styling
-    button->setCheckable(isToggleable);
-    button->setObjectName("ConferenceButton");
     
-    // Apply theme-specific styling
-    ThemeManager::Theme currentTheme = ThemeManager::instance()->currentTheme();
     QString styleSheet;
+    ColorScheme scheme = getLightColorScheme(); // Default to light, should be determined by theme manager
     
-    if (currentTheme == ThemeManager::DarkTheme) {
-        styleSheet = QString(
-            "QPushButton#ConferenceButton {"
-            "    background-color: #2A2A2A;"
-            "    border: 2px solid #424242;"
-            "    border-radius: 24px;"
-            "    color: #FFFFFF;"
-            "    min-width: 48px;"
-            "    min-height: 48px;"
-            "    max-width: 48px;"
-            "    max-height: 48px;"
-            "}"
-            "QPushButton#ConferenceButton:hover {"
-            "    background-color: #333333;"
-            "    border-color: #64B5F6;"
-            "}"
-            "QPushButton#ConferenceButton:checked {"
-            "    background-color: rgba(100, 181, 246, 0.2);"
-            "    border-color: #64B5F6;"
-            "    color: #64B5F6;"
-            "}"
-        );
-    } else if (currentTheme == ThemeManager::ModernTheme) {
-        styleSheet = QString(
-            "QPushButton#ConferenceButton {"
-            "    background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,"
-            "                                stop: 0 #FFFFFF, stop: 1 #F5F5F5);"
-            "    border: 2px solid #E0E0E0;"
-            "    border-radius: 28px;"
-            "    color: #212121;"
-            "    min-width: 56px;"
-            "    min-height: 56px;"
-            "    max-width: 56px;"
-            "    max-height: 56px;"
-            "}"
-            "QPushButton#ConferenceButton:hover {"
-            "    background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,"
-            "                                stop: 0 #E3F2FD, stop: 1 #BBDEFB);"
-            "    border-color: #2196F3;"
-            "}"
-            "QPushButton#ConferenceButton:checked {"
-            "    background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,"
-            "                                stop: 0 #E3F2FD, stop: 1 #BBDEFB);"
-            "    border-color: #2196F3;"
-            "    color: #2196F3;"
-            "}"
-        );
-    } else {
-        // Light theme
-        styleSheet = QString(
-            "QPushButton#ConferenceButton {"
-            "    background-color: #F5F5F5;"
-            "    border: 2px solid #E0E0E0;"
-            "    border-radius: 24px;"
-            "    color: #212121;"
-            "    min-width: 48px;"
-            "    min-height: 48px;"
-            "    max-width: 48px;"
-            "    max-height: 48px;"
-            "}"
-            "QPushButton#ConferenceButton:hover {"
-            "    background-color: #E3F2FD;"
-            "    border-color: #2196F3;"
-            "}"
-            "QPushButton#ConferenceButton:checked {"
-            "    background-color: #E3F2FD;"
-            "    border-color: #2196F3;"
-            "    color: #2196F3;"
-            "}"
-        );
+    switch (style) {
+        case ButtonStyle::Primary:
+            styleSheet = QString(
+                "QPushButton {"
+                "    background-color: %1;"
+                "    color: white;"
+                "    border: none;"
+                "    border-radius: 8px;"
+                "    padding: 12px 24px;"
+                "    font-weight: 500;"
+                "    min-width: 100px;"
+                "}"
+                "QPushButton:hover {"
+                "    background-color: %2;"
+                "}"
+                "QPushButton:pressed {"
+                "    background-color: %3;"
+                "}"
+                "QPushButton:disabled {"
+                "    background-color: #BDBDBD;"
+                "    color: #757575;"
+                "}"
+            ).arg(colorToString(scheme.primary))
+             .arg(colorToString(scheme.primaryDark))
+             .arg(colorToString(adjustColorBrightness(scheme.primaryDark, -20)));
+            break;
+            
+        case ButtonStyle::Secondary:
+            styleSheet = QString(
+                "QPushButton {"
+                "    background-color: transparent;"
+                "    color: %1;"
+                "    border: 2px solid %1;"
+                "    border-radius: 8px;"
+                "    padding: 12px 24px;"
+                "    font-weight: 500;"
+                "    min-width: 100px;"
+                "}"
+                "QPushButton:hover {"
+                "    background-color: %2;"
+                "}"
+                "QPushButton:pressed {"
+                "    background-color: %3;"
+                "}"
+            ).arg(colorToString(scheme.primary))
+             .arg(colorToString(QColor(scheme.primary.red(), scheme.primary.green(), scheme.primary.blue(), 25)))
+             .arg(colorToString(QColor(scheme.primary.red(), scheme.primary.green(), scheme.primary.blue(), 50)));
+            break;
+            
+        case ButtonStyle::Success:
+            styleSheet = QString(
+                "QPushButton {"
+                "    background-color: %1;"
+                "    color: white;"
+                "    border: none;"
+                "    border-radius: 8px;"
+                "    padding: 12px 24px;"
+                "    font-weight: 500;"
+                "    min-width: 100px;"
+                "}"
+                "QPushButton:hover {"
+                "    background-color: %2;"
+                "}"
+            ).arg(colorToString(scheme.success))
+             .arg(colorToString(adjustColorBrightness(scheme.success, -20)));
+            break;
+            
+        case ButtonStyle::Error:
+            styleSheet = QString(
+                "QPushButton {"
+                "    background-color: %1;"
+                "    color: white;"
+                "    border: none;"
+                "    border-radius: 8px;"
+                "    padding: 12px 24px;"
+                "    font-weight: 500;"
+                "    min-width: 100px;"
+                "}"
+                "QPushButton:hover {"
+                "    background-color: %2;"
+                "}"
+            ).arg(colorToString(scheme.error))
+             .arg(colorToString(adjustColorBrightness(scheme.error, -20)));
+            break;
+            
+        case ButtonStyle::Flat:
+            styleSheet = QString(
+                "QPushButton {"
+                "    background-color: transparent;"
+                "    color: %1;"
+                "    border: none;"
+                "    border-radius: 8px;"
+                "    padding: 12px 24px;"
+                "    font-weight: 500;"
+                "}"
+                "QPushButton:hover {"
+                "    background-color: %2;"
+                "}"
+            ).arg(colorToString(scheme.text))
+             .arg(colorToString(scheme.surface));
+            break;
+            
+        case ButtonStyle::Outlined:
+            styleSheet = QString(
+                "QPushButton {"
+                "    background-color: transparent;"
+                "    color: %1;"
+                "    border: 1px solid %2;"
+                "    border-radius: 8px;"
+                "    padding: 12px 24px;"
+                "    font-weight: 500;"
+                "}"
+                "QPushButton:hover {"
+                "    background-color: %2;"
+                "    border-color: %1;"
+                "}"
+            ).arg(colorToString(scheme.text))
+             .arg(colorToString(scheme.surface));
+            break;
     }
     
     button->setStyleSheet(styleSheet);
 }
 
-void StyleHelper::applyVideoWidgetStyle(QWidget* widget, bool isMainVideo)
+void StyleHelper::styleLineEdit(QLineEdit* lineEdit, InputStyle style)
 {
-    if (!widget) return;
-
-    widget->setObjectName(isMainVideo ? "MainVideoWidget" : "VideoWidget");
+    if (!lineEdit) return;
     
-    ThemeManager::Theme currentTheme = ThemeManager::instance()->currentTheme();
     QString styleSheet;
+    ColorScheme scheme = getLightColorScheme();
     
-    if (isMainVideo) {
-        if (currentTheme == ThemeManager::DarkTheme) {
-            styleSheet = "QWidget#MainVideoWidget { background-color: #000000; border: 2px solid #424242; border-radius: 12px; }";
-        } else if (currentTheme == ThemeManager::ModernTheme) {
-            styleSheet = "QWidget#MainVideoWidget { background-color: #212121; border: 3px solid #424242; border-radius: 16px; }";
-        } else {
-            styleSheet = "QWidget#MainVideoWidget { background-color: #212121; border: 2px solid #424242; border-radius: 12px; }";
-        }
-    } else {
-        if (currentTheme == ThemeManager::DarkTheme) {
-            styleSheet = "QWidget#VideoWidget { background-color: #424242; border: 2px solid #616161; border-radius: 8px; }"
-                        "QWidget#VideoWidget:hover { border-color: #64B5F6; }";
-        } else if (currentTheme == ThemeManager::ModernTheme) {
-            styleSheet = "QWidget#VideoWidget { background-color: #424242; border: 3px solid #616161; border-radius: 12px; }"
-                        "QWidget#VideoWidget:hover { border-color: #2196F3; }";
-        } else {
-            styleSheet = "QWidget#VideoWidget { background-color: #424242; border: 2px solid #616161; border-radius: 8px; }"
-                        "QWidget#VideoWidget:hover { border-color: #2196F3; }";
-        }
+    switch (style) {
+        case InputStyle::Default:
+            styleSheet = QString(
+                "QLineEdit {"
+                "    background-color: %1;"
+                "    border: 2px solid %2;"
+                "    border-radius: 8px;"
+                "    padding: 12px 16px;"
+                "    font-size: 11pt;"
+                "    color: %3;"
+                "    selection-background-color: %4;"
+                "}"
+                "QLineEdit:focus {"
+                "    border-color: %4;"
+                "    outline: none;"
+                "}"
+                "QLineEdit:hover {"
+                "    border-color: %5;"
+                "}"
+            ).arg(colorToString(scheme.surface))
+             .arg(colorToString(QColor("#E0E0E0")))
+             .arg(colorToString(scheme.text))
+             .arg(colorToString(scheme.primary))
+             .arg(colorToString(QColor("#BDBDBD")));
+            break;
+            
+        case InputStyle::Rounded:
+            styleSheet = QString(
+                "QLineEdit {"
+                "    background-color: %1;"
+                "    border: 2px solid %2;"
+                "    border-radius: 20px;"
+                "    padding: 12px 20px;"
+                "    font-size: 11pt;"
+                "    color: %3;"
+                "}"
+                "QLineEdit:focus {"
+                "    border-color: %4;"
+                "}"
+            ).arg(colorToString(scheme.surface))
+             .arg(colorToString(QColor("#E0E0E0")))
+             .arg(colorToString(scheme.text))
+             .arg(colorToString(scheme.primary));
+            break;
+            
+        case InputStyle::Outlined:
+            styleSheet = QString(
+                "QLineEdit {"
+                "    background-color: transparent;"
+                "    border: 2px solid %1;"
+                "    border-radius: 8px;"
+                "    padding: 12px 16px;"
+                "    font-size: 11pt;"
+                "    color: %2;"
+                "}"
+                "QLineEdit:focus {"
+                "    border-color: %3;"
+                "}"
+            ).arg(colorToString(QColor("#E0E0E0")))
+             .arg(colorToString(scheme.text))
+             .arg(colorToString(scheme.primary));
+            break;
+            
+        case InputStyle::Filled:
+            styleSheet = QString(
+                "QLineEdit {"
+                "    background-color: %1;"
+                "    border: none;"
+                "    border-bottom: 2px solid %2;"
+                "    border-radius: 4px 4px 0 0;"
+                "    padding: 16px 12px 8px 12px;"
+                "    font-size: 11pt;"
+                "    color: %3;"
+                "}"
+                "QLineEdit:focus {"
+                "    border-bottom-color: %4;"
+                "}"
+            ).arg(colorToString(scheme.surface))
+             .arg(colorToString(QColor("#E0E0E0")))
+             .arg(colorToString(scheme.text))
+             .arg(colorToString(scheme.primary));
+            break;
     }
     
-    widget->setStyleSheet(styleSheet);
+    lineEdit->setStyleSheet(styleSheet);
 }
 
-void StyleHelper::applyPanelStyle(QWidget* widget)
-{
-    if (!widget) return;
-
-    ThemeManager::Theme currentTheme = ThemeManager::instance()->currentTheme();
-    QString styleSheet;
-    
-    if (currentTheme == ThemeManager::DarkTheme) {
-        styleSheet = "QWidget { background-color: #1E1E1E; border: 1px solid #424242; border-radius: 8px; }";
-    } else if (currentTheme == ThemeManager::ModernTheme) {
-        styleSheet = "QWidget { background-color: white; border: 1px solid #E0E0E0; border-radius: 12px; margin: 8px; }";
-    } else {
-        styleSheet = "QWidget { background-color: #FFFFFF; border: 1px solid #E0E0E0; border-radius: 8px; }";
-    }
-    
-    widget->setStyleSheet(styleSheet);
-}
-
-void StyleHelper::applyCardStyle(QWidget* widget)
-{
-    if (!widget) return;
-
-    applyPanelStyle(widget);
-    applyShadowEffect(widget, QColor(0, 0, 0, 30), 8, 2);
-}
-
-void StyleHelper::applyStatusLabelStyle(QLabel* label, const QString& status)
+void StyleHelper::styleLabel(QLabel* label, const QString& role)
 {
     if (!label) return;
-
+    
+    ColorScheme scheme = getLightColorScheme();
     QString styleSheet;
     
-    if (status == "success") {
-        styleSheet = "QLabel { color: #388E3C; font-weight: 500; background-color: #E8F5E8; "
-                    "border: 1px solid #C8E6C9; border-radius: 4px; padding: 8px 12px; }";
-    } else if (status == "error") {
-        styleSheet = "QLabel { color: #D32F2F; font-weight: 500; background-color: #FFEBEE; "
-                    "border: 1px solid #FFCDD2; border-radius: 4px; padding: 8px 12px; }";
-    } else if (status == "warning") {
-        styleSheet = "QLabel { color: #F57C00; font-weight: 500; background-color: #FFF3E0; "
-                    "border: 1px solid #FFCC02; border-radius: 4px; padding: 8px 12px; }";
-    } else if (status == "info") {
-        styleSheet = "QLabel { color: #1976D2; font-weight: 500; background-color: #E3F2FD; "
-                    "border: 1px solid #BBDEFB; border-radius: 4px; padding: 8px 12px; }";
+    if (role == "title") {
+        styleSheet = QString(
+            "QLabel {"
+            "    font-size: 24pt;"
+            "    font-weight: bold;"
+            "    color: %1;"
+            "    margin: 20px 0;"
+            "}"
+        ).arg(colorToString(scheme.primary));
+    } else if (role == "subtitle") {
+        styleSheet = QString(
+            "QLabel {"
+            "    font-size: 12pt;"
+            "    color: %1;"
+            "    margin-bottom: 30px;"
+            "}"
+        ).arg(colorToString(scheme.textSecondary));
+    } else if (role == "error") {
+        styleSheet = QString(
+            "QLabel {"
+            "    color: %1;"
+            "    font-weight: 500;"
+            "    background-color: %2;"
+            "    border: 1px solid %3;"
+            "    border-radius: 4px;"
+            "    padding: 8px 12px;"
+            "}"
+        ).arg(colorToString(scheme.error))
+         .arg(colorToString(QColor("#FFEBEE")))
+         .arg(colorToString(QColor("#FFCDD2")));
+    } else if (role == "success") {
+        styleSheet = QString(
+            "QLabel {"
+            "    color: %1;"
+            "    font-weight: 500;"
+            "    background-color: %2;"
+            "    border: 1px solid %3;"
+            "    border-radius: 4px;"
+            "    padding: 8px 12px;"
+            "}"
+        ).arg(colorToString(scheme.success))
+         .arg(colorToString(QColor("#E8F5E8")))
+         .arg(colorToString(QColor("#C8E6C9")));
+    } else {
+        // Default label style
+        styleSheet = QString(
+            "QLabel {"
+            "    color: %1;"
+            "}"
+        ).arg(colorToString(scheme.text));
     }
     
     label->setStyleSheet(styleSheet);
 }
 
-QColor StyleHelper::getThemeColor(const QString& colorName)
+QIcon StyleHelper::createThemedIcon(const QString& iconName, const QColor& color)
 {
-    ThemeManager::Theme currentTheme = ThemeManager::instance()->currentTheme();
-    
-    if (colorName == "primary") {
-        return QColor("#2196F3");
-    } else if (colorName == "secondary") {
-        return currentTheme == ThemeManager::DarkTheme ? QColor("#64B5F6") : QColor("#1976D2");
-    } else if (colorName == "success") {
-        return QColor("#4CAF50");
-    } else if (colorName == "error") {
-        return QColor("#F44336");
-    } else if (colorName == "warning") {
-        return QColor("#FF9800");
-    } else if (colorName == "background") {
-        if (currentTheme == ThemeManager::DarkTheme) {
-            return QColor("#121212");
-        } else {
-            return QColor("#FAFAFA");
-        }
-    } else if (colorName == "surface") {
-        if (currentTheme == ThemeManager::DarkTheme) {
-            return QColor("#1E1E1E");
-        } else {
-            return QColor("#FFFFFF");
-        }
-    } else if (colorName == "text") {
-        if (currentTheme == ThemeManager::DarkTheme) {
-            return QColor("#FFFFFF");
-        } else {
-            return QColor("#212121");
-        }
-    }
-    
-    return QColor("#000000"); // Default fallback
+    // This is a simplified implementation
+    // In a real application, you might want to load SVG icons and recolor them
+    QString iconPath = QString(":/icons/%1.svg").arg(iconName);
+    return QIcon(iconPath);
 }
 
-QString StyleHelper::generateGradient(const QColor& startColor, const QColor& endColor, const QString& direction)
+QIcon StyleHelper::createButtonIcon(const QString& iconName, ButtonStyle style)
 {
-    QString gradientDirection;
-    if (direction == "horizontal") {
-        gradientDirection = "x1: 0, y1: 0, x2: 1, y2: 0";
-    } else if (direction == "diagonal") {
-        gradientDirection = "x1: 0, y1: 0, x2: 1, y2: 1";
+    QColor iconColor;
+    ColorScheme scheme = getLightColorScheme();
+    
+    switch (style) {
+        case ButtonStyle::Primary:
+        case ButtonStyle::Success:
+        case ButtonStyle::Error:
+            iconColor = Qt::white;
+            break;
+        default:
+            iconColor = scheme.text;
+            break;
+    }
+    
+    return createThemedIcon(iconName, iconColor);
+}
+
+QString StyleHelper::colorToString(const QColor& color)
+{
+    if (color.alpha() == 255) {
+        return color.name();
     } else {
-        gradientDirection = "x1: 0, y1: 0, x2: 0, y2: 1"; // vertical
+        return QString("rgba(%1, %2, %3, %4)")
+               .arg(color.red())
+               .arg(color.green())
+               .arg(color.blue())
+               .arg(color.alpha() / 255.0, 0, 'f', 2);
     }
-    
-    return QString("qlineargradient(%1, stop: 0 %2, stop: 1 %3)")
-           .arg(gradientDirection)
-           .arg(startColor.name())
-           .arg(endColor.name());
 }
 
-void StyleHelper::applyHoverEffect(QWidget* widget, const QColor& hoverColor)
+QColor StyleHelper::adjustColorBrightness(const QColor& color, int factor)
 {
-    if (!widget) return;
-    
-    // This would typically be implemented with event filters or custom widgets
-    // For now, we'll just set a property that can be used in stylesheets
-    widget->setProperty("hoverColor", hoverColor);
+    int r = qBound(0, color.red() + factor, 255);
+    int g = qBound(0, color.green() + factor, 255);
+    int b = qBound(0, color.blue() + factor, 255);
+    return QColor(r, g, b, color.alpha());
 }
 
-void StyleHelper::applyShadowEffect(QWidget* widget, const QColor& shadowColor, int blurRadius, int offset)
+QColor StyleHelper::blendColors(const QColor& color1, const QColor& color2, double ratio)
 {
-    if (!widget) return;
-
-    QGraphicsDropShadowEffect* shadowEffect = new QGraphicsDropShadowEffect(widget);
-    shadowEffect->setColor(shadowColor);
-    shadowEffect->setBlurRadius(blurRadius);
-    shadowEffect->setOffset(offset, offset);
-    widget->setGraphicsEffect(shadowEffect);
+    ratio = qBound(0.0, ratio, 1.0);
+    
+    int r = static_cast<int>(color1.red() * (1.0 - ratio) + color2.red() * ratio);
+    int g = static_cast<int>(color1.green() * (1.0 - ratio) + color2.green() * ratio);
+    int b = static_cast<int>(color1.blue() * (1.0 - ratio) + color2.blue() * ratio);
+    int a = static_cast<int>(color1.alpha() * (1.0 - ratio) + color2.alpha() * ratio);
+    
+    return QColor(r, g, b, a);
 }
 
-void StyleHelper::applyRoundedCorners(QWidget* widget, int radius)
+QString StyleHelper::createLinearGradient(const QColor& startColor, const QColor& endColor, const QString& direction)
 {
-    if (!widget) return;
-    
-    QString styleSheet = QString("QWidget { border-radius: %1px; }").arg(radius);
-    widget->setStyleSheet(widget->styleSheet() + styleSheet);
+    return QString("qlineargradient(x1: 0, y1: 0, x2: %1, y2: %2, stop: 0 %3, stop: 1 %4)")
+           .arg(direction.contains("right") ? "1" : "0")
+           .arg(direction.contains("bottom") ? "1" : "0")
+           .arg(colorToString(startColor))
+           .arg(colorToString(endColor));
 }
 
-QString StyleHelper::getThemedIcon(const QString& iconName)
+QString StyleHelper::createRadialGradient(const QColor& centerColor, const QColor& edgeColor)
 {
-    ThemeManager::Theme currentTheme = ThemeManager::instance()->currentTheme();
+    return QString("qradialgradient(cx: 0.5, cy: 0.5, radius: 1, stop: 0 %1, stop: 1 %2)")
+           .arg(colorToString(centerColor))
+           .arg(colorToString(edgeColor));
+}
+
+QString StyleHelper::createTransition(const QString& property, const QString& duration, const QString& easing)
+{
+    // Note: Qt StyleSheets don't support CSS transitions, this is for documentation/future use
+    return QString("transition: %1 %2 %3;").arg(property, duration, easing);
+}
+
+QString StyleHelper::createBoxShadow(int offsetX, int offsetY, int blur, const QColor& color, int spread)
+{
+    // Note: Qt StyleSheets have limited shadow support, this is for documentation
+    Q_UNUSED(offsetX)
+    Q_UNUSED(offsetY)
+    Q_UNUSED(blur)
+    Q_UNUSED(color)
+    Q_UNUSED(spread)
+    return QString(); // Qt doesn't support box-shadow in stylesheets
+}
+
+QString StyleHelper::createBorder(int width, const QString& style, const QColor& color)
+{
+    return QString("border: %1px %2 %3;")
+           .arg(width)
+           .arg(style)
+           .arg(colorToString(color));
+}
+
+QString StyleHelper::createBorderRadius(int radius)
+{
+    return QString("border-radius: %1px;").arg(radius);
+}
+
+QString StyleHelper::createBorderRadius(int topLeft, int topRight, int bottomRight, int bottomLeft)
+{
+    return QString("border-radius: %1px %2px %3px %4px;")
+           .arg(topLeft)
+           .arg(topRight)
+           .arg(bottomRight)
+           .arg(bottomLeft);
+}
+
+int StyleHelper::getScaledSize(int baseSize)
+{
+    // Get system DPI scaling factor
+    qreal dpr = QApplication::primaryScreen()->devicePixelRatio();
+    return static_cast<int>(baseSize * dpr);
+}
+
+QString StyleHelper::getScaledFont(int baseSize, const QString& weight)
+{
+    int scaledSize = getScaledSize(baseSize);
+    return QString("font-size: %1pt; font-weight: %2;").arg(scaledSize).arg(weight);
+}
+
+void StyleHelper::initializeColorSchemes()
+{
+    // Light color scheme
+    s_lightScheme.primary = QColor("#2196F3");
+    s_lightScheme.primaryDark = QColor("#1976D2");
+    s_lightScheme.secondary = QColor("#FF9800");
+    s_lightScheme.background = QColor("#FAFAFA");
+    s_lightScheme.surface = QColor("#FFFFFF");
+    s_lightScheme.text = QColor("#212121");
+    s_lightScheme.textSecondary = QColor("#666666");
+    s_lightScheme.accent = QColor("#FF5722");
+    s_lightScheme.error = QColor("#F44336");
+    s_lightScheme.success = QColor("#4CAF50");
+    s_lightScheme.warning = QColor("#FF9800");
     
-    // For dark theme, we might want to use different icon variants
-    if (currentTheme == ThemeManager::DarkTheme && iconName == "dropdown") {
-        return ":/icons/dropdown-dark.svg";
-    }
+    // Dark color scheme
+    s_darkScheme.primary = QColor("#64B5F6");
+    s_darkScheme.primaryDark = QColor("#1976D2");
+    s_darkScheme.secondary = QColor("#FFB74D");
+    s_darkScheme.background = QColor("#121212");
+    s_darkScheme.surface = QColor("#1E1E1E");
+    s_darkScheme.text = QColor("#FFFFFF");
+    s_darkScheme.textSecondary = QColor("#BDBDBD");
+    s_darkScheme.accent = QColor("#FF7043");
+    s_darkScheme.error = QColor("#F44336");
+    s_darkScheme.success = QColor("#4CAF50");
+    s_darkScheme.warning = QColor("#FF9800");
     
-    // Default to standard icon path
-    return QString(":/icons/%1.svg").arg(iconName);
+    // Modern color scheme (gradient-based)
+    s_modernScheme.primary = QColor("#2196F3");
+    s_modernScheme.primaryDark = QColor("#1565C0");
+    s_modernScheme.secondary = QColor("#9C27B0");
+    s_modernScheme.background = QColor("#F8F9FA");
+    s_modernScheme.surface = QColor("#FFFFFF");
+    s_modernScheme.text = QColor("#212121");
+    s_modernScheme.textSecondary = QColor("#6C757D");
+    s_modernScheme.accent = QColor("#E91E63");
+    s_modernScheme.error = QColor("#DC3545");
+    s_modernScheme.success = QColor("#28A745");
+    s_modernScheme.warning = QColor("#FFC107");
+    
+    s_schemesInitialized = true;
 }

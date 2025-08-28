@@ -1,25 +1,22 @@
 #include "MemoryLeakDetector.h"
-#include <QDateTime>
 #include <QDebug>
 #include <QCoreApplication>
+#include <algorithm>
+#include <chrono>
 
 MemoryLeakDetector* MemoryLeakDetector::s_instance = nullptr;
 
 MemoryLeakDetector::MemoryLeakDetector(QObject *parent)
     : QObject(parent)
     , m_leakCheckTimer(new QTimer(this))
-    , m_leakCheckInterval(60000) // 1分钟检查一次
-    , m_leakThresholdTime(300000) // 5分钟阈值
-    , m_totalAllocations(0)
-    , m_totalDeallocations(0)
-    , m_totalAllocatedMemory(0)
-    , m_peakMemoryUsage(0)
+    , m_trackingEnabled(true)
+    , m_leakDetectionActive(false)
 {
     s_instance = this;
     
-    // 设置泄漏检查定时器
-    m_leakCheckTimer->setInterval(m_leakCheckInterval);
-    connect(m_leakCheckTimer, &QTimer::timeout, this, &MemoryLeakDetector::onLeakCheckTimer);
+    // 设置泄漏检测定时器
+    m_leakCheckTimer->setInterval(30000); // 30秒检查一次
+    connect(m_leakCheckTimer, &QTimer::timeout, this, &MemoryLeakDetector::performLeakCheck);
     
     qDebug() << "MemoryLeakDetector: Initialized";
 }
@@ -28,10 +25,13 @@ MemoryLeakDetector::~MemoryLeakDetector()
 {
     stopLeakDetection();
     
-    // 生成最终报告
-    if (!m_allocations.isEmpty()) {
-        qWarning() << "MemoryLeakDetector: Potential memory leaks detected at shutdown";
-        generateLeakReport();
+    // 最终泄漏检查
+    auto leaks = detectLeaks();
+    if (!leaks.empty()) {
+        qWarning() << "MemoryLeakDetector: Found" << leaks.size() << "potential memory leaks at shutdown";
+        for (const auto& leak : leaks) {
+            qWarning() << "  Leak:" << leak.size << "bytes at" << leak.file << ":" << leak.line;
+        }
     }
     
     s_instance = nullptr;
@@ -44,51 +44,59 @@ MemoryLeakDetector* MemoryLeakDetector::instance()
 
 void MemoryLeakDetector::trackAllocation(void* ptr, size_t size, const QString& file, int line)
 {
-    if (!ptr) {
+    if (!m_trackingEnabled || !ptr) {
         return;
     }
     
-    QMutexLocker locker(&m_allocationsMutex);
+    QMutexLocker locker(&m_mutex);
     
     AllocationInfo info;
-    info.address = ptr;
     info.size = size;
     info.file = file;
     info.line = line;
-    info.timestamp = QDateTime::currentMSecsSinceEpoch();
+    info.timestamp = std::chrono::steady_clock::now();
     
     m_allocations[ptr] = info;
-    m_totalAllocations++;
-    m_totalAllocatedMemory += size;
     
-    if (m_totalAllocatedMemory > m_peakMemoryUsage) {
-        m_peakMemoryUsage = m_totalAllocatedMemory;
+    // 更新统计信息
+    m_stats.totalAllocations++;
+    m_stats.currentAllocations++;
+    m_stats.totalBytesAllocated += size;
+    m_stats.currentBytesAllocated += size;
+    
+    if (m_stats.currentAllocations > m_stats.peakAllocations) {
+        m_stats.peakAllocations = m_stats.currentAllocations;
     }
     
-    emit memoryStatisticsUpdated(m_allocations.size(), m_totalAllocatedMemory);
+    if (m_stats.currentBytesAllocated > m_stats.peakBytesAllocated) {
+        m_stats.peakBytesAllocated = m_stats.currentBytesAllocated;
+    }
 }
 
 void MemoryLeakDetector::trackDeallocation(void* ptr)
 {
-    if (!ptr) {
+    if (!m_trackingEnabled || !ptr) {
         return;
     }
     
-    QMutexLocker locker(&m_allocationsMutex);
+    QMutexLocker locker(&m_mutex);
     
     auto it = m_allocations.find(ptr);
     if (it != m_allocations.end()) {
-        m_totalAllocatedMemory -= it->size;
-        m_allocations.erase(it);
-        m_totalDeallocations++;
+        // 更新统计信息
+        m_stats.totalDeallocations++;
+        m_stats.currentAllocations--;
+        m_stats.currentBytesAllocated -= it->second.size;
         
-        emit memoryStatisticsUpdated(m_allocations.size(), m_totalAllocatedMemory);
+        // 移除分配记录
+        m_allocations.erase(it);
     }
 }
 
 void MemoryLeakDetector::startLeakDetection()
 {
-    if (!m_leakCheckTimer->isActive()) {
+    if (!m_leakDetectionActive) {
+        m_leakDetectionActive = true;
         m_leakCheckTimer->start();
         qDebug() << "MemoryLeakDetector: Leak detection started";
     }
@@ -96,138 +104,119 @@ void MemoryLeakDetector::startLeakDetection()
 
 void MemoryLeakDetector::stopLeakDetection()
 {
-    m_leakCheckTimer->stop();
-    qDebug() << "MemoryLeakDetector: Leak detection stopped";
-}
-
-void MemoryLeakDetector::performLeakCheck()
-{
-    QMutexLocker locker(&m_allocationsMutex);
-    
-    qint64 currentTime = QDateTime::currentMSecsSinceEpoch();
-    QList<AllocationInfo> potentialLeaks;
-    
-    for (auto it = m_allocations.begin(); it != m_allocations.end(); ++it) {
-        const AllocationInfo& info = it.value();
-        qint64 age = currentTime - info.timestamp;
-        
-        if (age > m_leakThresholdTime) {
-            potentialLeaks.append(info);
-        }
+    if (m_leakDetectionActive) {
+        m_leakDetectionActive = false;
+        m_leakCheckTimer->stop();
+        qDebug() << "MemoryLeakDetector: Leak detection stopped";
     }
-    
-    if (!potentialLeaks.isEmpty()) {
-        qWarning() << "MemoryLeakDetector: Found" << potentialLeaks.size() << "potential memory leaks";
-        emit memoryLeakDetected(potentialLeaks);
-    }
-    
-    // 清理过期的分配记录
-    cleanupOldAllocations();
 }
 
-int MemoryLeakDetector::getAllocationCount() const
+std::vector<MemoryLeakDetector::AllocationInfo> MemoryLeakDetector::detectLeaks() const
 {
-    QMutexLocker locker(&m_allocationsMutex);
-    return m_allocations.size();
-}
-
-qint64 MemoryLeakDetector::getTotalAllocatedMemory() const
-{
-    QMutexLocker locker(&m_allocationsMutex);
-    return m_totalAllocatedMemory;
-}
-
-QList<MemoryLeakDetector::AllocationInfo> MemoryLeakDetector::getPotentialLeaks() const
-{
-    QMutexLocker locker(&m_allocationsMutex);
+    QMutexLocker locker(&m_mutex);
     
-    qint64 currentTime = QDateTime::currentMSecsSinceEpoch();
-    QList<AllocationInfo> leaks;
+    std::vector<AllocationInfo> leaks;
+    auto now = std::chrono::steady_clock::now();
     
-    for (auto it = m_allocations.begin(); it != m_allocations.end(); ++it) {
-        const AllocationInfo& info = it.value();
-        qint64 age = currentTime - info.timestamp;
-        
-        if (age > m_leakThresholdTime) {
-            leaks.append(info);
+    // 检查超过5分钟未释放的内存分配
+    const auto threshold = std::chrono::minutes(5);
+    
+    for (const auto& [ptr, info] : m_allocations) {
+        if (now - info.timestamp > threshold) {
+            leaks.push_back(info);
         }
     }
     
     return leaks;
 }
 
-void MemoryLeakDetector::generateLeakReport()
+MemoryLeakDetector::MemoryStats MemoryLeakDetector::getMemoryStats() const
 {
-    QList<AllocationInfo> leaks = getPotentialLeaks();
-    
-    if (leaks.isEmpty()) {
-        qDebug() << "MemoryLeakDetector: No memory leaks detected";
-        return;
-    }
-    
-    qWarning() << "=== Memory Leak Report ===";
-    qWarning() << "Total potential leaks:" << leaks.size();
-    
-    qint64 totalLeakedMemory = 0;
-    QHash<QString, int> leaksByFile;
-    
-    for (const AllocationInfo& leak : leaks) {
-        totalLeakedMemory += leak.size;
-        
-        QString location = leak.file.isEmpty() ? "Unknown" : 
-                          QString("%1:%2").arg(leak.file).arg(leak.line);
-        leaksByFile[location]++;
-        
-        qint64 age = QDateTime::currentMSecsSinceEpoch() - leak.timestamp;
-        qWarning() << "Leak: Address=" << leak.address 
-                   << "Size=" << leak.size 
-                   << "Age=" << age/1000 << "s"
-                   << "Location=" << location;
-    }
-    
-    qWarning() << "Total leaked memory:" << totalLeakedMemory << "bytes";
-    qWarning() << "Leaks by location:";
-    
-    for (auto it = leaksByFile.begin(); it != leaksByFile.end(); ++it) {
-        qWarning() << "  " << it.key() << ":" << it.value() << "leaks";
-    }
-    
-    qWarning() << "========================";
+    QMutexLocker locker(&m_mutex);
+    return m_stats;
 }
 
-void MemoryLeakDetector::logMemoryStatistics()
+void MemoryLeakDetector::resetStats()
 {
-    QMutexLocker locker(&m_allocationsMutex);
+    QMutexLocker locker(&m_mutex);
+    m_stats = MemoryStats{};
+    qDebug() << "MemoryLeakDetector: Statistics reset";
+}
+
+void MemoryLeakDetector::forceGarbageCollection()
+{
+    qDebug() << "MemoryLeakDetector: Forcing garbage collection";
     
-    qDebug() << "=== Memory Statistics ===";
-    qDebug() << "Active allocations:" << m_allocations.size();
-    qDebug() << "Total allocations:" << m_totalAllocations;
-    qDebug() << "Total deallocations:" << m_totalDeallocations;
-    qDebug() << "Current allocated memory:" << m_totalAllocatedMemory << "bytes";
-    qDebug() << "Peak memory usage:" << m_peakMemoryUsage << "bytes";
-    qDebug() << "Allocation/Deallocation ratio:" 
-             << (m_totalDeallocations > 0 ? (double)m_totalAllocations / m_totalDeallocations : 0);
-    qDebug() << "========================";
+    // 强制Qt进行垃圾回收
+    if (QCoreApplication::instance()) {
+        QCoreApplication::instance()->processEvents();
+    }
+    
+    // 清理未使用的资源
+    cleanupUnusedResources();
 }
 
-void MemoryLeakDetector::onLeakCheckTimer()
+void MemoryLeakDetector::cleanupUnusedResources()
 {
-    performLeakCheck();
-}
-
-void MemoryLeakDetector::cleanupOldAllocations()
-{
-    // 清理超过1小时的分配记录以避免内存占用过多
-    qint64 currentTime = QDateTime::currentMSecsSinceEpoch();
-    qint64 cleanupThreshold = 3600000; // 1小时
+    qDebug() << "MemoryLeakDetector: Cleaning up unused resources";
+    
+    // 这里可以添加特定的资源清理逻辑
+    // 例如：清理缓存、释放未使用的对象等
+    
+    QMutexLocker locker(&m_mutex);
+    
+    // 清理过期的分配记录（超过1小时）
+    auto now = std::chrono::steady_clock::now();
+    const auto expireThreshold = std::chrono::hours(1);
     
     auto it = m_allocations.begin();
     while (it != m_allocations.end()) {
-        qint64 age = currentTime - it->timestamp;
-        if (age > cleanupThreshold) {
+        if (now - it->second.timestamp > expireThreshold) {
+            qWarning() << "MemoryLeakDetector: Removing stale allocation record for"
+                       << it->second.size << "bytes";
             it = m_allocations.erase(it);
         } else {
             ++it;
         }
+    }
+}
+
+void MemoryLeakDetector::setTrackingEnabled(bool enabled)
+{
+    QMutexLocker locker(&m_mutex);
+    m_trackingEnabled = enabled;
+    qDebug() << "MemoryLeakDetector: Tracking" << (enabled ? "enabled" : "disabled");
+}
+
+void MemoryLeakDetector::setLeakDetectionInterval(int seconds)
+{
+    m_leakCheckTimer->setInterval(seconds * 1000);
+    qDebug() << "MemoryLeakDetector: Leak detection interval set to" << seconds << "seconds";
+}
+
+void MemoryLeakDetector::performLeakCheck()
+{
+    auto leaks = detectLeaks();
+    
+    if (!leaks.empty()) {
+        size_t totalLeakedBytes = 0;
+        for (const auto& leak : leaks) {
+            totalLeakedBytes += leak.size;
+        }
+        
+        qWarning() << "MemoryLeakDetector: Found" << leaks.size() 
+                   << "potential leaks totaling" << totalLeakedBytes << "bytes";
+        
+        emit memoryLeakDetected(static_cast<int>(leaks.size()), totalLeakedBytes);
+    }
+    
+    // 发送统计更新
+    emit memoryStatsUpdated(getMemoryStats());
+    
+    // 定期清理
+    static int cleanupCounter = 0;
+    if (++cleanupCounter >= 10) { // 每10次检查清理一次
+        cleanupUnusedResources();
+        cleanupCounter = 0;
     }
 }

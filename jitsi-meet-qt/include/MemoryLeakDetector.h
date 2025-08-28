@@ -2,13 +2,16 @@
 #define MEMORYLEAKDETECTOR_H
 
 #include <QObject>
-#include <QHash>
-#include <QMutex>
 #include <QTimer>
-#include <QDebug>
+#include <QMutex>
+#include <memory>
+#include <unordered_map>
+#include <vector>
 
 /**
- * @brief 内存泄漏检测器 - 用于检测和报告潜在的内存泄漏
+ * @brief 内存泄漏检测器
+ * 
+ * 提供内存分配跟踪、泄漏检测和资源清理功能
  */
 class MemoryLeakDetector : public QObject
 {
@@ -16,11 +19,20 @@ class MemoryLeakDetector : public QObject
 
 public:
     struct AllocationInfo {
-        void* address;
         size_t size;
         QString file;
         int line;
-        qint64 timestamp;
+        std::chrono::steady_clock::time_point timestamp;
+    };
+
+    struct MemoryStats {
+        size_t totalAllocations{0};
+        size_t totalDeallocations{0};
+        size_t currentAllocations{0};
+        size_t peakAllocations{0};
+        size_t totalBytesAllocated{0};
+        size_t currentBytesAllocated{0};
+        size_t peakBytesAllocated{0};
     };
 
     explicit MemoryLeakDetector(QObject *parent = nullptr);
@@ -28,51 +40,50 @@ public:
 
     static MemoryLeakDetector* instance();
 
-    // 内存分配跟踪
+    // 内存跟踪
     void trackAllocation(void* ptr, size_t size, const QString& file = QString(), int line = 0);
     void trackDeallocation(void* ptr);
 
     // 泄漏检测
     void startLeakDetection();
     void stopLeakDetection();
-    void performLeakCheck();
+    std::vector<AllocationInfo> detectLeaks() const;
 
     // 统计信息
-    int getAllocationCount() const;
-    qint64 getTotalAllocatedMemory() const;
-    QList<AllocationInfo> getPotentialLeaks() const;
+    MemoryStats getMemoryStats() const;
+    void resetStats();
 
-    // 报告
-    void generateLeakReport();
-    void logMemoryStatistics();
+    // 资源清理
+    void forceGarbageCollection();
+    void cleanupUnusedResources();
+
+    // 配置
+    void setTrackingEnabled(bool enabled);
+    void setLeakDetectionInterval(int seconds);
 
 signals:
-    void memoryLeakDetected(const QList<AllocationInfo>& leaks);
-    void memoryStatisticsUpdated(int allocations, qint64 totalMemory);
+    void memoryLeakDetected(int leakCount, size_t totalLeakedBytes);
+    void memoryStatsUpdated(const MemoryStats& stats);
 
 private slots:
-    void onLeakCheckTimer();
+    void performLeakCheck();
 
 private:
-    void cleanupOldAllocations();
-
+    void updateStats();
+    
     static MemoryLeakDetector* s_instance;
     
-    QHash<void*, AllocationInfo> m_allocations;
-    mutable QMutex m_allocationsMutex;
-    
+    mutable QMutex m_mutex;
     QTimer* m_leakCheckTimer;
-    qint64 m_leakCheckInterval;
-    qint64 m_leakThresholdTime;
     
-    // 统计信息
-    int m_totalAllocations;
-    int m_totalDeallocations;
-    qint64 m_totalAllocatedMemory;
-    qint64 m_peakMemoryUsage;
+    std::unordered_map<void*, AllocationInfo> m_allocations;
+    MemoryStats m_stats;
+    
+    bool m_trackingEnabled;
+    bool m_leakDetectionActive;
 };
 
-// 便利宏用于跟踪内存分配
+// 便利宏用于内存跟踪
 #ifdef QT_DEBUG
 #define TRACK_ALLOCATION(ptr, size) \
     if (MemoryLeakDetector::instance()) { \

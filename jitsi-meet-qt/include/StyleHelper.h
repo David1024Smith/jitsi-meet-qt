@@ -4,97 +4,114 @@
 #include <QString>
 #include <QColor>
 #include <QWidget>
-#include <QPushButton>
-#include <QLabel>
+#include <QIcon>
+
+class QPushButton;
+class QLabel;
+class QLineEdit;
 
 /**
- * @brief Helper class for applying consistent styling across the application
+ * @brief The StyleHelper class provides utility functions for consistent styling
+ * 
+ * This class offers helper methods to:
+ * - Apply consistent styling to common widgets
+ * - Generate themed colors and gradients
+ * - Create styled icons and buttons
+ * - Handle hover and focus effects
  */
 class StyleHelper
 {
 public:
-    /**
-     * @brief Apply conference control button styling
-     * @param button Button to style
-     * @param iconPath Path to the button icon
-     * @param isToggleable Whether the button can be toggled
-     */
-    static void applyConferenceButtonStyle(QPushButton* button, const QString& iconPath, bool isToggleable = false);
+    // Color schemes
+    struct ColorScheme {
+        QColor primary;
+        QColor primaryDark;
+        QColor secondary;
+        QColor background;
+        QColor surface;
+        QColor text;
+        QColor textSecondary;
+        QColor accent;
+        QColor error;
+        QColor success;
+        QColor warning;
+    };
+    
+    // Button styles
+    enum class ButtonStyle {
+        Primary,
+        Secondary,
+        Success,
+        Warning,
+        Error,
+        Flat,
+        Outlined
+    };
+    
+    // Input styles
+    enum class InputStyle {
+        Default,
+        Rounded,
+        Outlined,
+        Filled
+    };
 
-    /**
-     * @brief Apply video widget styling
-     * @param widget Video widget to style
-     * @param isMainVideo Whether this is the main video widget
-     */
-    static void applyVideoWidgetStyle(QWidget* widget, bool isMainVideo = false);
-
-    /**
-     * @brief Apply panel styling (chat, participants, etc.)
-     * @param widget Panel widget to style
-     */
-    static void applyPanelStyle(QWidget* widget);
-
-    /**
-     * @brief Apply card styling for list items
-     * @param widget Widget to style as a card
-     */
-    static void applyCardStyle(QWidget* widget);
-
-    /**
-     * @brief Apply status label styling
-     * @param label Label to style
-     * @param status Status type (success, error, warning, info)
-     */
-    static void applyStatusLabelStyle(QLabel* label, const QString& status);
-
-    /**
-     * @brief Get theme-appropriate color
-     * @param colorName Color name (primary, secondary, success, error, etc.)
-     * @return QColor for the current theme
-     */
-    static QColor getThemeColor(const QString& colorName);
-
-    /**
-     * @brief Generate gradient stylesheet
-     * @param startColor Starting color
-     * @param endColor Ending color
-     * @param direction Gradient direction (horizontal, vertical, diagonal)
-     * @return CSS gradient string
-     */
-    static QString generateGradient(const QColor& startColor, const QColor& endColor, const QString& direction = "vertical");
-
-    /**
-     * @brief Apply hover effect to widget
-     * @param widget Widget to apply hover effect to
-     * @param hoverColor Color to use on hover
-     */
-    static void applyHoverEffect(QWidget* widget, const QColor& hoverColor);
-
-    /**
-     * @brief Apply shadow effect
-     * @param widget Widget to apply shadow to
-     * @param shadowColor Shadow color
-     * @param blurRadius Blur radius
-     * @param offset Shadow offset
-     */
-    static void applyShadowEffect(QWidget* widget, const QColor& shadowColor, int blurRadius = 10, int offset = 2);
-
-    /**
-     * @brief Apply rounded corners to widget
-     * @param widget Widget to apply rounded corners to
-     * @param radius Corner radius
-     */
-    static void applyRoundedCorners(QWidget* widget, int radius = 8);
-
-    /**
-     * @brief Get icon path for current theme
-     * @param iconName Base icon name
-     * @return Full path to themed icon
-     */
-    static QString getThemedIcon(const QString& iconName);
-
+    // Static utility methods
+    static ColorScheme getLightColorScheme();
+    static ColorScheme getDarkColorScheme();
+    static ColorScheme getModernColorScheme();
+    
+    // Widget styling
+    static void styleButton(QPushButton* button, ButtonStyle style = ButtonStyle::Primary);
+    static void styleLineEdit(QLineEdit* lineEdit, InputStyle style = InputStyle::Default);
+    static void styleLabel(QLabel* label, const QString& role = "default");
+    
+    // Icon utilities
+    static QIcon createThemedIcon(const QString& iconName, const QColor& color = QColor());
+    static QIcon createButtonIcon(const QString& iconName, ButtonStyle style);
+    
+    // Color utilities
+    static QString colorToString(const QColor& color);
+    static QColor adjustColorBrightness(const QColor& color, int factor);
+    static QColor blendColors(const QColor& color1, const QColor& color2, double ratio);
+    
+    // Gradient utilities
+    static QString createLinearGradient(const QColor& startColor, const QColor& endColor, 
+                                      const QString& direction = "to bottom");
+    static QString createRadialGradient(const QColor& centerColor, const QColor& edgeColor);
+    
+    // Animation utilities
+    static QString createTransition(const QString& property = "all", 
+                                  const QString& duration = "0.2s",
+                                  const QString& easing = "ease");
+    
+    // Shadow utilities
+    static QString createBoxShadow(int offsetX, int offsetY, int blur, 
+                                 const QColor& color, int spread = 0);
+    
+    // Border utilities
+    static QString createBorder(int width, const QString& style, const QColor& color);
+    static QString createBorderRadius(int radius);
+    static QString createBorderRadius(int topLeft, int topRight, int bottomRight, int bottomLeft);
+    
+    // Layout utilities
+    static void addHoverEffect(QWidget* widget, const QString& hoverStyle);
+    static void addFocusEffect(QWidget* widget, const QString& focusStyle);
+    static void addPressedEffect(QWidget* widget, const QString& pressedStyle);
+    
+    // Responsive utilities
+    static int getScaledSize(int baseSize);
+    static QString getScaledFont(int baseSize, const QString& weight = "normal");
+    
 private:
-    StyleHelper() = default;
+    StyleHelper() = default; // Static class
+    
+    static ColorScheme s_lightScheme;
+    static ColorScheme s_darkScheme;
+    static ColorScheme s_modernScheme;
+    static bool s_schemesInitialized;
+    
+    static void initializeColorSchemes();
 };
 
 #endif // STYLEHELPER_H

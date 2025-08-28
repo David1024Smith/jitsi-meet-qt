@@ -140,10 +140,10 @@ QGroupBox* SettingsDialog::createInterfaceGroup()
     if (m_translationManager) {
         m_languageCombo->addItem(tr("auto_language"), "auto");
         
-        QStringList languages = m_translationManager->availableLanguages();
-        for (const QString& lang : languages) {
-            QString displayName = m_translationManager->languageDisplayName(lang);
-            m_languageCombo->addItem(displayName, lang);
+        auto availableLanguages = m_translationManager->availableLanguages();
+        for (const auto& langInfo : availableLanguages) {
+            QString displayName = QString("%1 (%2)").arg(langInfo.nativeName, langInfo.code);
+            m_languageCombo->addItem(displayName, langInfo.code);
         }
     }
     
@@ -330,7 +330,8 @@ void SettingsDialog::loadSettings()
         return;
     }
     
-    ApplicationSettings settings = m_configManager->loadConfiguration();
+    auto settingsOpt = m_configManager->loadConfiguration();
+    ApplicationSettings settings = settingsOpt.value_or(ApplicationSettings{});
     m_originalSettings = settings;
     
     // Load server settings
@@ -433,7 +434,21 @@ void SettingsDialog::validateServerUrl()
 
 void SettingsDialog::onLanguageChanged()
 {
-    // Language change will be applied when settings are saved
+    if (!m_translationManager || !m_languageCombo) {
+        return;
+    }
+    
+    QString selectedLanguageCode = m_languageCombo->currentData().toString();
+    qDebug() << "Language changed to:" << selectedLanguageCode;
+    
+    // Apply language change immediately for preview
+    if (m_translationManager->setLanguage(selectedLanguageCode)) {
+        // Update UI text with new language
+        updateUIText();
+        qDebug() << "Language applied successfully";
+    } else {
+        qDebug() << "Failed to apply language change";
+    }
 }
 
 void SettingsDialog::onTranslationChanged()
@@ -575,55 +590,61 @@ void SettingsDialog::refreshDeviceList()
     // Clear existing items
     if (m_cameraCombo) {
         m_cameraCombo->clear();
-        QList<MediaManager::MediaDevice> cameras = m_mediaManager->availableCameras();
+        QList<MediaManager::MediaDevice> cameras = m_mediaManager->availableVideoDevices();
         for (const auto& camera : cameras) {
             m_cameraCombo->addItem(camera.name, camera.id);
         }
         
         // Select current camera
-        MediaManager::MediaDevice currentCamera = m_mediaManager->currentCamera();
-        int cameraIndex = m_cameraCombo->findData(currentCamera.id);
-        if (cameraIndex >= 0) {
-            m_cameraCombo->setCurrentIndex(cameraIndex);
+        auto currentCamera = m_mediaManager->currentVideoDevice();
+        if (currentCamera.has_value()) {
+            int cameraIndex = m_cameraCombo->findData(currentCamera->id);
+            if (cameraIndex >= 0) {
+                m_cameraCombo->setCurrentIndex(cameraIndex);
+            }
         }
     }
     
     if (m_microphoneCombo) {
         m_microphoneCombo->clear();
-        QList<MediaManager::MediaDevice> microphones = m_mediaManager->availableMicrophones();
+        QList<MediaManager::MediaDevice> microphones = m_mediaManager->availableAudioInputDevices();
         for (const auto& microphone : microphones) {
             m_microphoneCombo->addItem(microphone.name, microphone.id);
         }
         
         // Select current microphone
-        MediaManager::MediaDevice currentMicrophone = m_mediaManager->currentMicrophone();
-        int microphoneIndex = m_microphoneCombo->findData(currentMicrophone.id);
-        if (microphoneIndex >= 0) {
-            m_microphoneCombo->setCurrentIndex(microphoneIndex);
+        auto currentMicrophone = m_mediaManager->currentAudioInputDevice();
+        if (currentMicrophone.has_value()) {
+            int microphoneIndex = m_microphoneCombo->findData(currentMicrophone->id);
+            if (microphoneIndex >= 0) {
+                m_microphoneCombo->setCurrentIndex(microphoneIndex);
+            }
         }
     }
     
     if (m_speakerCombo) {
         m_speakerCombo->clear();
-        QList<MediaManager::MediaDevice> speakers = m_mediaManager->availableSpeakers();
+        QList<MediaManager::MediaDevice> speakers = m_mediaManager->availableAudioOutputDevices();
         for (const auto& speaker : speakers) {
             m_speakerCombo->addItem(speaker.name, speaker.id);
         }
         
         // Select current speaker
-        MediaManager::MediaDevice currentSpeaker = m_mediaManager->currentSpeaker();
-        int speakerIndex = m_speakerCombo->findData(currentSpeaker.id);
-        if (speakerIndex >= 0) {
-            m_speakerCombo->setCurrentIndex(speakerIndex);
+        auto currentSpeaker = m_mediaManager->currentAudioOutputDevice();
+        if (currentSpeaker.has_value()) {
+            int speakerIndex = m_speakerCombo->findData(currentSpeaker->id);
+            if (speakerIndex >= 0) {
+                m_speakerCombo->setCurrentIndex(speakerIndex);
+            }
         }
     }
     
     // Update volume sliders
     if (m_microphoneVolumeSlider && m_mediaManager) {
-        m_microphoneVolumeSlider->setValue(m_mediaManager->microphoneVolume());
+        m_microphoneVolumeSlider->setValue(static_cast<int>(m_mediaManager->microphoneVolume() * 100));
     }
     if (m_speakerVolumeSlider && m_mediaManager) {
-        m_speakerVolumeSlider->setValue(m_mediaManager->speakerVolume());
+        m_speakerVolumeSlider->setValue(static_cast<int>(m_mediaManager->masterVolume() * 100));
     }
 }
 
@@ -635,7 +656,7 @@ void SettingsDialog::onCameraChanged()
     
     QString deviceId = m_cameraCombo->currentData().toString();
     if (!deviceId.isEmpty()) {
-        m_mediaManager->selectCamera(deviceId);
+        m_mediaManager->setVideoDevice(deviceId);
     }
 }
 
@@ -647,7 +668,7 @@ void SettingsDialog::onMicrophoneChanged()
     
     QString deviceId = m_microphoneCombo->currentData().toString();
     if (!deviceId.isEmpty()) {
-        m_mediaManager->selectMicrophone(deviceId);
+        m_mediaManager->setAudioInputDevice(deviceId);
     }
 }
 
@@ -659,7 +680,7 @@ void SettingsDialog::onSpeakerChanged()
     
     QString deviceId = m_speakerCombo->currentData().toString();
     if (!deviceId.isEmpty()) {
-        m_mediaManager->selectSpeaker(deviceId);
+        m_mediaManager->setAudioOutputDevice(deviceId);
     }
 }
 
@@ -768,14 +789,14 @@ void SettingsDialog::stopAllTests()
 void SettingsDialog::onMicrophoneVolumeChanged(int volume)
 {
     if (m_mediaManager) {
-        m_mediaManager->setMicrophoneVolume(volume);
+        m_mediaManager->setMicrophoneVolume(volume / 100.0);
     }
 }
 
 void SettingsDialog::onSpeakerVolumeChanged(int volume)
 {
     if (m_mediaManager) {
-        m_mediaManager->setSpeakerVolume(volume);
+        m_mediaManager->setMasterVolume(volume / 100.0);
     }
 }
 

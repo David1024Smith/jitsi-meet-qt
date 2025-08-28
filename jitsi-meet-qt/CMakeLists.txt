@@ -1,338 +1,337 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.20)
 
 project(JitsiMeetQt VERSION 1.0.0 LANGUAGES CXX)
 
-# 设置C++标准
-set(CMAKE_CXX_STANDARD 14)
+# Set C++17 standard
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# 强制设置C++标准编译选项
-if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
-endif()
-
-# 设置构建类型
+# Set build type if not specified
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
-# MinGW编译器特定设置
+# Version information
+set(PROJECT_VERSION_MAJOR 1)
+set(PROJECT_VERSION_MINOR 0)
+set(PROJECT_VERSION_PATCH 0)
+set(PROJECT_VERSION_BUILD 0)
+
+# Configure for MinGW compiler , C:\Qt\6.8.3\mingw_64\bin ,C:\Qt\Tools\mingw1310_64\bin
 if(MINGW)
-    # 设置MinGW特定的编译选项
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -static-libgcc -static-libstdc++")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic")
+    set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -DDEBUG")
+    set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -DQT_NO_DEBUG_OUTPUT")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libgcc -static-libstdc++")
     
-    # 启用调试信息（即使在Release模式下）
-    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -g")
-    
-    # 优化设置
-    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O2 -DNDEBUG")
-    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -g3")
+    # Enable LTO for release builds
+    if(CMAKE_BUILD_TYPE STREQUAL "Release")
+        set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -flto")
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -flto")
+    endif()
 endif()
 
-# 设置Qt版本要求
-set(QT_MIN_VERSION "5.15.2")
+# Configure version header
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/version.h.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/include/version.h"
+    @ONLY
+)
 
-# 查找Qt组件 - 使用纯C++实现，不依赖WebEngine
-find_package(Qt5 ${QT_MIN_VERSION} REQUIRED COMPONENTS
+# Find Qt 6.8.3 components  C:\Qt\6.8.3\mingw_64\bin ,C:\Qt\Tools\mingw1310_64\bin
+find_package(Qt6 6.8.3 REQUIRED COMPONENTS
     Core
     Widgets
     Network
     WebSockets
     Multimedia
     MultimediaWidgets
-    Xml
     LinguistTools
 )
 
-# 设置Qt自动处理
+# Enable Qt MOC, UIC, and RCC
 set(CMAKE_AUTOMOC ON)
-set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
+set(CMAKE_AUTORCC ON)
 
-# 添加CMake模块路径
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
-
-# 包含目录
+# Include directories
 include_directories(
-    ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_BINARY_DIR}/include
 )
 
-# 源文件
+# Resource files
+set(RESOURCES
+    resources/resources.qrc
+)
+
+# Source files
 set(SOURCES
     src/main.cpp
     src/MainApplication.cpp
+    src/WebRTCEngine.cpp
+    src/MediaManager.cpp
+    src/ScreenShareManager.cpp
+    src/AuthenticationManager.cpp
+    src/XMPPClient.cpp
+    src/ConferenceManager.cpp
+    src/ChatManager.cpp
+    src/ConfigurationManager.cpp
     src/WindowManager.cpp
     src/WelcomeWindow.cpp
     src/ConferenceWindow.cpp
     src/SettingsDialog.cpp
-    src/ConfigurationManager.cpp
     src/ProtocolHandler.cpp
     src/TranslationManager.cpp
-    src/WindowStateManager.cpp
     src/NavigationBar.cpp
     src/RecentListWidget.cpp
-    src/models/RecentItem.cpp
-    src/XMPPClient.cpp
-    src/WebRTCEngine.cpp
-    src/MediaManager.cpp
-    src/ConferenceManager.cpp
-    src/AuthenticationManager.cpp
-    src/ChatManager.cpp
-    src/ScreenShareManager.cpp
+    src/WindowStateManager.cpp
     src/JitsiError.cpp
     src/ErrorRecoveryManager.cpp
     src/ErrorDialog.cpp
     src/ErrorUtils.cpp
     src/ThemeManager.cpp
-    src/StyleUtils.cpp
     src/StyleHelper.cpp
+    src/StyleUtils.cpp
     src/PerformanceManager.cpp
-    src/MemoryLeakDetector.cpp
-    src/StartupOptimizer.cpp
-    src/OptimizedRecentManager.cpp
     src/PerformanceConfig.cpp
+    src/StartupOptimizer.cpp
     src/MemoryProfiler.cpp
+    src/MemoryLeakDetector.cpp
+    src/OptimizedRecentManager.cpp
 )
 
-# 头文件
+# Header files
 set(HEADERS
     include/MainApplication.h
+    include/WebRTCEngine.h
+    include/MediaManager.h
+    include/ScreenShareManager.h
+    include/AuthenticationManager.h
+    include/XMPPClient.h
+    include/ConferenceManager.h
+    include/ChatManager.h
+    include/ConfigurationManager.h
     include/WindowManager.h
     include/WelcomeWindow.h
     include/ConferenceWindow.h
     include/SettingsDialog.h
-    include/ConfigurationManager.h
     include/ProtocolHandler.h
     include/TranslationManager.h
-    include/WindowStateManager.h
     include/NavigationBar.h
     include/RecentListWidget.h
-    include/models/RecentItem.h
-    include/XMPPClient.h
-    include/WebRTCEngine.h
-    include/MediaManager.h
-    include/ConferenceManager.h
-    include/AuthenticationManager.h
-    include/ChatManager.h
-    include/ScreenShareManager.h
-    include/JitsiConstants.h
+    include/WindowStateManager.h
     include/JitsiError.h
     include/ErrorRecoveryManager.h
     include/ErrorDialog.h
     include/ErrorUtils.h
     include/ThemeManager.h
-    include/StyleUtils.h
     include/StyleHelper.h
+    include/StyleUtils.h
     include/PerformanceManager.h
-    include/MemoryLeakDetector.h
-    include/StartupOptimizer.h
-    include/OptimizedRecentManager.h
     include/PerformanceConfig.h
+    include/StartupOptimizer.h
     include/MemoryProfiler.h
+    include/MemoryLeakDetector.h
+    include/OptimizedRecentManager.h
+    include/JitsiConstants.h
+    include/version.h.in
 )
 
-# 翻译文件
+# Translation files
 set(TS_FILES
-    translations/jitsi_en.ts
-    translations/jitsi_zh_CN.ts
-    translations/jitsi_ja.ts
-    translations/jitsi_ko.ts
-    translations/jitsi_fr.ts
-    translations/jitsi_de.ts
-    translations/jitsi_es.ts
-    translations/jitsi_ru.ts
+    translations/jitsimeet_en.ts
+    translations/jitsimeet_zh_CN.ts
+    translations/jitsimeet_es.ts
+    translations/jitsimeet_fr.ts
+    translations/jitsimeet_de.ts
+    translations/jitsimeet_ja.ts
+    translations/jitsimeet_ko.ts
+    translations/jitsimeet_ru.ts
+    translations/jitsimeet_pt.ts
+    translations/jitsimeet_it.ts
 )
 
-# 编译翻译文件
-qt5_create_translation(QM_FILES ${SOURCES} ${HEADERS} ${TS_FILES})
+# Create translation targets
+qt6_add_translations(${PROJECT_NAME} TS_FILES ${TS_FILES})
 
-# 资源文件
-set(RESOURCES
-    resources/resources.qrc
-)
+# MOC files (Qt will handle these automatically with CMAKE_AUTOMOC)
+qt6_standard_project_setup()
 
-# 创建可执行文件
-add_executable(${PROJECT_NAME}
-    ${SOURCES}
-    ${HEADERS}
-    ${RESOURCES}
-    ${QM_FILES}
-)
+# Create executable
+add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS} ${RESOURCES})
 
-# 第三方库依赖配置
-find_package(PkgConfig QUIET)
-
-# OpenSSL依赖（用于安全连接）
-find_package(OpenSSL QUIET)
-if(OpenSSL_FOUND)
-    target_link_libraries(${PROJECT_NAME} OpenSSL::SSL OpenSSL::Crypto)
-    target_compile_definitions(${PROJECT_NAME} PRIVATE OPENSSL_AVAILABLE)
-endif()
-
-# 链接Qt库 - 使用纯C++实现所需的库
+# Link Qt libraries
 target_link_libraries(${PROJECT_NAME}
-    Qt5::Core
-    Qt5::Widgets
-    Qt5::Network
-    Qt5::WebSockets
-    Qt5::Multimedia
-    Qt5::MultimediaWidgets
-    Qt5::Xml
+    Qt6::Core
+    Qt6::Widgets
+    Qt6::Network
+    Qt6::WebSockets
+    Qt6::Multimedia
+    Qt6::MultimediaWidgets
 )
 
-# Windows特定的系统库
+# Windows specific settings
 if(WIN32)
-    target_link_libraries(${PROJECT_NAME}
-        ws2_32      # Winsock
-        winmm       # Windows Multimedia
-        ole32       # OLE
-        oleaut32    # OLE Automation
-        uuid        # UUID
-        advapi32    # Advanced API
-        shell32     # Shell API
-        user32      # User API
-        gdi32       # GDI
-    )
-endif()
-
-# 版本信息配置
-set(PROJECT_VERSION_MAJOR 1)
-set(PROJECT_VERSION_MINOR 0)
-set(PROJECT_VERSION_PATCH 0)
-set(PROJECT_VERSION_BUILD 0)
-set(PROJECT_COMPANY_NAME "Jitsi Meet Qt")
-set(PROJECT_COPYRIGHT "Copyright (C) 2024 Jitsi Meet Qt Team")
-set(PROJECT_DESCRIPTION "Qt-based Jitsi Meet Desktop Application")
-
-# 配置版本头文件
-configure_file(
-    "${CMAKE_SOURCE_DIR}/include/version.h.in"
-    "${CMAKE_BINARY_DIR}/include/version.h"
-    @ONLY
-)
-
-# Windows特定设置
-if(WIN32)
-    # 设置应用程序图标和属性
+    # Set target properties
     set_target_properties(${PROJECT_NAME} PROPERTIES
         WIN32_EXECUTABLE TRUE
         OUTPUT_NAME "JitsiMeetQt"
-        VERSION ${PROJECT_VERSION}
     )
     
-    # 生成Windows资源文件
+    # Add Windows resources
+    target_sources(${PROJECT_NAME} PRIVATE resources/windows.rc)
+    
+    # Link Windows libraries
+    target_link_libraries(${PROJECT_NAME}
+        ws2_32
+        winmm
+        ole32
+        oleaut32
+        uuid
+        advapi32
+        shell32
+        user32
+        gdi32
+    )
+endif()
+
+# Install configuration
+install(TARGETS ${PROJECT_NAME}
+    RUNTIME DESTINATION bin
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib
+)
+
+# Install Qt libraries and dependencies
+if(WIN32)
+    # Find Qt installation path
+    get_target_property(QT_QMAKE_EXECUTABLE Qt6::qmake IMPORTED_LOCATION)
+    get_filename_component(QT_WINDEPLOYQT_EXECUTABLE ${QT_QMAKE_EXECUTABLE} PATH)
+    set(QT_WINDEPLOYQT_EXECUTABLE "${QT_WINDEPLOYQT_EXECUTABLE}/windeployqt.exe")
+    
+    # Configure deployment
     configure_file(
-        "${CMAKE_SOURCE_DIR}/resources/app.rc.in"
-        "${CMAKE_BINARY_DIR}/resources/app.rc"
+        "${CMAKE_CURRENT_SOURCE_DIR}/deploy/deploy.cmake.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/deploy.cmake"
         @ONLY
     )
     
-    # 添加Windows资源文件
-    target_sources(${PROJECT_NAME} PRIVATE "${CMAKE_BINARY_DIR}/resources/app.rc")
-    
-    # 添加生成的版本头文件路径
-    target_include_directories(${PROJECT_NAME} PRIVATE "${CMAKE_BINARY_DIR}/include")
+    install(SCRIPT "${CMAKE_CURRENT_BINARY_DIR}/deploy.cmake")
 endif()
 
-# 编译器特定设置
-if(MSVC)
-    target_compile_options(${PROJECT_NAME} PRIVATE /W4)
-elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wpedantic)
-endif()
-
-# Qt部署工具配置
-if(WIN32)
-    # 查找windeployqt工具
-    find_program(WINDEPLOYQT_EXECUTABLE windeployqt HINTS ${Qt5_DIR}/../../../bin)
-    
-    if(WINDEPLOYQT_EXECUTABLE)
-        # 添加部署目标
-        add_custom_target(deploy
-            COMMAND ${CMAKE_COMMAND} -E env PATH="${Qt5_DIR}/../../../bin" 
-                    ${WINDEPLOYQT_EXECUTABLE} 
-                    --qmldir ${CMAKE_SOURCE_DIR}
-                    --verbose 2
-                    --release
-                    --no-translations
-                    --no-system-d3d-compiler
-                    --no-opengl-sw
-                    $<TARGET_FILE:${PROJECT_NAME}>
-            DEPENDS ${PROJECT_NAME}
-            COMMENT "Deploying Qt libraries"
-        )
-    endif()
-endif()
-
-# CPack配置用于创建安装包
-set(CPACK_PACKAGE_NAME "JitsiMeetQt")
-set(CPACK_PACKAGE_VENDOR "${PROJECT_COMPANY_NAME}")
+# CPack configuration for Windows installer
+set(CPACK_GENERATOR "NSIS")
+set(CPACK_PACKAGE_NAME "Jitsi Meet Qt")
+set(CPACK_PACKAGE_VENDOR "Jitsi Meet Qt Project")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Native Qt implementation of Jitsi Meet")
 set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
-set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "${PROJECT_DESCRIPTION}")
-set(CPACK_PACKAGE_DESCRIPTION "${PROJECT_DESCRIPTION}")
+set(CPACK_PACKAGE_VERSION_MAJOR "${PROJECT_VERSION_MAJOR}")
+set(CPACK_PACKAGE_VERSION_MINOR "${PROJECT_VERSION_MINOR}")
+set(CPACK_PACKAGE_VERSION_PATCH "${PROJECT_VERSION_PATCH}")
 set(CPACK_PACKAGE_INSTALL_DIRECTORY "JitsiMeetQt")
-set(CPACK_PACKAGE_EXECUTABLES "JitsiMeetQt;Jitsi Meet Qt")
+set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
 
-# Windows特定的CPack设置
-if(WIN32)
-    set(CPACK_GENERATOR "NSIS;ZIP")
-    set(CPACK_NSIS_DISPLAY_NAME "Jitsi Meet Qt")
-    set(CPACK_NSIS_PACKAGE_NAME "Jitsi Meet Qt")
-    set(CPACK_NSIS_CONTACT "support@jitsimeetqt.com")
-    set(CPACK_NSIS_URL_INFO_ABOUT "https://github.com/jitsi/jitsi-meet-qt")
-    set(CPACK_NSIS_HELP_LINK "https://github.com/jitsi/jitsi-meet-qt/wiki")
-    set(CPACK_NSIS_MODIFY_PATH ON)
-    set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
-    
-    # 设置安装图标
-    set(CPACK_NSIS_MUI_ICON "${CMAKE_SOURCE_DIR}/resources/icons/app.ico")
-    set(CPACK_NSIS_MUI_UNIICON "${CMAKE_SOURCE_DIR}/resources/icons/app.ico")
-    
-    # 创建桌面快捷方式
-    set(CPACK_NSIS_CREATE_ICONS_EXTRA
-        "CreateShortCut '$DESKTOP\\\\Jitsi Meet Qt.lnk' '$INSTDIR\\\\bin\\\\JitsiMeetQt.exe'"
-    )
-    set(CPACK_NSIS_DELETE_ICONS_EXTRA
-        "Delete '$DESKTOP\\\\Jitsi Meet Qt.lnk'"
-    )
-    
-    # 注册协议处理器
-    set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS
-        "WriteRegStr HKCR 'jitsi-meet' '' 'URL:Jitsi Meet Protocol'
-         WriteRegStr HKCR 'jitsi-meet' 'URL Protocol' ''
-         WriteRegStr HKCR 'jitsi-meet\\\\DefaultIcon' '' '$INSTDIR\\\\bin\\\\JitsiMeetQt.exe,0'
-         WriteRegStr HKCR 'jitsi-meet\\\\shell\\\\open\\\\command' '' '$INSTDIR\\\\bin\\\\JitsiMeetQt.exe \\\"%1\\\"'"
-    )
-    set(CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS
-        "DeleteRegKey HKCR 'jitsi-meet'"
-    )
-endif()
+# NSIS specific settings
+set(CPACK_NSIS_DISPLAY_NAME "Jitsi Meet Qt")
+set(CPACK_NSIS_PACKAGE_NAME "Jitsi Meet Qt")
+set(CPACK_NSIS_CONTACT "support@jitsimeet.org")
+set(CPACK_NSIS_URL_INFO_ABOUT "https://jitsi.org/")
+set(CPACK_NSIS_HELP_LINK "https://jitsi.org/support/")
+set(CPACK_NSIS_MODIFY_PATH ON)
+set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
 
-# 安装配置
-install(TARGETS ${PROJECT_NAME}
-    RUNTIME DESTINATION bin
-    COMPONENT Runtime
+# Create desktop shortcut
+set(CPACK_NSIS_CREATE_ICONS_EXTRA
+    "CreateShortCut '$DESKTOP\\\\Jitsi Meet Qt.lnk' '$INSTDIR\\\\bin\\\\JitsiMeetQt.exe'"
 )
-
-# 安装资源文件
-install(DIRECTORY ${CMAKE_SOURCE_DIR}/translations
-    DESTINATION .
-    COMPONENT Translations
-    FILES_MATCHING PATTERN "*.qm"
-)
-
-# 安装许可证和文档
-install(FILES 
-    ${CMAKE_SOURCE_DIR}/README.md
-    DESTINATION .
-    COMPONENT Documentation
+set(CPACK_NSIS_DELETE_ICONS_EXTRA
+    "Delete '$DESKTOP\\\\Jitsi Meet Qt.lnk'"
 )
 
 include(CPack)
 
-# 测试配置
+# Enable testing
 enable_testing()
+
+# Settings Dialog Test
+if(BUILD_SETTINGS_TEST)
+    add_executable(test_settings_dialog
+        test_settings_dialog.cpp
+        src/SettingsDialog.cpp
+        src/ConfigurationManager.cpp
+        src/TranslationManager.cpp
+        src/MediaManager.cpp
+        src/WindowStateManager.cpp
+        src/JitsiError.cpp
+        src/ErrorUtils.cpp
+        src/ThemeManager.cpp
+        src/StyleHelper.cpp
+        src/StyleUtils.cpp
+    )
+    
+    target_link_libraries(test_settings_dialog
+        Qt6::Core
+        Qt6::Widgets
+        Qt6::Network
+        Qt6::Multimedia
+        Qt6::MultimediaWidgets
+    )
+    
+    set_target_properties(test_settings_dialog PROPERTIES
+        WIN32_EXECUTABLE TRUE
+    )
+endif()
+
+# Settings Dialog Verification
+if(BUILD_SETTINGS_VERIFY)
+    add_executable(verify_settings_dialog
+        verify_settings_dialog.cpp
+        src/SettingsDialog.cpp
+        src/ConfigurationManager.cpp
+        src/TranslationManager.cpp
+        src/MediaManager.cpp
+        src/WindowStateManager.cpp
+        src/JitsiError.cpp
+        src/ErrorUtils.cpp
+        src/ThemeManager.cpp
+        src/StyleHelper.cpp
+        src/StyleUtils.cpp
+    )
+    
+    target_link_libraries(verify_settings_dialog
+        Qt6::Core
+        Qt6::Widgets
+        Qt6::Network
+        Qt6::Multimedia
+        Qt6::MultimediaWidgets
+    )
+    
+    set_target_properties(verify_settings_dialog PROPERTIES
+        WIN32_EXECUTABLE TRUE
+    )
+endif()
+
+# Theme and Resource Test
+if(BUILD_THEME_TEST)
+    add_executable(test_theme_resources
+        test_theme_resources.cpp
+        src/ThemeManager.cpp
+        src/StyleHelper.cpp
+        src/StyleUtils.cpp
+        ${RESOURCES}
+    )
+    
+    target_link_libraries(test_theme_resources
+        Qt6::Core
+        Qt6::Widgets
+        Qt6::Network
+    )
+    
+    set_target_properties(test_theme_resources PROPERTIES
+        WIN32_EXECUTABLE TRUE
+    )
+endif()
+
 add_subdirectory(tests)

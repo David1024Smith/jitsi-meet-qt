@@ -4,28 +4,41 @@
 #include <QObject>
 #include <QTimer>
 #include <QElapsedTimer>
-#include <QHash>
 #include <QMutex>
 #include <QThread>
 #include <memory>
-class ConfigurationManager;
-class PerformanceConfig;
+#include <chrono>
+#include <unordered_map>
+
+class QApplication;
 
 /**
- * @brief 性能管理器 - 负责应用程序性能优化和监控
+ * @brief 性能管理器 - 负责应用程序性能监控和优化
+ * 
+ * 提供启动时间优化、资源加载优化、内存监控等功能
  */
 class PerformanceManager : public QObject
 {
     Q_OBJECT
 
 public:
+    enum class MetricType {
+        StartupTime,
+        MemoryUsage,
+        NetworkLatency,
+        VideoFrameRate,
+        AudioLatency,
+        CPUUsage
+    };
+
     struct PerformanceMetrics {
-        qint64 startupTime = 0;
-        qint64 memoryUsage = 0;
-        qint64 networkMemory = 0;
-        int recentItemsCount = 0;
-        qint64 configLoadTime = 0;
-        qint64 resourceLoadTime = 0;
+        std::chrono::milliseconds startupTime{0};
+        size_t memoryUsageMB{0};
+        std::chrono::milliseconds networkLatency{0};
+        double videoFrameRate{0.0};
+        std::chrono::milliseconds audioLatency{0};
+        double cpuUsagePercent{0.0};
+        std::chrono::steady_clock::time_point timestamp;
     };
 
     explicit PerformanceManager(QObject *parent = nullptr);
@@ -35,71 +48,54 @@ public:
 
     // 启动时间优化
     void startStartupTimer();
-    void markStartupComplete();
-    qint64 getStartupTime() const;
+    void endStartupTimer();
+    std::chrono::milliseconds getStartupTime() const;
 
-    // 资源加载优化
-    void preloadResources();
-    void optimizeResourceLoading();
-
-    // 网络内存管理
-    void optimizeNetworkMemory();
-
-    // 历史记录性能优化
-    void optimizeRecentItemsLoading();
-    void setMaxRecentItems(int maxItems);
-
-    // 内存监控和清理
+    // 内存管理
     void startMemoryMonitoring();
     void stopMemoryMonitoring();
-    void performMemoryCleanup();
-    qint64 getCurrentMemoryUsage();
+    size_t getCurrentMemoryUsage() const;
+    size_t getPeakMemoryUsage() const;
 
-    // 性能指标
-    PerformanceMetrics getMetrics() const;
-    void logPerformanceMetrics();
+    // 性能指标记录
+    void recordMetric(MetricType type, double value);
+    PerformanceMetrics getCurrentMetrics() const;
 
-    // 配置管理
-    PerformanceConfig* performanceConfig() const;
-    void applyPerformanceConfiguration();
+    // 资源预加载
+    void preloadResources();
+    void enableLazyLoading(bool enabled);
+
+    // 大型会议优化
+    void optimizeForLargeConference(int participantCount);
+    void setVideoQualityMode(const QString& mode);
 
 signals:
-    void memoryWarning(qint64 memoryUsage);
-    void performanceMetricsUpdated(const PerformanceMetrics& metrics);
+    void memoryWarning(size_t currentUsage, size_t threshold);
+    void performanceWarning(MetricType type, double value);
+    void metricsUpdated(const PerformanceMetrics& metrics);
 
 private slots:
-    void onMemoryCheckTimer();
-    void onCleanupTimer();
-    void onConfigurationChanged();
+    void updateMemoryMetrics();
+    void updatePerformanceMetrics();
 
 private:
     void initializeOptimizations();
     void setupMemoryThresholds();
-    void cleanupUnusedResources();
-    qint64 getProcessMemoryUsage();
-    qint64 getNetworkMemoryUsage();
-
+    
     static PerformanceManager* s_instance;
     
     QElapsedTimer m_startupTimer;
-    QTimer* m_memoryCheckTimer;
-    QTimer* m_cleanupTimer;
-    PerformanceConfig* m_performanceConfig;
+    QTimer* m_memoryMonitorTimer;
+    QTimer* m_metricsTimer;
     
-    PerformanceMetrics m_metrics;
-    QMutex m_metricsMutex;
+    mutable QMutex m_metricsMutex;
+    PerformanceMetrics m_currentMetrics;
     
-    // 内存管理配置
-    qint64 m_memoryWarningThreshold;
-    qint64 m_memoryCriticalThreshold;
-    int m_maxRecentItems;
+    size_t m_peakMemoryUsage;
+    size_t m_memoryWarningThreshold;
+    bool m_lazyLoadingEnabled;
     
-    // 网络优化
-    bool m_networkOptimized;
-    
-    // 资源预加载
-    QHash<QString, QByteArray> m_preloadedResources;
-    bool m_resourcesPreloaded;
+    std::unordered_map<MetricType, std::vector<double>> m_metricHistory;
 };
 
 #endif // PERFORMANCEMANAGER_H

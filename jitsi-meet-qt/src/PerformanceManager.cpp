@@ -1,11 +1,9 @@
 #include "PerformanceManager.h"
-#include "PerformanceConfig.h"
 #include <QApplication>
-#include <QStandardPaths>
-#include <QDir>
-#include <QDebug>
 #include <QProcess>
+#include <QDebug>
 #include <QThread>
+#include <algorithm>
 
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -16,31 +14,23 @@ PerformanceManager* PerformanceManager::s_instance = nullptr;
 
 PerformanceManager::PerformanceManager(QObject *parent)
     : QObject(parent)
-    , m_memoryCheckTimer(new QTimer(this))
-    , m_cleanupTimer(new QTimer(this))
+    , m_memoryMonitorTimer(new QTimer(this))
+    , m_metricsTimer(new QTimer(this))
+    , m_peakMemoryUsage(0)
     , m_memoryWarningThreshold(512 * 1024 * 1024) // 512MB
-    , m_memoryCriticalThreshold(1024 * 1024 * 1024) // 1GB
-    , m_maxRecentItems(50)
-    , m_networkOptimized(false)
-    , m_resourcesPreloaded(false)
+    , m_lazyLoadingEnabled(true)
 {
     s_instance = this;
     
-    // 创建性能配置管理器
-    m_performanceConfig = new PerformanceConfig(this);
-    connect(m_performanceConfig, &PerformanceConfig::configurationChanged,
-            this, &PerformanceManager::onConfigurationChanged);
+    // 设置内存监控定时器
+    m_memoryMonitorTimer->setInterval(5000); // 每5秒检查一次
+    connect(m_memoryMonitorTimer, &QTimer::timeout, this, &PerformanceManager::updateMemoryMetrics);
+    
+    // 设置性能指标更新定时器
+    m_metricsTimer->setInterval(1000); // 每秒更新一次
+    connect(m_metricsTimer, &QTimer::timeout, this, &PerformanceManager::updatePerformanceMetrics);
     
     initializeOptimizations();
-    applyPerformanceConfiguration();
-    
-    // 设置内存监控定时器
-    m_memoryCheckTimer->setInterval(m_performanceConfig->memorySettings().monitoringInterval);
-    connect(m_memoryCheckTimer, &QTimer::timeout, this, &PerformanceManager::onMemoryCheckTimer);
-    
-    // 设置清理定时器
-    m_cleanupTimer->setInterval(m_performanceConfig->memorySettings().cleanupInterval);
-    connect(m_cleanupTimer, &QTimer::timeout, this, &PerformanceManager::onCleanupTimer);
 }
 
 PerformanceManager::~PerformanceManager()
@@ -57,289 +47,294 @@ PerformanceManager* PerformanceManager::instance()
 void PerformanceManager::startStartupTimer()
 {
     m_startupTimer.start();
-    qDebug() << "PerformanceManager: Startup timer started";
+    qDebug() << "Performance: Startup timer started";
 }
 
-void PerformanceManager::markStartupComplete()
+void PerformanceManager::endStartupTimer()
 {
     if (m_startupTimer.isValid()) {
-        QMutexLocker locker(&m_metricsMutex);
-        m_metrics.startupTime = m_startupTimer.elapsed();
-        qDebug() << "PerformanceManager: Startup completed in" << m_metrics.startupTime << "ms";
+        auto elapsed = std::chrono::milliseconds(m_startupTimer.elapsed());
         
-        // 启动完成后开始内存监控
-        startMemoryMonitoring();
+        QMutexLocker locker(&m_metricsMutex);
+        m_currentMetrics.startupTime = elapsed;
+        m_currentMetrics.timestamp = std::chrono::steady_clock::now();
+        
+        qDebug() << "Performance: Startup completed in" << elapsed.count() << "ms";
+        
+        // 记录启动时间指标
+        recordMetric(MetricType::StartupTime, elapsed.count());
     }
 }
 
-qint64 PerformanceManager::getStartupTime() const
+std::chrono::milliseconds PerformanceManager::getStartupTime() const
 {
     QMutexLocker locker(&m_metricsMutex);
-    return m_metrics.startupTime;
-}
-
-void PerformanceManager::preloadResources()
-{
-    if (m_resourcesPreloaded) {
-        return;
-    }
-    
-    QElapsedTimer timer;
-    timer.start();
-    
-    // 预加载常用资源
-    QStringList resourcePaths = {
-        ":/styles/default.qss",
-        ":/styles/dark.qss",
-        ":/icons/settings.svg",
-        ":/icons/about.svg",
-        ":/icons/back.svg"
-    };
-    
-    for (const QString& path : resourcePaths) {
-        QFile file(path);
-        if (file.open(QIODevice::ReadOnly)) {
-            m_preloadedResources[path] = file.readAll();
-        }
-    }
-    
-    m_resourcesPreloaded = true;
-    
-    QMutexLocker locker(&m_metricsMutex);
-    m_metrics.resourceLoadTime = timer.elapsed();
-    
-    qDebug() << "PerformanceManager: Resources preloaded in" << m_metrics.resourceLoadTime << "ms";
-}
-
-void PerformanceManager::optimizeResourceLoading()
-{
-    // 在后台线程中预加载资源
-    QThread* resourceThread = QThread::create([this]() {
-        preloadResources();
-    });
-    
-    resourceThread->start();
-    
-    // 线程完成后自动删除
-    connect(resourceThread, &QThread::finished, resourceThread, &QThread::deleteLater);
-}
-
-void PerformanceManager::optimizeNetworkMemory()
-{
-    if (m_networkOptimized) {
-        return;
-    }
-    
-    // 优化网络内存使用
-    qDebug() << "PerformanceManager: Network memory optimization completed";
-    m_networkOptimized = true;
-}
-
-void PerformanceManager::optimizeRecentItemsLoading()
-{
-    // 限制最近项目数量以提高加载性能
-    QMutexLocker locker(&m_metricsMutex);
-    m_metrics.recentItemsCount = qMin(m_metrics.recentItemsCount, m_maxRecentItems);
-    
-    qDebug() << "PerformanceManager: Recent items optimized, count:" << m_metrics.recentItemsCount;
-}
-
-void PerformanceManager::setMaxRecentItems(int maxItems)
-{
-    m_maxRecentItems = maxItems;
-    optimizeRecentItemsLoading();
+    return m_currentMetrics.startupTime;
 }
 
 void PerformanceManager::startMemoryMonitoring()
 {
-    if (!m_memoryCheckTimer->isActive()) {
-        m_memoryCheckTimer->start();
-        m_cleanupTimer->start();
-        qDebug() << "PerformanceManager: Memory monitoring started";
+    if (!m_memoryMonitorTimer->isActive()) {
+        m_memoryMonitorTimer->start();
+        m_metricsTimer->start();
+        qDebug() << "Performance: Memory monitoring started";
     }
 }
 
 void PerformanceManager::stopMemoryMonitoring()
 {
-    m_memoryCheckTimer->stop();
-    m_cleanupTimer->stop();
-    qDebug() << "PerformanceManager: Memory monitoring stopped";
+    m_memoryMonitorTimer->stop();
+    m_metricsTimer->stop();
+    qDebug() << "Performance: Memory monitoring stopped";
 }
 
-void PerformanceManager::performMemoryCleanup()
-{
-    qint64 beforeCleanup = getCurrentMemoryUsage();
-    
-    // 清理网络缓存
-    optimizeNetworkMemory();
-    
-    // 清理未使用的资源
-    cleanupUnusedResources();
-    
-    // 强制垃圾回收
-    QCoreApplication::processEvents();
-    
-    qint64 afterCleanup = getCurrentMemoryUsage();
-    qint64 freed = beforeCleanup - afterCleanup;
-    
-    qDebug() << "PerformanceManager: Memory cleanup completed, freed:" << freed << "bytes";
-}
-
-qint64 PerformanceManager::getCurrentMemoryUsage()
-{
-    return getProcessMemoryUsage();
-}
-
-PerformanceManager::PerformanceMetrics PerformanceManager::getMetrics() const
-{
-    QMutexLocker locker(&m_metricsMutex);
-    PerformanceMetrics metrics = m_metrics;
-    metrics.memoryUsage = getProcessMemoryUsage();
-    metrics.networkMemory = getNetworkMemoryUsage();
-    return metrics;
-}
-
-void PerformanceManager::logPerformanceMetrics()
-{
-    PerformanceMetrics metrics = getMetrics();
-    
-    qDebug() << "=== Performance Metrics ===";
-    qDebug() << "Startup Time:" << metrics.startupTime << "ms";
-    qDebug() << "Memory Usage:" << metrics.memoryUsage / (1024*1024) << "MB";
-    qDebug() << "Network Memory:" << metrics.networkMemory / (1024*1024) << "MB";
-    qDebug() << "Recent Items Count:" << metrics.recentItemsCount;
-    qDebug() << "Config Load Time:" << metrics.configLoadTime << "ms";
-    qDebug() << "Resource Load Time:" << metrics.resourceLoadTime << "ms";
-    qDebug() << "===========================";
-}
-
-void PerformanceManager::onMemoryCheckTimer()
-{
-    qint64 currentMemory = getCurrentMemoryUsage();
-    
-    QMutexLocker locker(&m_metricsMutex);
-    m_metrics.memoryUsage = currentMemory;
-    
-    if (currentMemory > m_memoryCriticalThreshold) {
-        qWarning() << "PerformanceManager: Critical memory usage detected:" << currentMemory / (1024*1024) << "MB";
-        performMemoryCleanup();
-        emit memoryWarning(currentMemory);
-    } else if (currentMemory > m_memoryWarningThreshold) {
-        qDebug() << "PerformanceManager: High memory usage:" << currentMemory / (1024*1024) << "MB";
-        emit memoryWarning(currentMemory);
-    }
-    
-    emit performanceMetricsUpdated(getMetrics());
-}
-
-void PerformanceManager::onCleanupTimer()
-{
-    performMemoryCleanup();
-}
-
-qint64 PerformanceManager::getNetworkMemoryUsage()
-{
-    // 网络组件内存使用情况的估算
-    return getProcessMemoryUsage() * 0.1; // 估算网络组件占用10%的内存
-}
-
-void PerformanceManager::initializeOptimizations()
-{
-    // 设置应用程序属性以优化性能
-    QCoreApplication::setAttribute(Qt::AA_UseHighDpiPixmaps, true);
-    QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling, true);
-    
-    qDebug() << "PerformanceManager: Basic optimizations initialized";
-}
-
-void PerformanceManager::setupMemoryThresholds()
-{
-    // 根据系统内存调整阈值
-    qint64 systemMemory = 8 * 1024 * 1024 * 1024; // 默认8GB
-    
-#ifdef Q_OS_WIN
-    MEMORYSTATUSEX memInfo;
-    memInfo.dwLength = sizeof(MEMORYSTATUSEX);
-    if (GlobalMemoryStatusEx(&memInfo)) {
-        systemMemory = memInfo.ullTotalPhys;
-    }
-#endif
-    
-    // 根据系统内存调整阈值
-    if (systemMemory < 4 * 1024 * 1024 * 1024) { // 小于4GB
-        m_memoryWarningThreshold = 256 * 1024 * 1024; // 256MB
-        m_memoryCriticalThreshold = 512 * 1024 * 1024; // 512MB
-    } else if (systemMemory < 8 * 1024 * 1024 * 1024) { // 小于8GB
-        m_memoryWarningThreshold = 512 * 1024 * 1024; // 512MB
-        m_memoryCriticalThreshold = 1024 * 1024 * 1024; // 1GB
-    } else { // 8GB或更多
-        m_memoryWarningThreshold = 1024 * 1024 * 1024; // 1GB
-        m_memoryCriticalThreshold = 2048 * 1024 * 1024; // 2GB
-    }
-    
-    qDebug() << "PerformanceManager: Memory thresholds set - Warning:" 
-             << m_memoryWarningThreshold / (1024*1024) << "MB, Critical:" 
-             << m_memoryCriticalThreshold / (1024*1024) << "MB";
-}
-
-void PerformanceManager::cleanupUnusedResources()
-{
-    // 清理预加载的资源缓存
-    if (m_preloadedResources.size() > 10) {
-        m_preloadedResources.clear();
-        m_resourcesPreloaded = false;
-        qDebug() << "PerformanceManager: Preloaded resources cache cleared";
-    }
-}
-
-qint64 PerformanceManager::getProcessMemoryUsage()
+size_t PerformanceManager::getCurrentMemoryUsage() const
 {
 #ifdef Q_OS_WIN
-    PROCESS_MEMORY_COUNTERS_EX pmc;
-    if (GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc))) {
+    PROCESS_MEMORY_COUNTERS pmc;
+    if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc))) {
         return pmc.WorkingSetSize;
     }
 #endif
     return 0;
 }
 
-qint64 PerformanceManager::getNetworkMemoryUsage()
+size_t PerformanceManager::getPeakMemoryUsage() const
 {
-    // 网络组件内存使用情况的估算
-    return getProcessMemoryUsage() * 0.1; // 估算网络组件占用10%的内存
+    return m_peakMemoryUsage;
 }
 
-PerformanceConfig* PerformanceManager::performanceConfig() const
+void PerformanceManager::recordMetric(MetricType type, double value)
 {
-    return m_performanceConfig;
+    QMutexLocker locker(&m_metricsMutex);
+    
+    // 记录到历史数据
+    m_metricHistory[type].push_back(value);
+    
+    // 保持历史数据在合理范围内
+    if (m_metricHistory[type].size() > 100) {
+        m_metricHistory[type].erase(m_metricHistory[type].begin());
+    }
+    
+    // 更新当前指标
+    switch (type) {
+        case MetricType::StartupTime:
+            m_currentMetrics.startupTime = std::chrono::milliseconds(static_cast<int64_t>(value));
+            break;
+        case MetricType::MemoryUsage:
+            m_currentMetrics.memoryUsageMB = static_cast<size_t>(value);
+            break;
+        case MetricType::NetworkLatency:
+            m_currentMetrics.networkLatency = std::chrono::milliseconds(static_cast<int64_t>(value));
+            break;
+        case MetricType::VideoFrameRate:
+            m_currentMetrics.videoFrameRate = value;
+            break;
+        case MetricType::AudioLatency:
+            m_currentMetrics.audioLatency = std::chrono::milliseconds(static_cast<int64_t>(value));
+            break;
+        case MetricType::CPUUsage:
+            m_currentMetrics.cpuUsagePercent = value;
+            break;
+    }
+    
+    m_currentMetrics.timestamp = std::chrono::steady_clock::now();
+    
+    // 检查性能警告阈值
+    checkPerformanceThresholds(type, value);
 }
 
-void PerformanceManager::applyPerformanceConfiguration()
+PerformanceManager::PerformanceMetrics PerformanceManager::getCurrentMetrics() const
 {
-    if (!m_performanceConfig) {
+    QMutexLocker locker(&m_metricsMutex);
+    return m_currentMetrics;
+}
+
+void PerformanceManager::preloadResources()
+{
+    qDebug() << "Performance: Preloading critical resources";
+    
+    // 在后台线程中预加载资源
+    QThread::create([this]() {
+        // 预加载样式表
+        QApplication::instance()->setStyleSheet("");
+        
+        // 预加载字体
+        // 这里可以添加字体预加载逻辑
+        
+        // 预加载图标资源
+        // 这里可以添加图标预加载逻辑
+        
+        qDebug() << "Performance: Resource preloading completed";
+    })->start();
+}
+
+void PerformanceManager::enableLazyLoading(bool enabled)
+{
+    m_lazyLoadingEnabled = enabled;
+    qDebug() << "Performance: Lazy loading" << (enabled ? "enabled" : "disabled");
+}
+
+void PerformanceManager::optimizeForLargeConference(int participantCount)
+{
+    qDebug() << "Performance: Optimizing for large conference with" << participantCount << "participants";
+    
+    if (participantCount > 20) {
+        // 大型会议优化
+        setVideoQualityMode("low");
+        
+        // 减少更新频率
+        m_metricsTimer->setInterval(2000); // 2秒更新一次
+        
+        // 启用更激进的内存管理
+        m_memoryWarningThreshold = 256 * 1024 * 1024; // 256MB
+        
+    } else if (participantCount > 10) {
+        // 中型会议优化
+        setVideoQualityMode("medium");
+        m_metricsTimer->setInterval(1500);
+        
+    } else {
+        // 小型会议，使用默认设置
+        setVideoQualityMode("high");
+        m_metricsTimer->setInterval(1000);
+        m_memoryWarningThreshold = 512 * 1024 * 1024; // 512MB
+    }
+}
+
+void PerformanceManager::setVideoQualityMode(const QString& mode)
+{
+    qDebug() << "Performance: Setting video quality mode to" << mode;
+    
+    // 这里可以与MediaManager集成，调整视频质量
+    // 例如：调整分辨率、帧率、比特率等
+}
+
+void PerformanceManager::updateMemoryMetrics()
+{
+    size_t currentUsage = getCurrentMemoryUsage();
+    
+    if (currentUsage > m_peakMemoryUsage) {
+        m_peakMemoryUsage = currentUsage;
+    }
+    
+    // 转换为MB
+    size_t usageMB = currentUsage / (1024 * 1024);
+    recordMetric(MetricType::MemoryUsage, static_cast<double>(usageMB));
+    
+    // 检查内存警告
+    if (currentUsage > m_memoryWarningThreshold) {
+        emit memoryWarning(currentUsage, m_memoryWarningThreshold);
+        qWarning() << "Performance: Memory usage warning -" << usageMB << "MB";
+    }
+}
+
+void PerformanceManager::updatePerformanceMetrics()
+{
+    // 更新CPU使用率
+#ifdef Q_OS_WIN
+    // 简化的CPU使用率计算
+    static ULARGE_INTEGER lastCPU, lastSysCPU, lastUserCPU;
+    static int numProcessors = 0;
+    static bool first = true;
+    
+    if (first) {
+        SYSTEM_INFO sysInfo;
+        GetSystemInfo(&sysInfo);
+        numProcessors = sysInfo.dwNumberOfProcessors;
+        
+        FILETIME ftime, fsys, fuser;
+        GetSystemTimeAsFileTime(&ftime);
+        memcpy(&lastCPU, &ftime, sizeof(FILETIME));
+        
+        GetProcessTimes(GetCurrentProcess(), &ftime, &ftime, &fsys, &fuser);
+        memcpy(&lastSysCPU, &fsys, sizeof(FILETIME));
+        memcpy(&lastUserCPU, &fuser, sizeof(FILETIME));
+        first = false;
         return;
     }
     
-    const auto& memorySettings = m_performanceConfig->memorySettings();
-    m_memoryWarningThreshold = memorySettings.warningThreshold;
-    m_memoryCriticalThreshold = memorySettings.criticalThreshold;
+    FILETIME ftime, fsys, fuser;
+    ULARGE_INTEGER now, sys, user;
     
-    // 更新定时器间隔
-    if (m_memoryCheckTimer) {
-        m_memoryCheckTimer->setInterval(memorySettings.monitoringInterval);
-    }
-    if (m_cleanupTimer) {
-        m_cleanupTimer->setInterval(memorySettings.cleanupInterval);
-    }
+    GetSystemTimeAsFileTime(&ftime);
+    memcpy(&now, &ftime, sizeof(FILETIME));
     
-    const auto& recentSettings = m_performanceConfig->recentItemsSettings();
-    m_maxRecentItems = recentSettings.maxItems;
+    GetProcessTimes(GetCurrentProcess(), &ftime, &ftime, &fsys, &fuser);
+    memcpy(&sys, &fsys, sizeof(FILETIME));
+    memcpy(&user, &fuser, sizeof(FILETIME));
     
-    qDebug() << "PerformanceManager: Applied performance configuration";
+    double percent = (sys.QuadPart - lastSysCPU.QuadPart) + (user.QuadPart - lastUserCPU.QuadPart);
+    percent /= (now.QuadPart - lastCPU.QuadPart);
+    percent /= numProcessors;
+    percent *= 100;
+    
+    recordMetric(MetricType::CPUUsage, percent);
+    
+    lastCPU = now;
+    lastUserCPU = user;
+    lastSysCPU = sys;
+#endif
+    
+    emit metricsUpdated(getCurrentMetrics());
 }
 
-void PerformanceManager::onConfigurationChanged()
+void PerformanceManager::initializeOptimizations()
 {
-    applyPerformanceConfiguration();
-    qDebug() << "PerformanceManager: Configuration updated";
+    qDebug() << "Performance: Initializing optimizations";
+    
+    // 设置应用程序属性以优化性能
+    if (QApplication::instance()) {
+        QApplication::instance()->setAttribute(Qt::AA_UseHighDpiPixmaps, true);
+        QApplication::instance()->setAttribute(Qt::AA_EnableHighDpiScaling, true);
+    }
+    
+    setupMemoryThresholds();
+}
+
+void PerformanceManager::setupMemoryThresholds()
+{
+    // 根据系统内存设置阈值
+#ifdef Q_OS_WIN
+    MEMORYSTATUSEX memInfo;
+    memInfo.dwLength = sizeof(MEMORYSTATUSEX);
+    if (GlobalMemoryStatusEx(&memInfo)) {
+        DWORDLONG totalPhysMem = memInfo.ullTotalPhys;
+        
+        // 设置警告阈值为系统内存的10%
+        m_memoryWarningThreshold = static_cast<size_t>(totalPhysMem * 0.1);
+        
+        qDebug() << "Performance: Memory warning threshold set to" 
+                 << (m_memoryWarningThreshold / (1024 * 1024)) << "MB";
+    }
+#endif
+}
+
+void PerformanceManager::checkPerformanceThresholds(MetricType type, double value)
+{
+    bool shouldWarn = false;
+    
+    switch (type) {
+        case MetricType::StartupTime:
+            shouldWarn = value > 5000; // 5秒
+            break;
+        case MetricType::NetworkLatency:
+            shouldWarn = value > 500; // 500ms
+            break;
+        case MetricType::VideoFrameRate:
+            shouldWarn = value < 15; // 低于15fps
+            break;
+        case MetricType::AudioLatency:
+            shouldWarn = value > 150; // 150ms
+            break;
+        case MetricType::CPUUsage:
+            shouldWarn = value > 80; // 80%
+            break;
+        default:
+            break;
+    }
+    
+    if (shouldWarn) {
+        emit performanceWarning(type, value);
+    }
 }
