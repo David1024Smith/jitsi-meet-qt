@@ -1,4 +1,5 @@
 #include "ConferenceWindow.h"
+#include "modules/camera/include/CameraFactory.h"
 #include <QApplication>
 #include <QCloseEvent>
 #include <QMessageBox>
@@ -17,6 +18,7 @@ ConferenceWindow::ConferenceWindow(QWidget *parent)
     , m_mediaManager(nullptr)
     , m_chatManager(nullptr)
     , m_screenShareManager(nullptr)
+    , m_cameraManager(nullptr)
     , m_centralWidget(nullptr)
     , m_mainLayout(nullptr)
     , m_navigationBar(nullptr)
@@ -120,6 +122,24 @@ void ConferenceWindow::setupManagers()
     // 创建媒体管理器
     m_mediaManager = new MediaManager(this);
     qDebug() << "MediaManager created";
+    
+    // 创建模块化摄像头管理器
+    m_cameraManager = CameraFactory::instance()->createLocalCameraInterface("conference_local");
+    if (m_cameraManager) {
+        qDebug() << "CameraManager created successfully";
+        
+        // 连接摄像头管理器信号
+        connect(m_cameraManager, &ICameraManager::cameraStarted,
+                this, &ConferenceWindow::onLocalVideoStarted);
+        connect(m_cameraManager, &ICameraManager::cameraStopped,
+                this, &ConferenceWindow::onLocalVideoStopped);
+        connect(m_cameraManager, &ICameraManager::errorOccurred,
+                [this](const QString& error) {
+                    qWarning() << "Camera error:" << error;
+                });
+    } else {
+        qWarning() << "Failed to create CameraManager";
+    }
     
     // 创建聊天管理器
     m_chatManager = new ChatManager(this);
@@ -635,20 +655,43 @@ void ConferenceWindow::joinConference(const QString& url)
     // 显示连接状态
     showLoading(tr("Connecting to conference..."));
     
-    // 确保本地视频组件存在
-    if (!m_mediaManager->localVideoWidget()) {
-        qDebug() << "Creating local video widget for conference";
-        QVideoWidget* localVideo = new QVideoWidget(this);
-        localVideo->setMinimumSize(320, 240);
-        localVideo->setStyleSheet("background-color: black; border: 2px solid blue;");
+    // 使用新的模块化摄像头管理器
+    if (m_cameraManager) {
+        qDebug() << "Starting camera using CameraManager";
         
-        // 设置给MediaManager
-        m_mediaManager->setLocalVideoWidget(localVideo);
-        qDebug() << "Local video widget created and set to MediaManager";
+        // 创建视频预览组件
+        QVideoWidget* videoWidget = m_cameraManager->createPreviewWidget(this);
+        if (videoWidget) {
+            qDebug() << "Video preview widget created";
+        }
+        
+        // 启动摄像头
+        if (m_cameraManager->startWithPreset(ICameraDevice::StandardQuality)) {
+            qDebug() << "Camera started successfully with CameraManager";
+        } else {
+            qWarning() << "Failed to start camera with CameraManager";
+        }
+    } else {
+        // 回退到原有的MediaManager方式
+        qDebug() << "Falling back to MediaManager for camera";
+        
+        // 确保本地视频组件存在
+        if (!m_mediaManager->localVideoWidget()) {
+            qDebug() << "Creating local video widget for conference";
+            QVideoWidget* localVideo = new QVideoWidget(this);
+            localVideo->setMinimumSize(320, 240);
+            localVideo->setStyleSheet("background-color: black; border: 2px solid blue;");
+            
+            // 设置给MediaManager
+            m_mediaManager->setLocalVideoWidget(localVideo);
+            qDebug() << "Local video widget created and set to MediaManager";
+        }
+        
+        // 启动本地视频
+        m_mediaManager->startLocalVideo();
     }
     
-    // 启动本地视频
-    m_mediaManager->startLocalVideo();
+    // 启动音频（仍使用MediaManager）
     m_mediaManager->startLocalAudio();
     
     // 加入会议
@@ -834,26 +877,39 @@ void ConferenceWindow::onLocalVideoStarted()
 {
     qDebug() << "Local video started";
     
-    QVideoWidget* localVideo = m_mediaManager->localVideoWidget();
+    QVideoWidget* localVideo = nullptr;
+    
+    // 优先使用CameraManager的视频组件
+    if (m_cameraManager) {
+        localVideo = m_cameraManager->previewWidget();
+        qDebug() << "Using CameraManager video widget";
+    }
+    
+    // 回退到MediaManager
     if (!localVideo) {
-        // 如果MediaManager还没有本地视频组件，创建一个
-        qDebug() << "Creating local video widget";
-        localVideo = new QVideoWidget(this);
-        localVideo->setMinimumSize(320, 240);
-        localVideo->setStyleSheet("background-color: black; border: 2px solid green;");
-        
-        // 设置给MediaManager
-        m_mediaManager->setLocalVideoWidget(localVideo);
-        
-        // 强制启动摄像头显示
-        m_mediaManager->forceStartCameraDisplay();
-        
-        qDebug() << "Local video widget created and set";
+        localVideo = m_mediaManager->localVideoWidget();
+        if (!localVideo) {
+            // 如果MediaManager还没有本地视频组件，创建一个
+            qDebug() << "Creating local video widget for MediaManager";
+            localVideo = new QVideoWidget(this);
+            localVideo->setMinimumSize(320, 240);
+            localVideo->setStyleSheet("background-color: black; border: 2px solid green;");
+            
+            // 设置给MediaManager
+            m_mediaManager->setLocalVideoWidget(localVideo);
+            
+            // 强制启动摄像头显示
+            m_mediaManager->forceStartCameraDisplay();
+            
+            qDebug() << "Local video widget created and set to MediaManager";
+        }
     }
     
     if (localVideo) {
         addVideoWidget("local", localVideo);
         qDebug() << "Local video widget added to layout";
+    } else {
+        qWarning() << "No local video widget available";
     }
 }
 

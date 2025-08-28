@@ -63,3 +63,4 @@ jitsi-meet-qt/docs/WindowManager.md
 build/
 jitsi-meet-qt/docs/
 .kiro/specs/
+.cache/

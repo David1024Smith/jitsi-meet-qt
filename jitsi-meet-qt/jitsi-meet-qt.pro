@@ -14,6 +14,9 @@ TEMPLATE = app
 INCLUDEPATH += include
 INCLUDEPATH += src
 
+# Include all modules
+include(modules/modules.pri)
+
 # Define version
 VERSION = 1.0.0
 DEFINES += APP_VERSION=\\\"$$VERSION\\\"

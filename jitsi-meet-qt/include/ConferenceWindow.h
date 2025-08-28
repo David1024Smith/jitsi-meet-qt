@@ -26,6 +26,9 @@
 #include "ScreenShareManager.h"
 #include "JitsiError.h"
 
+// 前向声明
+class ICameraManager;
+
 class ConferenceWindow : public QMainWindow
 {
     Q_OBJECT
@@ -157,6 +160,9 @@ private:
     MediaManager* m_mediaManager;
     ChatManager* m_chatManager;
     ScreenShareManager* m_screenShareManager;
+    
+    // 新的模块化摄像头管理器
+    class ICameraManager* m_cameraManager;
 
     // 主要UI组件
     QWidget* m_centralWidget;
