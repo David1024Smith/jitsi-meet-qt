@@ -635,6 +635,18 @@ void ConferenceWindow::joinConference(const QString& url)
     // 显示连接状态
     showLoading(tr("Connecting to conference..."));
     
+    // 确保本地视频组件存在
+    if (!m_mediaManager->localVideoWidget()) {
+        qDebug() << "Creating local video widget for conference";
+        QVideoWidget* localVideo = new QVideoWidget(this);
+        localVideo->setMinimumSize(320, 240);
+        localVideo->setStyleSheet("background-color: black; border: 2px solid blue;");
+        
+        // 设置给MediaManager
+        m_mediaManager->setLocalVideoWidget(localVideo);
+        qDebug() << "Local video widget created and set to MediaManager";
+    }
+    
     // 启动本地视频
     m_mediaManager->startLocalVideo();
     m_mediaManager->startLocalAudio();
@@ -823,8 +835,25 @@ void ConferenceWindow::onLocalVideoStarted()
     qDebug() << "Local video started";
     
     QVideoWidget* localVideo = m_mediaManager->localVideoWidget();
+    if (!localVideo) {
+        // 如果MediaManager还没有本地视频组件，创建一个
+        qDebug() << "Creating local video widget";
+        localVideo = new QVideoWidget(this);
+        localVideo->setMinimumSize(320, 240);
+        localVideo->setStyleSheet("background-color: black; border: 2px solid green;");
+        
+        // 设置给MediaManager
+        m_mediaManager->setLocalVideoWidget(localVideo);
+        
+        // 强制启动摄像头显示
+        m_mediaManager->forceStartCameraDisplay();
+        
+        qDebug() << "Local video widget created and set";
+    }
+    
     if (localVideo) {
         addVideoWidget("local", localVideo);
+        qDebug() << "Local video widget added to layout";
     }
 }
 
@@ -997,8 +1026,11 @@ void ConferenceWindow::arrangeVideoWidgets()
 {
     int videoCount = m_videoWidgets.size();
     
+    qDebug() << "Arranging video widgets, count:" << videoCount;
+    
     if (videoCount == 0) {
         m_noVideoLabel->setVisible(true);
+        qDebug() << "No video widgets, showing no video label";
         return;
     }
     
@@ -1008,11 +1040,22 @@ void ConferenceWindow::arrangeVideoWidgets()
     m_videoGridColumns = qCeil(qSqrt(videoCount));
     m_videoGridRows = qCeil(static_cast<double>(videoCount) / m_videoGridColumns);
     
+    qDebug() << "Video grid layout:" << m_videoGridRows << "x" << m_videoGridColumns;
+    
     // 重新排列视频部件
     int row = 0, col = 0;
     for (auto it = m_videoWidgets.begin(); it != m_videoWidgets.end(); ++it) {
         QVideoWidget* widget = it.value();
+        QString participantId = it.key();
+        
+        qDebug() << "Placing video widget for" << participantId << "at position" << row << "," << col;
+        qDebug() << "Widget size:" << widget->size() << "visible:" << widget->isVisible();
+        
         m_videoLayout->addWidget(widget, row, col);
+        
+        // 确保组件可见
+        widget->show();
+        widget->setVisible(true);
         
         col++;
         if (col >= m_videoGridColumns) {
@@ -1020,19 +1063,36 @@ void ConferenceWindow::arrangeVideoWidgets()
             row++;
         }
     }
+    
+    qDebug() << "Video layout arrangement completed";
 }
 
 void ConferenceWindow::addVideoWidget(const QString& participantId, QVideoWidget* widget)
 {
     if (!widget || m_videoWidgets.contains(participantId)) {
+        qDebug() << "Cannot add video widget for" << participantId << "- widget:" << (widget ? "valid" : "null") << "already exists:" << m_videoWidgets.contains(participantId);
         return;
     }
+    
+    qDebug() << "Adding video widget for participant:" << participantId;
     
     widget->setMinimumSize(m_videoWidgetSize);
     widget->setMaximumSize(m_videoWidgetSize * 2);
     widget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     
+    // 确保组件可见
+    widget->show();
+    widget->setVisible(true);
+    
+    // 为本地视频添加特殊样式
+    if (participantId == "local") {
+        widget->setStyleSheet("background-color: black; border: 3px solid green; border-radius: 5px;");
+        qDebug() << "Applied local video styling";
+    }
+    
     m_videoWidgets[participantId] = widget;
+    
+    qDebug() << "Video widget added, total widgets:" << m_videoWidgets.size();
     updateVideoLayout();
 }
 

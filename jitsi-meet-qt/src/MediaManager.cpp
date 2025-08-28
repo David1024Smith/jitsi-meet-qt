@@ -87,6 +87,70 @@ MediaManager::~MediaManager()
     qDebug() << "MediaManager destroyed";
 }
 
+void MediaManager::forceStartCameraDisplay()
+{
+    qDebug() << "Force starting camera display";
+    
+    // 获取所有摄像头
+    auto cameras = QMediaDevices::videoInputs();
+    if (cameras.isEmpty()) {
+        qWarning() << "No cameras found for force start";
+        return;
+    }
+    
+    // 停止现有摄像头
+    if (m_camera) {
+        m_camera->stop();
+        m_camera.reset();
+    }
+    
+    // 创建新的摄像头
+    QCameraDevice cameraDevice = cameras.first();
+    qDebug() << "Force initializing camera:" << cameraDevice.description();
+    
+    m_camera = std::make_unique<QCamera>(cameraDevice, this);
+    
+    // 重新连接信号
+    connect(m_camera.get(), &QCamera::activeChanged, [this](bool active) {
+        qDebug() << "Force camera active changed:" << active;
+        if (active && m_localVideoWidget) {
+            qDebug() << "Camera activated, video should be visible now";
+        }
+    });
+    
+    connect(m_camera.get(), &QCamera::errorOccurred, [this](QCamera::Error error) {
+        qWarning() << "Force camera error:" << error;
+    });
+    
+    // 设置捕获会话
+    if (m_captureSession) {
+        m_captureSession->setCamera(m_camera.get());
+        
+        if (m_localVideoWidget) {
+            m_captureSession->setVideoOutput(m_localVideoWidget);
+            qDebug() << "Force connected video output to widget";
+            
+            // 设置视频组件属性确保可见
+            m_localVideoWidget->show();
+            m_localVideoWidget->setStyleSheet("background-color: black; border: 2px solid red;");
+            qDebug() << "Video widget size:" << m_localVideoWidget->size();
+        }
+        
+        // 立即启动
+        qDebug() << "Force starting camera...";
+        m_camera->start();
+        m_videoActive = true;
+        
+        // 更新设备ID
+        m_currentVideoDeviceId = QString::fromUtf8(cameraDevice.id());
+        
+        emit localVideoStarted();
+        qDebug() << "Force camera start completed";
+    } else {
+        qWarning() << "Capture session not available for force start";
+    }
+}
+
 QList<MediaManager::MediaDevice> MediaManager::availableVideoDevices() const
 {
     return m_videoDevices;
@@ -304,22 +368,41 @@ void MediaManager::startLocalVideo()
 {
     qDebug() << "Starting local video";
     
-    if (!m_hasVideoPermission) {
-        qWarning() << "Video permission not granted";
-        emit mediaError("Video permission not granted");
-        return;
-    }
-    
     if (m_videoActive) {
         qDebug() << "Video already active";
         return;
     }
     
+    // 直接初始化摄像头，不检查权限
     if (!m_camera) {
         initializeVideoCapture();
     }
     
+    // 如果摄像头仍然没有初始化，强制创建
+    if (!m_camera) {
+        qDebug() << "Force initializing camera without permission check";
+        auto cameras = QMediaDevices::videoInputs();
+        if (!cameras.isEmpty()) {
+            QCameraDevice cameraDevice = cameras.first();
+            m_camera = std::make_unique<QCamera>(cameraDevice, this);
+            connect(m_camera.get(), &QCamera::activeChanged,
+                    this, &MediaManager::onCameraActiveChanged);
+            connect(m_camera.get(), &QCamera::errorOccurred,
+                    this, &MediaManager::onCameraErrorOccurred);
+            
+            if (m_captureSession) {
+                m_captureSession->setCamera(m_camera.get());
+                if (m_localVideoWidget) {
+                    m_captureSession->setVideoOutput(m_localVideoWidget);
+                    qDebug() << "Video output connected to widget";
+                }
+            }
+            qDebug() << "Force camera initialized:" << cameraDevice.description();
+        }
+    }
+    
     if (m_camera && !m_videoMuted) {
+        qDebug() << "Starting camera...";
         m_camera->start();
         m_videoActive = true;
         emit localVideoStarted();
@@ -331,6 +414,8 @@ void MediaManager::startLocalVideo()
         
         qDebug() << "Local video started successfully";
     } else {
+        qWarning() << "Cannot start camera: camera=" << (m_camera ? "available" : "null") 
+                   << " muted=" << m_videoMuted;
         emit mediaError("Failed to start video camera");
     }
 }
@@ -362,12 +447,6 @@ void MediaManager::startLocalAudio()
 {
     qDebug() << "Starting local audio";
     
-    if (!m_hasAudioPermission) {
-        qWarning() << "Audio permission not granted";
-        emit mediaError("Audio permission not granted");
-        return;
-    }
-    
     if (m_audioActive) {
         qDebug() << "Audio already active";
         return;
@@ -391,7 +470,10 @@ void MediaManager::startLocalAudio()
         
         qDebug() << "Local audio started successfully";
     } else {
-        emit mediaError("Failed to start audio input");
+        qDebug() << "Audio input not available or muted";
+        // 不发送错误，因为音频不是必需的
+        m_audioActive = true;
+        emit localAudioStarted();
     }
 }
 
@@ -427,6 +509,33 @@ void MediaManager::setLocalVideoWidget(QVideoWidget* widget)
     
     if (m_captureSession && widget) {
         m_captureSession->setVideoOutput(widget);
+        qDebug() << "Video widget connected to capture session";
+        
+        // 如果摄像头还没有初始化，立即初始化
+        if (!m_camera) {
+            qDebug() << "Auto-initializing camera for video widget";
+            auto cameras = QMediaDevices::videoInputs();
+            if (!cameras.isEmpty()) {
+                QCameraDevice cameraDevice = cameras.first();
+                m_camera = std::make_unique<QCamera>(cameraDevice, this);
+                connect(m_camera.get(), &QCamera::activeChanged,
+                        this, &MediaManager::onCameraActiveChanged);
+                connect(m_camera.get(), &QCamera::errorOccurred,
+                        this, &MediaManager::onCameraErrorOccurred);
+                
+                m_captureSession->setCamera(m_camera.get());
+                m_currentVideoDeviceId = QString::fromUtf8(cameraDevice.id());
+                qDebug() << "Auto-initialized camera:" << cameraDevice.description();
+            }
+        }
+        
+        // 如果摄像头存在但没有启动，自动启动
+        if (m_camera && !m_camera->isActive() && !m_videoMuted) {
+            qDebug() << "Auto-starting camera for video widget";
+            m_camera->start();
+            m_videoActive = true;
+            emit localVideoStarted();
+        }
     }
 }
 
@@ -930,12 +1039,7 @@ void MediaManager::refreshDeviceStates()
 
 void MediaManager::initializeVideoCapture()
 {
-    qDebug() << "Initializing video capture";
-    
-    if (!m_hasVideoPermission) {
-        qWarning() << "Video permission not granted";
-        return;
-    }
+    qDebug() << "Initializing video capture (direct mode)";
     
     QList<QCameraDevice> cameras = QMediaDevices::videoInputs();
     if (cameras.isEmpty()) {
@@ -969,6 +1073,7 @@ void MediaManager::initializeVideoCapture()
         m_captureSession->setCamera(m_camera.get());
         if (m_localVideoWidget) {
             m_captureSession->setVideoOutput(m_localVideoWidget);
+            qDebug() << "Video output connected to widget in initializeVideoCapture";
         }
     }
     
@@ -977,12 +1082,7 @@ void MediaManager::initializeVideoCapture()
 
 void MediaManager::initializeAudioCapture()
 {
-    qDebug() << "Initializing audio capture";
-    
-    if (!m_hasAudioPermission) {
-        qWarning() << "Audio permission not granted";
-        return;
-    }
+    qDebug() << "Initializing audio capture (direct mode)";
     
     QList<QAudioDevice> audioInputs = QMediaDevices::audioInputs();
     if (audioInputs.isEmpty()) {

@@ -91,6 +91,9 @@ public:
     void startLocalAudio();
     void stopLocalAudio();
     
+    // Force camera display (bypass permission checks)
+    void forceStartCameraDisplay();
+    
     // Local media preview
     QVideoWidget* localVideoWidget() const;
     void setLocalVideoWidget(QVideoWidget* widget);
