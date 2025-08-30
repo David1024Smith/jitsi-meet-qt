@@ -1,0 +1,159 @@
+{
+  "testConfigurations": {
+    "lowQuality": {
+      "quality": 0,
+      "frameRate": 15,
+      "bitrate": 1000,
+      "resolution": {
+        "width": 640,
+        "height": 480
+      },
+      "description": "Low quality configuration for basic testing"
+    },
+    "mediumQuality": {
+      "quality": 1,
+      "frameRate": 30,
+      "bitrate": 2500,
+      "resolution": {
+        "width": 1280,
+        "height": 720
+      },
+      "description": "Medium quality configuration for standard testing"
+    },
+    "highQuality": {
+      "quality": 2,
+      "frameRate": 60,
+      "bitrate": 5000,
+      "resolution": {
+        "width": 1920,
+        "height": 1080
+      },
+      "description": "High quality configuration for performance testing"
+    }
+  },
+  "performanceBenchmarks": {
+    "captureTime": {
+      "lowQuality": 20,
+      "mediumQuality": 35,
+      "highQuality": 50,
+      "unit": "milliseconds",
+      "description": "Maximum acceptable capture time per frame"
+    },
+    "encodeTime": {
+      "lowQuality": 30,
+      "mediumQuality": 60,
+      "highQuality": 100,
+      "unit": "milliseconds",
+      "description": "Maximum acceptable encode time per frame"
+    },
+    "memoryUsage": {
+      "baseline": 50,
+      "maximum": 200,
+      "variation": 100,
+      "unit": "megabytes",
+      "description": "Memory usage thresholds"
+    },
+    "cpuUsage": {
+      "average": 80,
+      "maximum": 95,
+      "unit": "percentage",
+      "description": "CPU usage thresholds"
+    },
+    "latency": {
+      "average": 200,
+      "maximum": 500,
+      "unit": "milliseconds",
+      "description": "End-to-end latency thresholds"
+    }
+  },
+  "mockData": {
+    "screens": [
+      {
+        "id": "screen_0",
+        "name": "Primary Display",
+        "resolution": "1920x1080",
+        "isPrimary": true
+      },
+      {
+        "id": "screen_1", 
+        "name": "Secondary Display",
+        "resolution": "1680x1050",
+        "isPrimary": false
+      }
+    ],
+    "windows": [
+      {
+        "id": "window_desktop",
+        "title": "Desktop",
+        "processName": "explorer.exe",
+        "isVisible": true
+      },
+      {
+        "id": "window_browser",
+        "title": "Web Browser",
+        "processName": "chrome.exe",
+        "isVisible": true
+      },
+      {
+        "id": "window_editor",
+        "title": "Code Editor",
+        "processName": "code.exe",
+        "isVisible": true
+      }
+    ]
+  },
+  "legacyConfigurations": {
+    "version1_0": {
+      "version": "1.0",
+      "screen_id": 0,
+      "quality_level": 2,
+      "frame_rate": 25,
+      "enable_audio": true,
+      "compression": "h264"
+    },
+    "version1_1": {
+      "version": "1.1",
+      "screenId": 0,
+      "qualityLevel": 2,
+      "frameRate": 30,
+      "audioEnabled": false,
+      "encodingFormat": "vp8"
+    }
+  },
+  "errorScenarios": {
+    "initializationFailure": {
+      "description": "Simulate initialization failure",
+      "errorCode": "INIT_FAILED",
+      "errorMessage": "Failed to initialize screen capture device"
+    },
+    "captureFailure": {
+      "description": "Simulate capture failure",
+      "errorCode": "CAPTURE_FAILED", 
+      "errorMessage": "Failed to capture screen content"
+    },
+    "encodingFailure": {
+      "description": "Simulate encoding failure",
+      "errorCode": "ENCODE_FAILED",
+      "errorMessage": "Failed to encode captured frame"
+    },
+    "permissionDenied": {
+      "description": "Simulate permission denied",
+      "errorCode": "PERMISSION_DENIED",
+      "errorMessage": "Screen capture permission denied"
+    }
+  },
+  "testFrames": {
+    "solidColors": [
+      {"color": "#FF0000", "description": "Red frame"},
+      {"color": "#00FF00", "description": "Green frame"},
+      {"color": "#0000FF", "description": "Blue frame"},
+      {"color": "#FFFFFF", "description": "White frame"},
+      {"color": "#000000", "description": "Black frame"}
+    ],
+    "patterns": [
+      {"type": "checkerboard", "size": 32, "description": "Checkerboard pattern"},
+      {"type": "gradient", "direction": "horizontal", "description": "Horizontal gradient"},
+      {"type": "noise", "intensity": 0.5, "description": "Random noise pattern"}
+    ]
+  }
+}

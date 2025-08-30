@@ -1,0 +1,68 @@
+{
+  "server": {
+    "url": "https://meet.jit.si",
+    "port": 443,
+    "timeout": 30000,
+    "ssl_enabled": true,
+    "retry_count": 3,
+    "retry_interval": 1000
+  },
+  "protocols": {
+    "webrtc": {
+      "enabled": true,
+      "stun_servers": [
+        "stun:stun.l.google.com:19302",
+        "stun:stun1.l.google.com:19302"
+      ],
+      "turn_servers": [],
+      "ice_timeout": 10000
+    },
+    "websocket": {
+      "enabled": true,
+      "url": "wss://echo.websocket.org",
+      "heartbeat_interval": 30000
+    },
+    "http": {
+      "enabled": true,
+      "user_agent": "NetworkModuleTest/1.0",
+      "max_redirects": 5
+    }
+  },
+  "quality_monitoring": {
+    "enabled": true,
+    "interval": 5000,
+    "target_hosts": [
+      "8.8.8.8",
+      "1.1.1.1"
+    ],
+    "thresholds": {
+      "excellent": 90,
+      "good": 70,
+      "fair": 50,
+      "poor": 30
+    },
+    "latency_threshold": 100,
+    "bandwidth_threshold": 1000,
+    "packet_loss_threshold": 1.0
+  },
+  "performance": {
+    "max_latency": 1000,
+    "min_bandwidth": 100,
+    "test_duration": 60,
+    "connection_pool_size": 10,
+    "max_concurrent_connections": 5
+  },
+  "testing": {
+    "mock_mode": false,
+    "verbose_logging": true,
+    "test_timeout": 30000,
+    "performance_iterations": 10,
+    "stress_test_connections": 100
+  },
+  "environment": {
+    "test_server_url": "@TEST_SERVER_URL@",
+    "test_server_port": "@TEST_SERVER_PORT@",
+    "log_level": "debug",
+    "output_directory": "@CMAKE_CURRENT_BINARY_DIR@/test_output"
+  }
+}

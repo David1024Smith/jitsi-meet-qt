@@ -1,0 +1,54 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+    <qresource prefix="/ui">
+        <!-- Base Styles -->
+        <file>styles/base.qss</file>
+        <file>styles/widgets.qss</file>
+        
+        <!-- Theme Styles -->
+        <file>styles/themes/default.qss</file>
+        <file>styles/themes/dark.qss</file>
+        <file>styles/themes/light.qss</file>
+        
+        <!-- Default Theme Resources -->
+        <file>themes/default/colors.json</file>
+        <file>themes/default/fonts.json</file>
+        <file>themes/default/sizes.json</file>
+        
+        <!-- Dark Theme Resources -->
+        <file>themes/dark/colors.json</file>
+        <file>themes/dark/fonts.json</file>
+        <file>themes/dark/sizes.json</file>
+        
+        <!-- Light Theme Resources -->
+        <file>themes/light/colors.json</file>
+        <file>themes/light/fonts.json</file>
+        <file>themes/light/sizes.json</file>
+        
+        <!-- Action Icons -->
+        <file>icons/actions/play.svg</file>
+        <file>icons/actions/pause.svg</file>
+        <file>icons/actions/stop.svg</file>
+        <file>icons/actions/record.svg</file>
+        <file>icons/actions/settings.svg</file>
+        <file>icons/actions/close.svg</file>
+        <file>icons/actions/minimize.svg</file>
+        <file>icons/actions/maximize.svg</file>
+        
+        <!-- Status Icons -->
+        <file>icons/status/connected.svg</file>
+        <file>icons/status/disconnected.svg</file>
+        <file>icons/status/error.svg</file>
+        <file>icons/status/warning.svg</file>
+        <file>icons/status/success.svg</file>
+        <file>icons/status/info.svg</file>
+        
+        <!-- UI Icons -->
+        <file>icons/ui/menu.svg</file>
+        <file>icons/ui/search.svg</file>
+        <file>icons/ui/filter.svg</file>
+        <file>icons/ui/sort.svg</file>
+        <file>icons/ui/expand.svg</file>
+        <file>icons/ui/collapse.svg</file>
+    </qresource>
+</RCC>

@@ -1,0 +1,216 @@
+{
+  "test_meetings": [
+    {
+      "id": "test-meeting-001",
+      "name": "Basic Test Meeting",
+      "url": "https://meet.jit.si/test-room-001",
+      "server": "meet.jit.si",
+      "room": "test-room-001",
+      "created_at": "2024-01-15T10:00:00Z",
+      "settings": {
+        "audio_enabled": true,
+        "video_enabled": true,
+        "max_participants": 25,
+        "password_protected": false
+      },
+      "participants": [
+        {
+          "id": "participant-001",
+          "name": "Test User 1",
+          "email": "user1@example.com",
+          "role": "moderator",
+          "audio_enabled": true,
+          "video_enabled": true,
+          "joined_at": "2024-01-15T10:05:00Z"
+        },
+        {
+          "id": "participant-002",
+          "name": "Test User 2",
+          "email": "user2@example.com",
+          "role": "participant",
+          "audio_enabled": true,
+          "video_enabled": false,
+          "joined_at": "2024-01-15T10:07:00Z"
+        }
+      ]
+    },
+    {
+      "id": "test-meeting-002",
+      "name": "Password Protected Meeting",
+      "url": "https://meet.jit.si/secure-room-002",
+      "server": "meet.jit.si",
+      "room": "secure-room-002",
+      "created_at": "2024-01-15T11:00:00Z",
+      "settings": {
+        "audio_enabled": true,
+        "video_enabled": true,
+        "max_participants": 10,
+        "password_protected": true,
+        "password": "test123"
+      },
+      "participants": []
+    },
+    {
+      "id": "test-meeting-003",
+      "name": "Large Meeting",
+      "url": "https://meet.jit.si/large-room-003",
+      "server": "meet.jit.si",
+      "room": "large-room-003",
+      "created_at": "2024-01-15T12:00:00Z",
+      "settings": {
+        "audio_enabled": true,
+        "video_enabled": true,
+        "max_participants": 100,
+        "password_protected": false,
+        "recording_enabled": true
+      },
+      "participants": []
+    },
+    {
+      "id": "test-meeting-004",
+      "name": "Custom Server Meeting",
+      "url": "https://custom.jitsi.server.com/custom-room-004",
+      "server": "custom.jitsi.server.com",
+      "room": "custom-room-004",
+      "created_at": "2024-01-15T13:00:00Z",
+      "settings": {
+        "audio_enabled": false,
+        "video_enabled": true,
+        "max_participants": 50,
+        "password_protected": false,
+        "quality": "high"
+      },
+      "participants": []
+    }
+  ],
+  "test_urls": [
+    {
+      "url": "https://meet.jit.si/test-room",
+      "valid": true,
+      "server": "meet.jit.si",
+      "room": "test-room",
+      "protocol": "https"
+    },
+    {
+      "url": "https://meet.jit.si/test-room?config.startWithAudioMuted=true",
+      "valid": true,
+      "server": "meet.jit.si",
+      "room": "test-room",
+      "protocol": "https",
+      "parameters": {
+        "config.startWithAudioMuted": "true"
+      }
+    },
+    {
+      "url": "jitsi://meet.jit.si/protocol-room",
+      "valid": true,
+      "server": "meet.jit.si",
+      "room": "protocol-room",
+      "protocol": "jitsi"
+    },
+    {
+      "url": "http://insecure.server.com/room",
+      "valid": false,
+      "error": "Insecure protocol not allowed"
+    },
+    {
+      "url": "invalid-url",
+      "valid": false,
+      "error": "Invalid URL format"
+    },
+    {
+      "url": "",
+      "valid": false,
+      "error": "Empty URL"
+    }
+  ],
+  "test_participants": [
+    {
+      "id": "participant-test-001",
+      "name": "Alice Johnson",
+      "email": "alice@example.com",
+      "role": "moderator",
+      "audio_enabled": true,
+      "video_enabled": true,
+      "screen_sharing": false,
+      "connection_quality": 85
+    },
+    {
+      "id": "participant-test-002",
+      "name": "Bob Smith",
+      "email": "bob@example.com",
+      "role": "participant",
+      "audio_enabled": true,
+      "video_enabled": false,
+      "screen_sharing": false,
+      "connection_quality": 72
+    },
+    {
+      "id": "participant-test-003",
+      "name": "Carol Davis",
+      "email": "carol@example.com",
+      "role": "participant",
+      "audio_enabled": false,
+      "video_enabled": true,
+      "screen_sharing": true,
+      "connection_quality": 91
+    }
+  ],
+  "test_invitations": [
+    {
+      "id": "invitation-001",
+      "recipient_email": "guest1@example.com",
+      "sender_name": "Meeting Organizer",
+      "meeting_url": "https://meet.jit.si/invitation-test-room",
+      "message": "You are invited to join our meeting",
+      "scheduled_time": "2024-01-16T14:00:00Z",
+      "created_at": "2024-01-15T10:00:00Z"
+    },
+    {
+      "id": "invitation-002",
+      "recipient_email": "guest2@example.com",
+      "sender_name": "Team Lead",
+      "meeting_url": "https://meet.jit.si/team-standup",
+      "message": "Daily standup meeting",
+      "scheduled_time": "2024-01-16T09:00:00Z",
+      "created_at": "2024-01-15T18:00:00Z"
+    }
+  ],
+  "error_scenarios": [
+    {
+      "scenario": "network_error",
+      "description": "Network connection lost during meeting",
+      "error_code": "NETWORK_ERROR",
+      "error_message": "Network connection lost",
+      "recovery_possible": true
+    },
+    {
+      "scenario": "server_error",
+      "description": "Server returns error response",
+      "error_code": "SERVER_ERROR",
+      "error_message": "Server temporarily unavailable",
+      "recovery_possible": true
+    },
+    {
+      "scenario": "authentication_error",
+      "description": "Authentication failed",
+      "error_code": "AUTH_ERROR",
+      "error_message": "Authentication failed",
+      "recovery_possible": false
+    },
+    {
+      "scenario": "room_full",
+      "description": "Meeting room is full",
+      "error_code": "ROOM_FULL",
+      "error_message": "Meeting room has reached maximum capacity",
+      "recovery_possible": false
+    },
+    {
+      "scenario": "invalid_url",
+      "description": "Invalid meeting URL provided",
+      "error_code": "INVALID_URL",
+      "error_message": "Invalid meeting URL format",
+      "recovery_possible": false
+    }
+  ]
+}

@@ -1,0 +1,197 @@
+{
+  "test_messages": [
+    {
+      "id": "msg_001",
+      "content": "Hello, this is a test message!",
+      "senderId": "user_001",
+      "senderName": "Test User 1",
+      "roomId": "room_001",
+      "timestamp": "2024-01-15T10:30:00Z",
+      "type": "text",
+      "status": "sent",
+      "priority": "normal"
+    },
+    {
+      "id": "msg_002",
+      "content": "This is a longer test message that contains more text to test message handling with various content lengths and formatting options.",
+      "senderId": "user_002",
+      "senderName": "Test User 2",
+      "roomId": "room_001",
+      "timestamp": "2024-01-15T10:31:00Z",
+      "type": "text",
+      "status": "sent",
+      "priority": "normal"
+    },
+    {
+      "id": "msg_003",
+      "content": "😀😃😄😁😆😅😂🤣",
+      "senderId": "user_003",
+      "senderName": "Test User 3",
+      "roomId": "room_001",
+      "timestamp": "2024-01-15T10:32:00Z",
+      "type": "emoji",
+      "status": "sent",
+      "priority": "normal"
+    },
+    {
+      "id": "msg_004",
+      "content": "test_file.pdf",
+      "senderId": "user_001",
+      "senderName": "Test User 1",
+      "roomId": "room_002",
+      "timestamp": "2024-01-15T10:33:00Z",
+      "type": "file",
+      "status": "sent",
+      "priority": "normal",
+      "fileInfo": {
+        "fileName": "test_file.pdf",
+        "fileSize": 1024000,
+        "mimeType": "application/pdf",
+        "fileUrl": "https://example.com/files/test_file.pdf"
+      }
+    },
+    {
+      "id": "msg_005",
+      "content": "User Test User 4 joined the room",
+      "senderId": "system",
+      "senderName": "System",
+      "roomId": "room_001",
+      "timestamp": "2024-01-15T10:34:00Z",
+      "type": "system",
+      "status": "sent",
+      "priority": "low"
+    },
+    {
+      "id": "msg_006",
+      "content": "URGENT: Server maintenance in 5 minutes",
+      "senderId": "admin",
+      "senderName": "Administrator",
+      "roomId": "room_001",
+      "timestamp": "2024-01-15T10:35:00Z",
+      "type": "notification",
+      "status": "sent",
+      "priority": "high"
+    },
+    {
+      "id": "msg_007",
+      "content": "Hello 🌍 World! This is a mixed message with text and emojis 🚀",
+      "senderId": "user_002",
+      "senderName": "Test User 2",
+      "roomId": "room_002",
+      "timestamp": "2024-01-15T10:36:00Z",
+      "type": "text",
+      "status": "sent",
+      "priority": "normal"
+    },
+    {
+      "id": "msg_008",
+      "content": "Failed message for testing",
+      "senderId": "user_003",
+      "senderName": "Test User 3",
+      "roomId": "room_001",
+      "timestamp": "2024-01-15T10:37:00Z",
+      "type": "text",
+      "status": "failed",
+      "priority": "normal"
+    },
+    {
+      "id": "msg_009",
+      "content": "Pending message for testing",
+      "senderId": "user_001",
+      "senderName": "Test User 1",
+      "roomId": "room_002",
+      "timestamp": "2024-01-15T10:38:00Z",
+      "type": "text",
+      "status": "pending",
+      "priority": "normal"
+    },
+    {
+      "id": "msg_010",
+      "content": "Critical system alert message",
+      "senderId": "system",
+      "senderName": "System",
+      "roomId": "room_001",
+      "timestamp": "2024-01-15T10:39:00Z",
+      "type": "system",
+      "status": "sent",
+      "priority": "critical"
+    }
+  ],
+  "bulk_test_messages": [
+    {
+      "template": "Bulk message {index} from user {userId}",
+      "count": 100,
+      "senderIds": ["user_001", "user_002", "user_003"],
+      "roomIds": ["room_001", "room_002"],
+      "types": ["text", "emoji"],
+      "priorities": ["low", "normal", "high"]
+    }
+  ],
+  "performance_test_messages": [
+    {
+      "template": "Performance test message {index} with timestamp {timestamp}",
+      "count": 1000,
+      "senderIds": ["perf_user_001", "perf_user_002", "perf_user_003", "perf_user_004", "perf_user_005"],
+      "roomIds": ["perf_room_001", "perf_room_002", "perf_room_003"],
+      "interval_ms": 10
+    }
+  ],
+  "stress_test_messages": [
+    {
+      "template": "Stress test message {index} - {randomText}",
+      "count": 10000,
+      "concurrent_senders": 50,
+      "message_rate_per_second": 100,
+      "content_variations": [
+        "Short message",
+        "Medium length message with some additional content to test various message sizes",
+        "Very long message that contains a lot of text to test message handling with longer content that might need special processing or truncation in some cases and should test the limits of message processing capabilities"
+      ]
+    }
+  ],
+  "unicode_test_messages": [
+    {
+      "id": "unicode_001",
+      "content": "Unicode test: 你好世界 🌍 مرحبا بالعالم Здравствуй мир",
+      "senderId": "unicode_user",
+      "senderName": "Unicode Tester",
+      "roomId": "unicode_room",
+      "type": "text"
+    },
+    {
+      "id": "unicode_002", 
+      "content": "Emoji test: 😀😃😄😁😆😅😂🤣😊😇🙂🙃😉😌😍🥰😘😗😙😚😋😛😝😜🤪🤨🧐🤓😎🤩🥳😏😒😞😔😟😕🙁☹️😣😖😫😩🥺😢😭😤😠😡🤬🤯😳🥵🥶😱😨😰😥😓🤗🤔🤭🤫🤥😶😐😑😬🙄😯😦😧😮😲🥱😴🤤😪😵🤐🥴🤢🤮🤧😷🤒🤕🤑🤠😈👿👹👺🤡💩👻💀☠️👽👾🤖🎃😺😸😹😻😼😽🙀😿😾",
+      "senderId": "emoji_user",
+      "senderName": "Emoji Tester",
+      "roomId": "emoji_room",
+      "type": "emoji"
+    }
+  ],
+  "edge_case_messages": [
+    {
+      "id": "edge_001",
+      "content": "",
+      "description": "Empty message content"
+    },
+    {
+      "id": "edge_002",
+      "content": "A",
+      "description": "Single character message"
+    },
+    {
+      "id": "edge_003",
+      "content": "   ",
+      "description": "Whitespace only message"
+    },
+    {
+      "id": "edge_004",
+      "content": "Message with\nnewlines\nand\ttabs",
+      "description": "Message with special characters"
+    },
+    {
+      "id": "edge_005",
+      "content": "Message with \"quotes\" and 'apostrophes' and special chars: !@#$%^&*()_+-=[]{}|;:,.<>?",
+      "description": "Message with special punctuation"
+    }
+  ]
+}

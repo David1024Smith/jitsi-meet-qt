@@ -1,0 +1,35 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+    <qresource prefix="/screenshare">
+        <!-- 图标资源 -->
+        <file>icons/screen_share.png</file>
+        <file>icons/screen_capture.png</file>
+        <file>icons/window_capture.png</file>
+        <file>icons/region_select.png</file>
+        <file>icons/play.png</file>
+        <file>icons/pause.png</file>
+        <file>icons/stop.png</file>
+        <file>icons/settings.png</file>
+        <file>icons/refresh.png</file>
+        <file>icons/save.png</file>
+        <file>icons/preview.png</file>
+        <file>icons/fullscreen.png</file>
+        <file>icons/fit_to_window.png</file>
+        <file>icons/original_size.png</file>
+        
+        <!-- 样式表资源 -->
+        <file>styles/screenshare.qss</file>
+        <file>styles/dark_theme.qss</file>
+        <file>styles/light_theme.qss</file>
+        
+        <!-- 图片资源 -->
+        <file>images/no_preview.png</file>
+        <file>images/screen_placeholder.png</file>
+        <file>images/window_placeholder.png</file>
+        
+        <!-- 翻译资源 -->
+        <file>translations/screenshare_en.qm</file>
+        <file>translations/screenshare_zh.qm</file>
+        <file>translations/screenshare_zh_CN.qm</file>
+    </qresource>
+</RCC>

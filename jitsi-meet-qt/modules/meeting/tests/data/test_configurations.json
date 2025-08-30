@@ -1,0 +1,273 @@
+{
+  "default_configuration": {
+    "server": "meet.jit.si",
+    "timeout": 10000,
+    "audio_enabled": true,
+    "video_enabled": true,
+    "quality": "medium",
+    "max_participants": 25,
+    "auto_reconnect": true,
+    "reconnect_attempts": 3,
+    "reconnect_delay": 2000
+  },
+  "test_configurations": [
+    {
+      "name": "basic_config",
+      "description": "Basic configuration for testing",
+      "config": {
+        "server": "test.jitsi.server.com",
+        "timeout": 5000,
+        "audio_enabled": true,
+        "video_enabled": true,
+        "quality": "low",
+        "debug": true
+      }
+    },
+    {
+      "name": "high_quality_config",
+      "description": "High quality configuration",
+      "config": {
+        "server": "premium.jitsi.server.com",
+        "timeout": 15000,
+        "audio_enabled": true,
+        "video_enabled": true,
+        "quality": "high",
+        "bandwidth": 2000,
+        "resolution": "1080p"
+      }
+    },
+    {
+      "name": "audio_only_config",
+      "description": "Audio-only configuration",
+      "config": {
+        "server": "audio.jitsi.server.com",
+        "timeout": 8000,
+        "audio_enabled": true,
+        "video_enabled": false,
+        "quality": "medium",
+        "audio_quality": "high"
+      }
+    },
+    {
+      "name": "secure_config",
+      "description": "Secure configuration with authentication",
+      "config": {
+        "server": "secure.jitsi.server.com",
+        "timeout": 12000,
+        "audio_enabled": true,
+        "video_enabled": true,
+        "authentication_required": true,
+        "encryption_enabled": true,
+        "password_protected": true
+      }
+    },
+    {
+      "name": "mobile_config",
+      "description": "Optimized for mobile devices",
+      "config": {
+        "server": "mobile.jitsi.server.com",
+        "timeout": 20000,
+        "audio_enabled": true,
+        "video_enabled": true,
+        "quality": "low",
+        "bandwidth": 500,
+        "resolution": "480p",
+        "battery_optimization": true
+      }
+    }
+  ],
+  "server_configurations": [
+    {
+      "server": "meet.jit.si",
+      "name": "Official Jitsi Meet",
+      "supported_features": [
+        "audio",
+        "video",
+        "screen_sharing",
+        "chat",
+        "recording"
+      ],
+      "max_participants": 75,
+      "quality_levels": ["low", "medium", "high"],
+      "authentication_methods": ["guest", "jwt"]
+    },
+    {
+      "server": "test.jitsi.server.com",
+      "name": "Test Server",
+      "supported_features": [
+        "audio",
+        "video",
+        "chat"
+      ],
+      "max_participants": 10,
+      "quality_levels": ["low", "medium"],
+      "authentication_methods": ["guest"]
+    },
+    {
+      "server": "premium.jitsi.server.com",
+      "name": "Premium Server",
+      "supported_features": [
+        "audio",
+        "video",
+        "screen_sharing",
+        "chat",
+        "recording",
+        "live_streaming",
+        "breakout_rooms"
+      ],
+      "max_participants": 200,
+      "quality_levels": ["medium", "high", "ultra"],
+      "authentication_methods": ["guest", "jwt", "oauth"]
+    }
+  ],
+  "ui_configurations": [
+    {
+      "name": "compact_ui",
+      "description": "Compact UI for small screens",
+      "settings": {
+        "display_mode": "compact",
+        "show_participants": false,
+        "show_chat": false,
+        "show_statistics": false,
+        "button_size": "small"
+      }
+    },
+    {
+      "name": "full_ui",
+      "description": "Full UI with all features",
+      "settings": {
+        "display_mode": "detailed",
+        "show_participants": true,
+        "show_chat": true,
+        "show_statistics": true,
+        "show_controls": true,
+        "button_size": "large"
+      }
+    },
+    {
+      "name": "presenter_ui",
+      "description": "UI optimized for presenters",
+      "settings": {
+        "display_mode": "normal",
+        "show_participants": true,
+        "show_chat": false,
+        "show_statistics": true,
+        "show_screen_share_controls": true,
+        "button_size": "medium"
+      }
+    }
+  ],
+  "theme_configurations": [
+    {
+      "name": "light_theme",
+      "colors": {
+        "background": "#ffffff",
+        "foreground": "#000000",
+        "primary": "#007bff",
+        "secondary": "#6c757d",
+        "success": "#28a745",
+        "warning": "#ffc107",
+        "error": "#dc3545"
+      }
+    },
+    {
+      "name": "dark_theme",
+      "colors": {
+        "background": "#2b2b2b",
+        "foreground": "#ffffff",
+        "primary": "#0d6efd",
+        "secondary": "#6c757d",
+        "success": "#198754",
+        "warning": "#fd7e14",
+        "error": "#dc3545"
+      }
+    },
+    {
+      "name": "high_contrast_theme",
+      "colors": {
+        "background": "#000000",
+        "foreground": "#ffffff",
+        "primary": "#ffff00",
+        "secondary": "#ffffff",
+        "success": "#00ff00",
+        "warning": "#ffff00",
+        "error": "#ff0000"
+      }
+    }
+  ],
+  "performance_configurations": [
+    {
+      "name": "low_end_device",
+      "description": "Configuration for low-end devices",
+      "settings": {
+        "video_resolution": "360p",
+        "video_framerate": 15,
+        "audio_quality": "medium",
+        "enable_simulcast": false,
+        "enable_layer_suspension": true,
+        "cpu_adaptation": true
+      }
+    },
+    {
+      "name": "high_end_device",
+      "description": "Configuration for high-end devices",
+      "settings": {
+        "video_resolution": "1080p",
+        "video_framerate": 30,
+        "audio_quality": "high",
+        "enable_simulcast": true,
+        "enable_layer_suspension": false,
+        "cpu_adaptation": false
+      }
+    },
+    {
+      "name": "bandwidth_limited",
+      "description": "Configuration for limited bandwidth",
+      "settings": {
+        "video_resolution": "480p",
+        "video_framerate": 20,
+        "audio_quality": "medium",
+        "enable_simulcast": true,
+        "enable_layer_suspension": true,
+        "adaptive_bitrate": true,
+        "max_bitrate": 500
+      }
+    }
+  ],
+  "validation_rules": {
+    "server": {
+      "required": true,
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+    },
+    "timeout": {
+      "required": true,
+      "type": "integer",
+      "minimum": 1000,
+      "maximum": 60000
+    },
+    "audio_enabled": {
+      "required": false,
+      "type": "boolean",
+      "default": true
+    },
+    "video_enabled": {
+      "required": false,
+      "type": "boolean",
+      "default": true
+    },
+    "quality": {
+      "required": false,
+      "type": "string",
+      "enum": ["low", "medium", "high", "ultra"],
+      "default": "medium"
+    },
+    "max_participants": {
+      "required": false,
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 500,
+      "default": 25
+    }
+  }
+}

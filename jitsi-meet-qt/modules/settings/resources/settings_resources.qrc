@@ -1,0 +1,27 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+    <qresource prefix="/settings">
+        <!-- Icons -->
+        <file>icons/settings.png</file>
+        <file>icons/preferences.png</file>
+        <file>icons/config.png</file>
+        <file>icons/validation.png</file>
+        <file>icons/storage.png</file>
+        
+        <!-- Styles -->
+        <file>styles/default.qss</file>
+        <file>styles/dark.qss</file>
+        <file>styles/light.qss</file>
+        
+        <!-- Templates -->
+        <file>templates/default_settings.json</file>
+        <file>templates/audio_config.json</file>
+        <file>templates/video_config.json</file>
+        <file>templates/network_config.json</file>
+        
+        <!-- Schemas -->
+        <file>schemas/settings_schema.json</file>
+        <file>schemas/preferences_schema.json</file>
+        <file>schemas/validation_rules.json</file>
+    </qresource>
+</RCC>

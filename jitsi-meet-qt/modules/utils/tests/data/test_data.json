@@ -1,0 +1,132 @@
+{
+  "test_suite": {
+    "name": "Utils Module Tests",
+    "version": "1.0.0",
+    "description": "Comprehensive test suite for Utils module"
+  },
+  "test_data": {
+    "strings": {
+      "simple": "Hello World",
+      "unicode": "Hello 世界 🌍",
+      "empty": "",
+      "whitespace": "   \t\n   ",
+      "long": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+      "special_chars": "!@#$%^&*()_+-=[]{}|;':\",./<>?",
+      "html": "<script>alert('test')</script>",
+      "sql": "SELECT * FROM users WHERE id = 1; DROP TABLE users;",
+      "json": "{\"key\": \"value\", \"number\": 42, \"boolean\": true}"
+    },
+    "numbers": {
+      "integers": [0, 1, -1, 42, -42, 2147483647, -2147483648],
+      "floats": [0.0, 1.5, -1.5, 3.14159, -3.14159, 1.7976931348623157e+308],
+      "strings": ["0", "42", "3.14", "-123", "1e10", "invalid", ""]
+    },
+    "emails": {
+      "valid": [
+        "test@example.com",
+        "user.name@domain.co.uk",
+        "user+tag@example.org",
+        "firstname.lastname@company.com"
+      ],
+      "invalid": [
+        "invalid-email",
+        "@domain.com",
+        "user@",
+        "user@domain",
+        "user..name@domain.com",
+        "user@domain..com"
+      ]
+    },
+    "passwords": {
+      "weak": ["123", "password", "abc", ""],
+      "medium": ["Password1", "test123", "MyPassword"],
+      "strong": ["MyStr0ng!Pass", "C0mpl3x@P4ssw0rd", "Sup3r$ecur3P@ss"]
+    },
+    "urls": {
+      "valid": [
+        "http://example.com",
+        "https://www.example.com",
+        "ftp://files.example.com",
+        "http://localhost:8080/path?param=value"
+      ],
+      "invalid": [
+        "not-a-url",
+        "http://",
+        "://example.com",
+        "http:example.com"
+      ]
+    },
+    "files": {
+      "paths": [
+        "/tmp/test.txt",
+        "C:\\Windows\\System32\\test.dll",
+        "./relative/path/file.dat",
+        "../parent/directory/file.log"
+      ],
+      "extensions": [".txt", ".log", ".dat", ".tmp", ".json", ".xml", ".ini"],
+      "sizes": [0, 1024, 1048576, 1073741824]
+    },
+    "crypto": {
+      "algorithms": ["AES-128", "AES-192", "AES-256", "RSA-1024", "RSA-2048", "RSA-4096"],
+      "hash_algorithms": ["MD5", "SHA-1", "SHA-224", "SHA-256", "SHA-384", "SHA-512"],
+      "test_data": [
+        "Hello World",
+        "The quick brown fox jumps over the lazy dog",
+        "",
+        "A very long string that should test the encryption algorithm with various data sizes and patterns to ensure proper handling of different input lengths and content types."
+      ]
+    },
+    "performance": {
+      "iterations": [100, 1000, 10000],
+      "data_sizes": [1024, 10240, 102400, 1048576],
+      "thread_counts": [1, 2, 4, 8, 16]
+    }
+  },
+  "expected_results": {
+    "string_operations": {
+      "trim": {
+        "   hello   ": "hello",
+        "\t\ntest\t\n": "test"
+      },
+      "case_conversion": {
+        "Hello World": {
+          "upper": "HELLO WORLD",
+          "lower": "hello world",
+          "camel": "helloWorld",
+          "pascal": "HelloWorld",
+          "snake": "hello_world",
+          "kebab": "hello-world"
+        }
+      }
+    },
+    "validation": {
+      "email_scores": {
+        "test@example.com": 100,
+        "invalid-email": 0
+      },
+      "password_strength": {
+        "123": 0,
+        "Password1": 60,
+        "MyStr0ng!Pass": 100
+      }
+    }
+  },
+  "test_configuration": {
+    "timeouts": {
+      "short": 1000,
+      "medium": 5000,
+      "long": 30000
+    },
+    "retry_counts": {
+      "network": 3,
+      "file": 2,
+      "crypto": 1
+    },
+    "thresholds": {
+      "performance_warning": 1000,
+      "performance_error": 5000,
+      "memory_warning": 1048576,
+      "memory_error": 10485760
+    }
+  }
+}

@@ -11,6 +11,9 @@
 #include "ErrorRecoveryManager.h"
 #include "ThemeManager.h"
 #include "PerformanceManager.h"
+#include "Logger.h"
+#include "ErrorLogger.h"
+#include "ErrorEventBus.h"
 #include <QCommandLineParser>
 #include <QStandardPaths>
 #include <QDir>
@@ -142,6 +145,12 @@ MainApplication::~MainApplication() {
         delete m_protocolHandler;
         m_protocolHandler = nullptr;
     }
+    
+    // Shutdown logging system last
+    LOG_INFO("Shutting down Jitsi Meet Qt application");
+    ErrorLogger::instance()->shutdown();
+    ErrorEventBus::instance()->shutdown();
+    Logger::instance()->shutdown();
     
     s_instance = nullptr;
     qDebug() << "MainApplication destroyed";
@@ -375,6 +384,33 @@ void MainApplication::initializeTranslationManager() {
 
 void MainApplication::initializeManagers() {
     qDebug() << "Initializing manager components...";
+    
+    // 0. Initialize logging system first (all other components depend on it)
+    Logger* logger = Logger::instance();
+    if (logger->initialize()) {
+        qDebug() << "Logger initialized successfully";
+    } else {
+        qWarning() << "Failed to initialize Logger";
+    }
+    
+    // Initialize error event bus
+    ErrorEventBus* errorBus = ErrorEventBus::instance();
+    if (errorBus->initialize()) {
+        qDebug() << "ErrorEventBus initialized successfully";
+    } else {
+        qWarning() << "Failed to initialize ErrorEventBus";
+    }
+    
+    // Initialize error logger integration
+    ErrorLogger* errorLogger = ErrorLogger::instance();
+    if (errorLogger->initialize()) {
+        qDebug() << "ErrorLogger initialized successfully";
+    } else {
+        qWarning() << "Failed to initialize ErrorLogger";
+    }
+    
+    // Log the initialization start
+    LOG_INFO("Starting Jitsi Meet Qt application initialization");
     
     // 1. Initialize configuration manager first (other components depend on it)
     m_configurationManager = new ConfigurationManager(this);

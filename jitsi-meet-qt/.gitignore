@@ -14,6 +14,9 @@ Makefile*
 *build-*
 *.so
 *.so.*
+*.qmake.stash
+mocinclude.opt
+object_script.*
 
 # CMake
 CMakeLists.txt.user

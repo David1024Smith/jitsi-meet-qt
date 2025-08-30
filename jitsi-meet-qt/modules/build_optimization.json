@@ -1,0 +1,165 @@
+{
+  "parallel_jobs": 8,
+  "use_ccache": true,
+  "use_precompiled_headers": true,
+  "incremental_build": true,
+  "optimize_level": "O3",
+  "link_time_optimization": true,
+  "strip_debug_symbols": true,
+  "compress_resources": true,
+  "module_build_order": [
+    "utils",
+    "settings", 
+    "performance",
+    "core",
+    "camera",
+    "audio",
+    "network",
+    "screenshare",
+    "chat",
+    "meeting",
+    "ui",
+    "compatibility"
+  ],
+  "compiler_optimizations": {
+    "gcc": {
+      "release": [
+        "-O3",
+        "-march=native",
+        "-mtune=native",
+        "-flto",
+        "-fuse-linker-plugin",
+        "-fno-fat-lto-objects",
+        "-DNDEBUG"
+      ],
+      "debug": [
+        "-Og",
+        "-g3",
+        "-fno-omit-frame-pointer",
+        "-DDEBUG"
+      ]
+    },
+    "clang": {
+      "release": [
+        "-O3",
+        "-march=native",
+        "-flto",
+        "-DNDEBUG"
+      ],
+      "debug": [
+        "-O0",
+        "-g",
+        "-fno-omit-frame-pointer",
+        "-DDEBUG"
+      ]
+    },
+    "msvc": {
+      "release": [
+        "/O2",
+        "/GL",
+        "/DNDEBUG"
+      ],
+      "debug": [
+        "/Od",
+        "/Zi",
+        "/DDEBUG"
+      ]
+    }
+  },
+  "linker_optimizations": {
+    "gcc": {
+      "release": [
+        "-Wl,--gc-sections",
+        "-Wl,--strip-all",
+        "-flto"
+      ],
+      "debug": []
+    },
+    "clang": {
+      "release": [
+        "-Wl,--gc-sections",
+        "-Wl,--strip-all",
+        "-flto"
+      ],
+      "debug": []
+    },
+    "msvc": {
+      "release": [
+        "/LTCG",
+        "/OPT:REF",
+        "/OPT:ICF"
+      ],
+      "debug": []
+    }
+  },
+  "ccache_config": {
+    "max_size": "2G",
+    "compression": true,
+    "hash_dir": false,
+    "cache_dir": ".build_cache/ccache"
+  },
+  "precompiled_headers": {
+    "enabled": true,
+    "common_headers": [
+      "QtCore",
+      "QtGui", 
+      "QtWidgets",
+      "QtNetwork",
+      "QtMultimedia",
+      "memory",
+      "vector",
+      "string",
+      "map",
+      "unordered_map",
+      "functional",
+      "algorithm",
+      "chrono",
+      "thread",
+      "mutex",
+      "atomic"
+    ]
+  },
+  "resource_optimization": {
+    "compress_qrc": true,
+    "optimize_images": true,
+    "minify_qss": true,
+    "remove_unused_resources": true
+  },
+  "build_cache": {
+    "enabled": true,
+    "cache_directory": ".build_cache",
+    "max_cache_size": "5G",
+    "cache_object_files": true,
+    "cache_moc_files": true,
+    "cache_rcc_files": true
+  },
+  "parallel_compilation": {
+    "max_parallel_jobs": 16,
+    "auto_detect_cores": true,
+    "memory_per_job": "1G",
+    "load_average_limit": 1.5
+  },
+  "dependency_optimization": {
+    "minimize_includes": true,
+    "use_forward_declarations": true,
+    "optimize_template_instantiation": true,
+    "reduce_symbol_visibility": true
+  },
+  "platform_specific": {
+    "windows": {
+      "use_ninja": false,
+      "use_jom": true,
+      "enable_pdb_generation": false
+    },
+    "linux": {
+      "use_ninja": true,
+      "use_gold_linker": true,
+      "enable_debug_fission": false
+    },
+    "macos": {
+      "use_ninja": true,
+      "enable_dsym_generation": false,
+      "use_lld": false
+    }
+  }
+}

@@ -1,0 +1,325 @@
+# Resource object code (Python 3)
+# Created by: object code
+# Created by: The Resource Compiler for Qt version 6.9.0
+# WARNING! All changes made in this file will be lost!
+
+from PySide6 import QtCore
+
+qt_resource_data = b"\
+\x00\x00\x01\x9e\
+[\
+General]\x0d\x0aversio\
+n=1.0.0\x0d\x0adebug=t\
+rue\x0d\x0alanguage=en\
+\x0d\x0a\x0d\x0a[Database]\x0d\x0a\
+host=localhost\x0d\x0a\
+port=5432\x0d\x0aname=\
+test_db\x0d\x0ausernam\
+e=test_user\x0d\x0apas\
+sword=test_pass\x0d\
+\x0a\x0d\x0a[Logging]\x0d\x0ale\
+vel=debug\x0d\x0afile=\
+/tmp/test.log\x0d\x0ac\
+onsole=true\x0d\x0anet\
+work=false\x0d\x0a\x0d\x0a[C\
+rypto]\x0d\x0aalgorith\
+m=AES-256\x0d\x0akey_s\
+ize=32\x0d\x0ause_ssl=\
+true\x0d\x0a\x0d\x0a[Perform\
+ance]\x0d\x0acache_siz\
+e=1024\x0d\x0athread_c\
+ount=4\x0d\x0atimeout=\
+30000\x0d\x0a\x0d\x0a[UI]\x0d\x0at\
+heme=dark\x0d\x0afont_\
+size=12\x0d\x0awindow_\
+width=1024\x0d\x0awind\
+ow_height=768\
+\x00\x00\x0fX\
+{\
+\x0d\x0a  \x22test_suite\x22\
+: {\x0d\x0a    \x22name\x22:\
+ \x22Utils Module T\
+ests\x22,\x0d\x0a    \x22ver\
+sion\x22: \x221.0.0\x22,\x0d\
+\x0a    \x22descriptio\
+n\x22: \x22Comprehensi\
+ve test suite fo\
+r Utils module\x22\x0d\
+\x0a  },\x0d\x0a  \x22test_d\
+ata\x22: {\x0d\x0a    \x22st\
+rings\x22: {\x0d\x0a     \
+ \x22simple\x22: \x22Hell\
+o World\x22,\x0d\x0a     \
+ \x22unicode\x22: \x22Hel\
+lo \xe4\xb8\x96\xe7\x95\x8c \xf0\x9f\x8c\x8d\x22,\
+\x0d\x0a      \x22empty\x22:\
+ \x22\x22,\x0d\x0a      \x22whi\
+tespace\x22: \x22   \x5ct\
+\x5cn   \x22,\x0d\x0a      \x22\
+long\x22: \x22Lorem ip\
+sum dolor sit am\
+et, consectetur \
+adipiscing elit.\
+ Sed do eiusmod \
+tempor incididun\
+t ut labore et d\
+olore magna aliq\
+ua.\x22,\x0d\x0a      \x22sp\
+ecial_chars\x22: \x22!\
+@#$%^&*()_+-=[]{\
+}|;':\x5c\x22,./<>?\x22,\x0d\
+\x0a      \x22html\x22: \x22\
+<script>alert('t\
+est')</script>\x22,\
+\x0d\x0a      \x22sql\x22: \x22\
+SELECT * FROM us\
+ers WHERE id = 1\
+; DROP TABLE use\
+rs;\x22,\x0d\x0a      \x22js\
+on\x22: \x22{\x5c\x22key\x5c\x22: \
+\x5c\x22value\x5c\x22, \x5c\x22num\
+ber\x5c\x22: 42, \x5c\x22boo\
+lean\x5c\x22: true}\x22\x0d\x0a\
+    },\x0d\x0a    \x22num\
+bers\x22: {\x0d\x0a      \
+\x22integers\x22: [0, \
+1, -1, 42, -42, \
+2147483647, -214\
+7483648],\x0d\x0a     \
+ \x22floats\x22: [0.0,\
+ 1.5, -1.5, 3.14\
+159, -3.14159, 1\
+.797693134862315\
+7e+308],\x0d\x0a      \
+\x22strings\x22: [\x220\x22,\
+ \x2242\x22, \x223.14\x22, \x22\
+-123\x22, \x221e10\x22, \x22\
+invalid\x22, \x22\x22]\x0d\x0a \
+   },\x0d\x0a    \x22emai\
+ls\x22: {\x0d\x0a      \x22v\
+alid\x22: [\x0d\x0a      \
+  \x22test@example.\
+com\x22,\x0d\x0a        \x22\
+user.name@domain\
+.co.uk\x22,\x0d\x0a      \
+  \x22user+tag@exam\
+ple.org\x22,\x0d\x0a     \
+   \x22firstname.la\
+stname@company.c\
+om\x22\x0d\x0a      ],\x0d\x0a \
+     \x22invalid\x22: \
+[\x0d\x0a        \x22inva\
+lid-email\x22,\x0d\x0a   \
+     \x22@domain.co\
+m\x22,\x0d\x0a        \x22us\
+er@\x22,\x0d\x0a        \x22\
+user@domain\x22,\x0d\x0a \
+       \x22user..na\
+me@domain.com\x22,\x0d\
+\x0a        \x22user@d\
+omain..com\x22\x0d\x0a   \
+   ]\x0d\x0a    },\x0d\x0a  \
+  \x22passwords\x22: {\
+\x0d\x0a      \x22weak\x22: \
+[\x22123\x22, \x22passwor\
+d\x22, \x22abc\x22, \x22\x22],\x0d\
+\x0a      \x22medium\x22:\
+ [\x22Password1\x22, \x22\
+test123\x22, \x22MyPas\
+sword\x22],\x0d\x0a      \
+\x22strong\x22: [\x22MySt\
+r0ng!Pass\x22, \x22C0m\
+pl3x@P4ssw0rd\x22, \
+\x22Sup3r$ecur3P@ss\
+\x22]\x0d\x0a    },\x0d\x0a    \
+\x22urls\x22: {\x0d\x0a     \
+ \x22valid\x22: [\x0d\x0a   \
+     \x22http://exa\
+mple.com\x22,\x0d\x0a    \
+    \x22https://www\
+.example.com\x22,\x0d\x0a\
+        \x22ftp://f\
+iles.example.com\
+\x22,\x0d\x0a        \x22htt\
+p://localhost:80\
+80/path?param=va\
+lue\x22\x0d\x0a      ],\x0d\x0a\
+      \x22invalid\x22:\
+ [\x0d\x0a        \x22not\
+-a-url\x22,\x0d\x0a      \
+  \x22http://\x22,\x0d\x0a  \
+      \x22://exampl\
+e.com\x22,\x0d\x0a       \
+ \x22http:example.c\
+om\x22\x0d\x0a      ]\x0d\x0a  \
+  },\x0d\x0a    \x22files\
+\x22: {\x0d\x0a      \x22pat\
+hs\x22: [\x0d\x0a        \
+\x22/tmp/test.txt\x22,\
+\x0d\x0a        \x22C:\x5c\x5cW\
+indows\x5c\x5cSystem32\
+\x5c\x5ctest.dll\x22,\x0d\x0a  \
+      \x22./relativ\
+e/path/file.dat\x22\
+,\x0d\x0a        \x22../p\
+arent/directory/\
+file.log\x22\x0d\x0a     \
+ ],\x0d\x0a      \x22exte\
+nsions\x22: [\x22.txt\x22\
+, \x22.log\x22, \x22.dat\x22\
+, \x22.tmp\x22, \x22.json\
+\x22, \x22.xml\x22, \x22.ini\
+\x22],\x0d\x0a      \x22size\
+s\x22: [0, 1024, 10\
+48576, 107374182\
+4]\x0d\x0a    },\x0d\x0a    \
+\x22crypto\x22: {\x0d\x0a   \
+   \x22algorithms\x22:\
+ [\x22AES-128\x22, \x22AE\
+S-192\x22, \x22AES-256\
+\x22, \x22RSA-1024\x22, \x22\
+RSA-2048\x22, \x22RSA-\
+4096\x22],\x0d\x0a      \x22\
+hash_algorithms\x22\
+: [\x22MD5\x22, \x22SHA-1\
+\x22, \x22SHA-224\x22, \x22S\
+HA-256\x22, \x22SHA-38\
+4\x22, \x22SHA-512\x22],\x0d\
+\x0a      \x22test_dat\
+a\x22: [\x0d\x0a        \x22\
+Hello World\x22,\x0d\x0a \
+       \x22The quic\
+k brown fox jump\
+s over the lazy \
+dog\x22,\x0d\x0a        \x22\
+\x22,\x0d\x0a        \x22A v\
+ery long string \
+that should test\
+ the encryption \
+algorithm with v\
+arious data size\
+s and patterns t\
+o ensure proper \
+handling of diff\
+erent input leng\
+ths and content \
+types.\x22\x0d\x0a      ]\
+\x0d\x0a    },\x0d\x0a    \x22p\
+erformance\x22: {\x0d\x0a\
+      \x22iteration\
+s\x22: [100, 1000, \
+10000],\x0d\x0a      \x22\
+data_sizes\x22: [10\
+24, 10240, 10240\
+0, 1048576],\x0d\x0a  \
+    \x22thread_coun\
+ts\x22: [1, 2, 4, 8\
+, 16]\x0d\x0a    }\x0d\x0a  \
+},\x0d\x0a  \x22expected_\
+results\x22: {\x0d\x0a   \
+ \x22string_operati\
+ons\x22: {\x0d\x0a      \x22\
+trim\x22: {\x0d\x0a      \
+  \x22   hello   \x22:\
+ \x22hello\x22,\x0d\x0a     \
+   \x22\x5ct\x5cntest\x5ct\x5cn\
+\x22: \x22test\x22\x0d\x0a     \
+ },\x0d\x0a      \x22case\
+_conversion\x22: {\x0d\
+\x0a        \x22Hello \
+World\x22: {\x0d\x0a     \
+     \x22upper\x22: \x22H\
+ELLO WORLD\x22,\x0d\x0a  \
+        \x22lower\x22:\
+ \x22hello world\x22,\x0d\
+\x0a          \x22came\
+l\x22: \x22helloWorld\x22\
+,\x0d\x0a          \x22pa\
+scal\x22: \x22HelloWor\
+ld\x22,\x0d\x0a          \
+\x22snake\x22: \x22hello_\
+world\x22,\x0d\x0a       \
+   \x22kebab\x22: \x22hel\
+lo-world\x22\x0d\x0a     \
+   }\x0d\x0a      }\x0d\x0a \
+   },\x0d\x0a    \x22vali\
+dation\x22: {\x0d\x0a    \
+  \x22email_scores\x22\
+: {\x0d\x0a        \x22te\
+st@example.com\x22:\
+ 100,\x0d\x0a        \x22\
+invalid-email\x22: \
+0\x0d\x0a      },\x0d\x0a   \
+   \x22password_str\
+ength\x22: {\x0d\x0a     \
+   \x22123\x22: 0,\x0d\x0a  \
+      \x22Password1\
+\x22: 60,\x0d\x0a        \
+\x22MyStr0ng!Pass\x22:\
+ 100\x0d\x0a      }\x0d\x0a \
+   }\x0d\x0a  },\x0d\x0a  \x22t\
+est_configuratio\
+n\x22: {\x0d\x0a    \x22time\
+outs\x22: {\x0d\x0a      \
+\x22short\x22: 1000,\x0d\x0a\
+      \x22medium\x22: \
+5000,\x0d\x0a      \x22lo\
+ng\x22: 30000\x0d\x0a    \
+},\x0d\x0a    \x22retry_c\
+ounts\x22: {\x0d\x0a     \
+ \x22network\x22: 3,\x0d\x0a\
+      \x22file\x22: 2,\
+\x0d\x0a      \x22crypto\x22\
+: 1\x0d\x0a    },\x0d\x0a   \
+ \x22thresholds\x22: {\
+\x0d\x0a      \x22perform\
+ance_warning\x22: 1\
+000,\x0d\x0a      \x22per\
+formance_error\x22:\
+ 5000,\x0d\x0a      \x22m\
+emory_warning\x22: \
+1048576,\x0d\x0a      \
+\x22memory_error\x22: \
+10485760\x0d\x0a    }\x0d\
+\x0a  }\x0d\x0a}\
+"
+
+qt_resource_name = b"\
+\x00\x04\
+\x00\x07\xac\xa4\
+\x00t\
+\x00e\x00s\x00t\
+\x00\x04\
+\x00\x06\xa8\xa1\
+\x00d\
+\x00a\x00t\x00a\
+\x00\x0f\
+\x09\xb5k\xe9\
+\x00t\
+\x00e\x00s\x00t\x00_\x00c\x00o\x00n\x00f\x00i\x00g\x00.\x00i\x00n\x00i\
+\x00\x0e\
+\x03\x91\xb5\xfe\
+\x00t\
+\x00e\x00s\x00t\x00_\x00d\x00a\x00t\x00a\x00.\x00j\x00s\x00o\x00n\
+"
+
+qt_resource_struct = b"\
+\x00\x00\x00\x00\x00\x02\x00\x00\x00\x01\x00\x00\x00\x01\
+\x00\x00\x00\x00\x00\x00\x00\x00\
+\x00\x00\x00\x00\x00\x02\x00\x00\x00\x01\x00\x00\x00\x02\
+\x00\x00\x00\x00\x00\x00\x00\x00\
+\x00\x00\x00\x0e\x00\x02\x00\x00\x00\x02\x00\x00\x00\x03\
+\x00\x00\x00\x00\x00\x00\x00\x00\
+\x00\x00\x00@\x00\x00\x00\x00\x00\x01\x00\x00\x01\xa2\
+\x00\x00\x01\x98\xf5\x9110\
+\x00\x00\x00\x1c\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\
+\x00\x00\x01\x98\xf5\x90\xdb@\
+"
+
+def qInitResources():
+    QtCore.qRegisterResourceData(0x03, qt_resource_struct, qt_resource_name, qt_resource_data)
+
+def qCleanupResources():
+    QtCore.qUnregisterResourceData(0x03, qt_resource_struct, qt_resource_name, qt_resource_data)
+
+qInitResources()

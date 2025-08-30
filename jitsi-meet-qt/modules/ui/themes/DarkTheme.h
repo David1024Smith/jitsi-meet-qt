@@ -1,0 +1,151 @@
+#ifndef DARKTHEME_H
+#define DARKTHEME_H
+
+#include "BaseTheme.h"
+#include <QColor>
+#include <QFont>
+#include <QString>
+
+/**
+ * @brief 暗色主题类
+ * 
+ * DarkTheme提供应用程序的暗色主题样式，适合在低光环境下使用，
+ * 包括深色背景、亮色文字和适配的UI元素样式。
+ */
+class DarkTheme : public BaseTheme
+{
+    Q_OBJECT
+
+public:
+    explicit DarkTheme(QObject *parent = nullptr);
+    ~DarkTheme() override;
+
+    // BaseTheme接口实现
+    QString name() const override;
+    QString displayName() const override;
+    QString description() const override;
+    QString version() const override;
+    QString author() const override;
+
+    // 主题加载和应用
+    bool load() override;
+    bool apply() override;
+    void unload() override;
+    bool isLoaded() const override;
+
+    // 颜色方案
+    QColor primaryColor() const override;
+    QColor secondaryColor() const override;
+    QColor backgroundColor() const override;
+    QColor textColor() const override;
+    QColor accentColor() const override;
+    QColor borderColor() const override;
+    QColor hoverColor() const override;
+    QColor pressedColor() const override;
+    QColor disabledColor() const override;
+    QColor errorColor() const override;
+    QColor warningColor() const override;
+    QColor successColor() const override;
+
+    // 字体设置
+    QFont defaultFont() const override;
+    QFont titleFont() const override;
+    QFont headerFont() const override;
+    QFont buttonFont() const override;
+    QFont menuFont() const override;
+    QFont tooltipFont() const override;
+
+    // 尺寸设置
+    int borderRadius() const override;
+    int borderWidth() const override;
+    int spacing() const override;
+    int margin() const override;
+    int padding() const override;
+    int iconSize() const override;
+    int buttonHeight() const override;
+    int toolbarHeight() const override;
+
+    // 样式表
+    QString styleSheet() const override;
+    QString getStyleSheet() const override;
+    QString getWidgetStyleSheet(const QString& widgetType) const override;
+    QString getButtonStyleSheet() const override;
+    QString getMenuStyleSheet() const override;
+    QString getToolBarStyleSheet() const override;
+    QString getStatusBarStyleSheet() const override;
+    QString getDialogStyleSheet() const override;
+
+    // 图标和资源
+    QString getIconPath(const QString& iconName) const override;
+    QString getImagePath(const QString& imageName) const override;
+    QPixmap getIcon(const QString& iconName, const QSize& size = QSize()) const override;
+    QPixmap getImage(const QString& imageName) const override;
+
+    // 主题自定义
+    void setCustomProperty(const QString& property, const QVariant& value) override;
+    QVariant getCustomProperty(const QString& property) const override;
+    bool hasCustomProperty(const QString& property) const override;
+    void removeCustomProperty(const QString& property) override;
+
+protected:
+    void initializeColors() override;
+    void initializeFonts() override;
+    void initializeSizes() override;
+    void initializeStyleSheets() override;
+    void initializeResources() override;
+
+private:
+    void setupDarkColors();
+    void setupDarkFonts();
+    void setupDarkSizes();
+    QString generateDarkButtonStyleSheet() const;
+    QString generateDarkMenuStyleSheet() const;
+    QString generateDarkToolBarStyleSheet() const;
+    QString generateDarkStatusBarStyleSheet() const;
+    QString generateDarkDialogStyleSheet() const;
+
+    // 暗色主题颜色定义
+    QColor m_primaryColor;
+    QColor m_secondaryColor;
+    QColor m_backgroundColor;
+    QColor m_textColor;
+    QColor m_accentColor;
+    QColor m_borderColor;
+    QColor m_hoverColor;
+    QColor m_pressedColor;
+    QColor m_disabledColor;
+    QColor m_errorColor;
+    QColor m_warningColor;
+    QColor m_successColor;
+
+    // 字体定义
+    QFont m_defaultFont;
+    QFont m_titleFont;
+    QFont m_headerFont;
+    QFont m_buttonFont;
+    QFont m_menuFont;
+    QFont m_tooltipFont;
+
+    // 尺寸定义
+    int m_borderRadius;
+    int m_borderWidth;
+    int m_spacing;
+    int m_margin;
+    int m_padding;
+    int m_iconSize;
+    int m_buttonHeight;
+    int m_toolbarHeight;
+
+    // 样式表缓存
+    mutable QString m_cachedStyleSheet;
+    mutable QMap<QString, QString> m_cachedWidgetStyleSheets;
+
+    // 资源路径
+    QString m_resourcePath;
+    QString m_iconPath;
+    QString m_imagePath;
+
+    bool m_loaded;
+};
+
+#endif // DARKTHEME_H

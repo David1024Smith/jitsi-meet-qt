@@ -1,0 +1,456 @@
+name: Comprehensive Test Suite
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run tests daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      test_types:
+        description: 'Test types to run (comma-separated: unit,integration,e2e,performance,regression)'
+        required: false
+        default: 'unit,integration,performance'
+      modules:
+        description: 'Specific modules to test (comma-separated)'
+        required: false
+        default: 'all'
+      coverage_enabled:
+        description: 'Enable coverage analysis'
+        type: boolean
+        required: false
+        default: true
+
+env:
+  QT_VERSION: '6.5.0'
+  CMAKE_BUILD_TYPE: Release
+  COVERAGE_THRESHOLD: 75
+
+jobs:
+  # Build and prepare test environment
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up test matrix
+        id: set-matrix
+        run: |
+          if [ "${{ github.event.inputs.modules }}" = "all" ] || [ -z "${{ github.event.inputs.modules }}" ]; then
+            MODULES='["core", "audio", "video", "network", "ui", "chat", "screenshare", "meeting", "settings", "utils", "performance", "compatibility"]'
+          else
+            MODULES=$(echo '${{ github.event.inputs.modules }}' | jq -R 'split(",") | map(select(length > 0))')
+          fi
+          echo "matrix={\"module\":$MODULES}" >> $GITHUB_OUTPUT
+
+  # Unit tests for each module
+  unit-tests:
+    needs: prepare
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{fromJson(needs.prepare.outputs.matrix)}}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v3
+        with:
+          version: ${{ env.QT_VERSION }}
+          modules: 'qtnetworkauth qtwebsockets qtmultimedia'
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            ninja-build \
+            lcov \
+            gcovr \
+            xvfb \
+            libgl1-mesa-dev \
+            libglu1-mesa-dev \
+            libasound2-dev \
+            libpulse-dev \
+            libv4l-dev
+
+      - name: Setup virtual display
+        run: |
+          export DISPLAY=:99
+          Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
+
+      - name: Configure CMake
+        run: |
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=${{ env.CMAKE_BUILD_TYPE }} \
+            -DENABLE_COVERAGE=${{ github.event.inputs.coverage_enabled || 'true' }} \
+            -DENABLE_TESTING=ON
+
+      - name: Build module tests
+        run: |
+          cmake --build build --target ${{ matrix.module }}_tests
+
+      - name: Run unit tests for ${{ matrix.module }}
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          cd build
+          ctest -R "${{ matrix.module }}_UnitTests" --output-on-failure --verbose
+
+      - name: Generate coverage for ${{ matrix.module }}
+        if: github.event.inputs.coverage_enabled == 'true' || github.event_name != 'workflow_dispatch'
+        run: |
+          cd build
+          lcov --capture --directory . --output-file ${{ matrix.module }}_coverage.info
+          lcov --remove ${{ matrix.module }}_coverage.info \
+            '*/tests/*' '*/examples/*' '*/mocks/*' '/usr/*' '*/Qt*/*' \
+            --output-file ${{ matrix.module }}_coverage_filtered.info
+
+      - name: Upload coverage reports
+        if: github.event.inputs.coverage_enabled == 'true' || github.event_name != 'workflow_dispatch'
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-${{ matrix.module }}
+          path: build/${{ matrix.module }}_coverage_filtered.info
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results-${{ matrix.module }}
+          path: |
+            build/Testing/
+            build/*_test_results.xml
+
+  # Integration tests
+  integration-tests:
+    runs-on: ubuntu-latest
+    needs: prepare
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v3
+        with:
+          version: ${{ env.QT_VERSION }}
+          modules: 'qtnetworkauth qtwebsockets qtmultimedia'
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            ninja-build \
+            xvfb \
+            libgl1-mesa-dev \
+            libglu1-mesa-dev
+
+      - name: Setup virtual display
+        run: |
+          export DISPLAY=:99
+          Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
+
+      - name: Configure CMake
+        run: |
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=${{ env.CMAKE_BUILD_TYPE }} \
+            -DENABLE_TESTING=ON
+
+      - name: Build integration tests
+        run: |
+          cmake --build build --target integration_test
+
+      - name: Run integration tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          cd build
+          ctest -R "IntegrationTests" --output-on-failure --verbose
+
+      - name: Upload integration test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: integration-test-results
+          path: |
+            build/Testing/
+            build/integration_test_results.xml
+
+  # Performance tests
+  performance-tests:
+    runs-on: ubuntu-latest
+    if: contains(github.event.inputs.test_types, 'performance') || github.event_name != 'workflow_dispatch'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v3
+        with:
+          version: ${{ env.QT_VERSION }}
+          modules: 'qtnetworkauth qtwebsockets qtmultimedia'
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            ninja-build \
+            xvfb \
+            time \
+            valgrind
+
+      - name: Setup virtual display
+        run: |
+          export DISPLAY=:99
+          Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
+
+      - name: Configure CMake
+        run: |
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DENABLE_TESTING=ON
+
+      - name: Build performance tests
+        run: |
+          cmake --build build --target performance_benchmark
+
+      - name: Run performance benchmarks
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          cd build
+          ctest -R "PerformanceBenchmarks" --output-on-failure --verbose
+
+      - name: Upload performance results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-test-results
+          path: |
+            build/performance_results.json
+            build/performance_report.html
+
+  # End-to-end tests
+  e2e-tests:
+    runs-on: ubuntu-latest
+    if: contains(github.event.inputs.test_types, 'e2e') || github.event_name == 'schedule'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v3
+        with:
+          version: ${{ env.QT_VERSION }}
+          modules: 'qtnetworkauth qtwebsockets qtmultimedia'
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            ninja-build \
+            xvfb \
+            python3 \
+            python3-pip
+
+      - name: Setup Python environment
+        run: |
+          pip3 install pytest selenium
+
+      - name: Setup virtual display
+        run: |
+          export DISPLAY=:99
+          Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
+
+      - name: Configure and build
+        run: |
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=${{ env.CMAKE_BUILD_TYPE }}
+          cmake --build build
+
+      - name: Run E2E tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          cd modules/tests
+          python3 run_comprehensive_tests.py --types e2e --verbose
+
+      - name: Upload E2E test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: e2e-test-results
+          path: |
+            modules/tests/test_results/
+            modules/tests/screenshots/
+
+  # Comprehensive test runner
+  comprehensive-tests:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v3
+        with:
+          version: ${{ env.QT_VERSION }}
+          modules: 'qtnetworkauth qtwebsockets qtmultimedia'
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            ninja-build \
+            lcov \
+            gcovr \
+            xvfb \
+            python3 \
+            python3-pip
+
+      - name: Setup Python environment
+        run: |
+          pip3 install pytest selenium requests
+
+      - name: Setup virtual display
+        run: |
+          export DISPLAY=:99
+          Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
+
+      - name: Configure CMake
+        run: |
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=${{ env.CMAKE_BUILD_TYPE }} \
+            -DENABLE_COVERAGE=ON \
+            -DENABLE_TESTING=ON
+
+      - name: Build all tests
+        run: |
+          cmake --build build --target run_all_tests
+
+      - name: Run comprehensive test suite
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          cd modules/tests
+          python3 run_comprehensive_tests.py \
+            --types ${{ github.event.inputs.test_types || 'unit,integration,performance' }} \
+            --coverage \
+            --verbose
+
+      - name: Upload comprehensive results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: comprehensive-test-results
+          path: |
+            modules/tests/test_results/
+            build/coverage_html/
+
+  # Merge coverage reports
+  coverage-report:
+    runs-on: ubuntu-latest
+    needs: [unit-tests]
+    if: github.event.inputs.coverage_enabled == 'true' || github.event_name != 'workflow_dispatch'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install lcov
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lcov
+
+      - name: Download coverage artifacts
+        uses: actions/download-artifact@v3
+        with:
+          pattern: coverage-*
+          path: coverage-reports/
+
+      - name: Merge coverage reports
+        run: |
+          lcov --add-tracefile coverage-reports/coverage-*/coverage_*_filtered.info \
+               --output-file merged_coverage.info
+
+      - name: Generate HTML coverage report
+        run: |
+          genhtml merged_coverage.info --output-directory coverage_html \
+            --title "Jitsi Meet Qt Test Coverage" \
+            --show-details --legend
+
+      - name: Check coverage threshold
+        run: |
+          COVERAGE=$(lcov --summary merged_coverage.info | grep "lines" | grep -o '[0-9.]*%' | head -1 | sed 's/%//')
+          echo "Current coverage: $COVERAGE%"
+          echo "Threshold: ${{ env.COVERAGE_THRESHOLD }}%"
+          
+          if (( $(echo "$COVERAGE < ${{ env.COVERAGE_THRESHOLD }}" | bc -l) )); then
+            echo "Coverage $COVERAGE% is below threshold ${{ env.COVERAGE_THRESHOLD }}%"
+            exit 1
+          fi
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: merged_coverage.info
+          flags: unittests
+          name: jitsi-meet-qt-coverage
+
+      - name: Upload coverage HTML
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-html-report
+          path: coverage_html/
+
+  # Final status check
+  test-status:
+    runs-on: ubuntu-latest
+    needs: [unit-tests, integration-tests, performance-tests, coverage-report]
+    if: always()
+    
+    steps:
+      - name: Check test results
+        run: |
+          echo "Unit tests: ${{ needs.unit-tests.result }}"
+          echo "Integration tests: ${{ needs.integration-tests.result }}"
+          echo "Performance tests: ${{ needs.performance-tests.result }}"
+          echo "Coverage report: ${{ needs.coverage-report.result }}"
+          
+          if [ "${{ needs.unit-tests.result }}" != "success" ] || \
+             [ "${{ needs.integration-tests.result }}" != "success" ]; then
+            echo "Critical tests failed!"
+            exit 1
+          fi
+
+      - name: Notify on failure
+        if: failure() && (github.event_name == 'push' || github.event_name == 'schedule')
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          text: 'Jitsi Meet Qt tests failed on ${{ github.ref }}'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

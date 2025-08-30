@@ -1,0 +1,57 @@
+<RCC>
+    <qresource prefix="/meeting">
+        <!-- Icons -->
+        <file>icons/meeting.png</file>
+        <file>icons/join.png</file>
+        <file>icons/create.png</file>
+        <file>icons/leave.png</file>
+        <file>icons/invite.png</file>
+        <file>icons/settings.png</file>
+        <file>icons/audio-on.png</file>
+        <file>icons/audio-off.png</file>
+        <file>icons/video-on.png</file>
+        <file>icons/video-off.png</file>
+        <file>icons/screen-share.png</file>
+        <file>icons/chat.png</file>
+        <file>icons/participants.png</file>
+        <file>icons/lock.png</file>
+        <file>icons/unlock.png</file>
+        <file>icons/record.png</file>
+        
+        <!-- Quality Icons -->
+        <file>icons/quality/excellent.png</file>
+        <file>icons/quality/good.png</file>
+        <file>icons/quality/fair.png</file>
+        <file>icons/quality/poor.png</file>
+        
+        <!-- Styles -->
+        <file>styles/meeting.qss</file>
+        <file>styles/dark-theme.qss</file>
+        <file>styles/light-theme.qss</file>
+        <file>styles/components/meeting-widget.qss</file>
+        <file>styles/components/join-dialog.qss</file>
+        <file>styles/components/create-dialog.qss</file>
+        
+        <!-- Sounds -->
+        <file>sounds/join.wav</file>
+        <file>sounds/leave.wav</file>
+        <file>sounds/notification.wav</file>
+        <file>sounds/error.wav</file>
+        
+        <!-- Templates -->
+        <file>templates/meeting-templates.json</file>
+        <file>templates/invitation-templates/default.html</file>
+        <file>templates/invitation-templates/formal.html</file>
+        <file>templates/invitation-templates/casual.html</file>
+        <file>templates/config-templates/basic.json</file>
+        <file>templates/config-templates/advanced.json</file>
+        <file>templates/config-templates/enterprise.json</file>
+        
+        <!-- Data -->
+        <file>data/server-list.json</file>
+        <file>data/default-config.json</file>
+        <file>data/help/user-guide.html</file>
+        <file>data/help/troubleshooting.html</file>
+        <file>data/help/faq.html</file>
+    </qresource>
+</RCC>
