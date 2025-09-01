@@ -130,12 +130,12 @@ win32 {
     DEFINES += WIN32_PLATFORM
     RC_FILE = resources/app.rc
     # Fix MinGW linking issues
-    CONFIG += no_lflags_merge
+    CONFIG += console
     QMAKE_LFLAGS += -Wl,--allow-multiple-definition
-    # Explicitly exclude Qt6EntryPoint to avoid __imp___argc issue
+    # Remove problematic Qt6EntryPoint
     QMAKE_LIBS_QT_ENTRY_POINT =
-    # Ensure proper linking order for MinGW
-    LIBS += -lkernel32 -luser32 -lgdi32 -lwinspool -lcomdlg32 -ladvapi32 -lshell32 -lole32 -loleaut32 -luuid -lodbc32 -lodbccp32
+    # Add required Windows libraries
+    LIBS += -lkernel32 -luser32 -lgdi32 -ladvapi32 -lshell32
 }
 
 unix:!macx {
