@@ -1,4 +1,6 @@
 #include "../include/MediaManager.h"
+#include "../modules/audio/include/AudioManager.h"
+#include "../modules/camera/include/CameraManager.h"
 #include <QDebug>
 
 MediaManager::MediaManager(QObject *parent)
@@ -26,10 +28,20 @@ bool MediaManager::initialize()
     qDebug() << "Initializing MediaManager...";
     
     // Initialize audio manager
-    // m_audioManager = new AudioManager(this);
+    m_audioManager = new AudioManager(this);
+    if (!m_audioManager->initialize()) {
+        qWarning() << "Failed to initialize AudioManager";
+        delete m_audioManager;
+        m_audioManager = nullptr;
+    }
     
     // Initialize camera manager  
-    // m_cameraManager = new CameraManager(this);
+    m_cameraManager = new CameraManager(this);
+    if (!m_cameraManager->initialize()) {
+        qWarning() << "Failed to initialize CameraManager";
+        delete m_cameraManager;
+        m_cameraManager = nullptr;
+    }
     
     m_initialized = true;
     qDebug() << "MediaManager initialized successfully";
@@ -42,12 +54,15 @@ void MediaManager::cleanup()
     qDebug() << "Cleaning up MediaManager...";
     
     if (m_audioManager) {
-        // m_audioManager->cleanup();
+        m_audioManager->stopAudio();
+        delete m_audioManager;
         m_audioManager = nullptr;
     }
     
     if (m_cameraManager) {
-        // m_cameraManager->cleanup();
+        m_cameraManager->stopCamera();
+        m_cameraManager->cleanup();
+        delete m_cameraManager;
         m_cameraManager = nullptr;
     }
     

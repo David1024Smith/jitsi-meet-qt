@@ -20,19 +20,10 @@ set(CAMERA_SOURCES
     # Core camera files
     src/CameraModule.cpp
     src/CameraManager.cpp
-    src/VideoDevice.cpp
+    src/CameraFactory.cpp
     
-    # Capture
-    capture/VideoCapture.cpp
-    capture/CameraCapture.cpp
-    
-    # Processing
-    processing/VideoProcessor.cpp
-    processing/FrameProcessor.cpp
-    
-    # Effects
-    effects/VideoEffects.cpp
-    effects/FilterManager.cpp
+    # Utilities
+    utils/CameraUtils.cpp
 )
 
 # Header files
@@ -40,23 +31,13 @@ set(CAMERA_HEADERS
     # Core headers
     include/CameraModule.h
     include/CameraManager.h
-    include/VideoDevice.h
-    
-    # Capture headers
-    capture/VideoCapture.h
-    capture/CameraCapture.h
-    
-    # Processing headers
-    processing/VideoProcessor.h
-    processing/FrameProcessor.h
-    
-    # Effects headers
-    effects/VideoEffects.h
-    effects/FilterManager.h
     
     # Interface headers
     interfaces/ICameraManager.h
-    interfaces/IVideoDevice.h
+    interfaces/ICameraDevice.h
+    
+    # Utilities
+    utils/CameraUtils.h
 )
 
 # Create the camera library

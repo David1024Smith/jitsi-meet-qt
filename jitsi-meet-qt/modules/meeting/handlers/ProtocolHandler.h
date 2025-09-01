@@ -297,6 +297,13 @@ private:
     QVariantMap parseJitsiProtocol(const QString& url);
 
     /**
+     * @brief 解析Jitsi Meet深度链接协议URL
+     * @param url 协议URL
+     * @return 解析结果
+     */
+    QVariantMap parseJitsiMeetProtocol(const QString& url);
+
+    /**
      * @brief 解析Meet协议URL
      * @param url 协议URL
      * @return 解析结果

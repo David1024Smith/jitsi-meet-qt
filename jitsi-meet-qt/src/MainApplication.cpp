@@ -1,10 +1,11 @@
 #include "../include/MainApplication.h"
-#include "ProtocolHandler.h"
+#include "../modules/meeting/handlers/ProtocolHandler.h"
 #include "../include/WindowManager.h"
 #include "TranslationManager.h"
 #include "ConfigurationManager.h"
 #include "ConferenceManager.h"
 #include "MediaManager.h"
+#include <QUrlQuery>
 // #include "ChatManager.h" // 暂时禁用聊天功能
 // #include "../modules/screenshare/include/ScreenShareManager.h" // 使用模块化版本
 #include "AuthenticationManager.h"
@@ -150,7 +151,8 @@ MainApplication::~MainApplication() {
     }
     
     if (m_protocolHandler) {
-        m_protocolHandler->unregisterProtocol();
+        m_protocolHandler->unregisterProtocol("jitsi-meet");
+        m_protocolHandler->unregisterProtocol("jitsi");
         delete m_protocolHandler;
         m_protocolHandler = nullptr;
     }
@@ -332,15 +334,29 @@ void MainApplication::initializeProtocolHandler() {
         m_protocolHandler = new ProtocolHandler(this);
         
         // Connect protocol handler signals
-        connect(m_protocolHandler, &ProtocolHandler::protocolUrlReceived,
-                this, &MainApplication::onProtocolUrlReceived);
+        connect(m_protocolHandler, &ProtocolHandler::protocolCalled,
+                this, [this](const QString& protocolUrl, const QVariantMap& /*parameters*/) {
+                    this->onProtocolUrlReceived(protocolUrl);
+                });
+        connect(m_protocolHandler, &ProtocolHandler::errorOccurred,
+                this, [](const QString& error) {
+                    qWarning() << "Protocol handler error:" << error;
+                });
         
-        // Register the protocol
-        bool registered = m_protocolHandler->registerProtocol();
+        // Register jitsi-meet protocol
+        bool registered = m_protocolHandler->registerProtocol("jitsi-meet");
         if (registered) {
-            qDebug() << "Protocol handler registered successfully";
+            qDebug() << "jitsi-meet protocol registered successfully";
         } else {
-            qWarning() << "Failed to register protocol handler";
+            qWarning() << "Failed to register jitsi-meet protocol";
+        }
+        
+        // Also register jitsi protocol for compatibility
+        bool jitsiRegistered = m_protocolHandler->registerProtocol("jitsi");
+        if (jitsiRegistered) {
+            qDebug() << "jitsi protocol registered successfully";
+        } else {
+            qWarning() << "Failed to register jitsi protocol";
         }
     }
 }
@@ -361,9 +377,32 @@ void MainApplication::onProtocolUrlReceived(const QString& url) {
     qDebug() << "Protocol URL received:" << url;
     
     if (m_protocolHandler) {
-        QString parsedUrl = m_protocolHandler->parseProtocolUrl(url);
-        if (!parsedUrl.isEmpty()) {
-            emit protocolUrlReceived(parsedUrl);
+        // 处理协议URL并获取解析结果
+        QVariantMap result = m_protocolHandler->handleProtocolCall(url);
+        
+        if (result.value("valid", false).toBool()) {
+            // 构建标准URL用于会议连接
+            QString server = result.value("server", "meet.jit.si").toString();
+            QString room = result.value("room").toString();
+            
+            if (!room.isEmpty()) {
+                QString standardUrl = QString("https://%1/%2").arg(server, room);
+                
+                // 添加查询参数
+                QVariantMap params = result.value("parameters").toMap();
+                if (!params.isEmpty()) {
+                    QUrlQuery query;
+                    for (auto it = params.begin(); it != params.end(); ++it) {
+                        query.addQueryItem(it.key(), it.value().toString());
+                    }
+                    standardUrl += "?" + query.toString();
+                }
+                
+                qDebug() << "Converted protocol URL to standard URL:" << standardUrl;
+                emit protocolUrlReceived(standardUrl);
+            } else {
+                qWarning() << "No room name found in protocol URL:" << url;
+            }
         } else {
             qWarning() << "Failed to parse protocol URL:" << url;
         }

@@ -218,6 +218,9 @@ QVariantMap ProtocolHandler::parseProtocolUrl(const QString& protocolUrl)
     if (protocol == "jitsi") {
         QVariantMap jitsiData = parseJitsiProtocol(protocolUrl);
         result["jitsiData"] = jitsiData;
+    } else if (protocol == "jitsi-meet") {
+        QVariantMap jitsiMeetData = parseJitsiMeetProtocol(protocolUrl);
+        result["jitsiMeetData"] = jitsiMeetData;
     } else if (protocol == "meet") {
         QVariantMap meetData = parseMeetProtocol(protocolUrl);
         result["meetData"] = meetData;
@@ -420,6 +423,7 @@ void ProtocolHandler::initializeSupportedProtocols()
     // Initialize default protocols
     d->protocolDescriptions.clear();
     d->protocolDescriptions["jitsi"] = "Jitsi Meet Protocol";
+    d->protocolDescriptions["jitsi-meet"] = "Jitsi Meet Deep Link Protocol";
     d->protocolDescriptions["meet"] = "Generic Meeting Protocol";
     d->protocolDescriptions["conference"] = "Conference Protocol";
     
@@ -572,6 +576,139 @@ QVariantMap ProtocolHandler::parseJitsiProtocol(const QString& url)
         }
         
         result["parameters"] = params;
+    }
+    
+    return result;
+}
+
+QVariantMap ProtocolHandler::parseJitsiMeetProtocol(const QString& url)
+{
+    QVariantMap result;
+    
+    // 支持多种jitsi-meet://协议格式
+    // 格式1: jitsi-meet://meet.jit.si/roomname
+    // 格式2: jitsi-meet://roomname (默认服务器)
+    // 格式3: jitsi-meet://server/roomname?params#config
+    
+    QRegularExpression pattern(R"(^jitsi-meet:\/\/([^\/\?#]+)(?:\/([^\/\?#]+))?(?:\?([^#]*))?(?:#(.*))?$)");
+    QRegularExpressionMatch match = pattern.match(url);
+    
+    if (!match.hasMatch()) {
+        result["valid"] = false;
+        result["error"] = "Invalid jitsi-meet protocol URL format";
+        return result;
+    }
+    
+    result["valid"] = true;
+    
+    QString firstPart = match.captured(1);
+    QString secondPart = match.captured(2);
+    QString queryString = match.captured(3);
+    QString fragment = match.captured(4);
+    
+    // 判断URL格式
+    if (secondPart.isEmpty()) {
+        // 格式: jitsi-meet://roomname 或 jitsi-meet://server
+        if (firstPart.contains('.')) {
+            // 包含点号，可能是服务器地址
+            result["server"] = firstPart;
+            result["room"] = "";
+        } else {
+            // 纯房间名，使用默认服务器
+            result["server"] = "meet.jit.si";
+            result["room"] = firstPart;
+        }
+    } else {
+        // 格式: jitsi-meet://server/roomname
+        result["server"] = firstPart;
+        result["room"] = secondPart;
+    }
+    
+    // 解析查询参数
+    if (!queryString.isEmpty()) {
+        QUrlQuery query(queryString);
+        QVariantMap params;
+        
+        for (const auto& item : query.queryItems()) {
+            QString key = item.first;
+            QString value = item.second;
+            
+            // 处理Jitsi Meet特定参数
+            if (key == "jwt") {
+                params["authToken"] = value;
+            } else if (key.startsWith("config.")) {
+                // 配置参数
+                QString configKey = key.mid(7); // 移除"config."前缀
+                if (configKey == "startWithAudioMuted") {
+                    params["audioMuted"] = (value.toLower() == "true");
+                } else if (configKey == "startWithVideoMuted") {
+                    params["videoMuted"] = (value.toLower() == "true");
+                } else if (configKey == "prejoinPageEnabled") {
+                    params["prejoinEnabled"] = (value.toLower() == "true");
+                } else if (configKey == "requireDisplayName") {
+                    params["requireDisplayName"] = (value.toLower() == "true");
+                } else {
+                    params[configKey] = value;
+                }
+            } else if (key.startsWith("interfaceConfig.")) {
+                // 界面配置参数
+                QString interfaceKey = key.mid(16); // 移除"interfaceConfig."前缀
+                params[interfaceKey] = value;
+            } else {
+                params[key] = value;
+            }
+        }
+        
+        result["parameters"] = params;
+    }
+    
+    // 解析片段配置
+    if (!fragment.isEmpty()) {
+        QVariantMap fragmentConfig;
+        
+        // 片段可能包含JSON配置或简单的键值对
+        if (fragment.startsWith("{") && fragment.endsWith("}")) {
+            // JSON格式配置
+            QJsonParseError error;
+            QJsonDocument doc = QJsonDocument::fromJson(fragment.toUtf8(), &error);
+            if (error.error == QJsonParseError::NoError && doc.isObject()) {
+                QJsonObject obj = doc.object();
+                for (auto it = obj.begin(); it != obj.end(); ++it) {
+                    fragmentConfig[it.key()] = it.value().toVariant();
+                }
+            }
+        } else {
+            // 简单键值对格式: key1=value1&key2=value2
+            QUrlQuery fragmentQuery(fragment);
+            for (const auto& item : fragmentQuery.queryItems()) {
+                fragmentConfig[item.first] = item.second;
+            }
+        }
+        
+        if (!fragmentConfig.isEmpty()) {
+            result["fragmentConfig"] = fragmentConfig;
+        }
+    }
+    
+    // 构建标准URL
+    QString server = result["server"].toString();
+    QString room = result["room"].toString();
+    if (!server.isEmpty() && !room.isEmpty()) {
+        QString standardUrl = QString("https://%1/%2").arg(server, room);
+        
+        // 添加查询参数到标准URL
+        if (result.contains("parameters")) {
+            QVariantMap params = result["parameters"].toMap();
+            if (!params.isEmpty()) {
+                QUrlQuery urlQuery;
+                for (auto it = params.begin(); it != params.end(); ++it) {
+                    urlQuery.addQueryItem(it.key(), it.value().toString());
+                }
+                standardUrl += "?" + urlQuery.toString();
+            }
+        }
+        
+        result["standardUrl"] = standardUrl;
     }
     
     return result;

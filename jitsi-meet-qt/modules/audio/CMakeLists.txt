@@ -20,17 +20,13 @@ set(AUDIO_SOURCES
     # Core audio files
     src/AudioModule.cpp
     src/AudioManager.cpp
-    src/AudioDevice.cpp
+    src/AudioFactory.cpp
     
-    # Processing
-    processing/AudioProcessor.cpp
-    processing/NoiseReduction.cpp
-    processing/EchoCancel.cpp
+    # Platform specific
+    src/platform/QtAudioDevice.cpp
     
-    # Devices
-    devices/InputDevice.cpp
-    devices/OutputDevice.cpp
-    devices/DeviceManager.cpp
+    # Config files
+    config/AudioConfig.cpp
 )
 
 # Header files
@@ -38,17 +34,13 @@ set(AUDIO_HEADERS
     # Core headers
     include/AudioModule.h
     include/AudioManager.h
-    include/AudioDevice.h
+    include/AudioFactory.h
     
-    # Processing headers
-    processing/AudioProcessor.h
-    processing/NoiseReduction.h
-    processing/EchoCancel.h
+    # Config headers
+    config/AudioConfig.h
     
-    # Device headers
-    devices/InputDevice.h
-    devices/OutputDevice.h
-    devices/DeviceManager.h
+    # Platform specific
+    src/platform/QtAudioDevice.h
     
     # Interface headers
     interfaces/IAudioManager.h

@@ -56,13 +56,22 @@ QVariantMap URLHandler::parseURL(const QString& url)
     case JitsiProtocol:
         result = parseJitsiProtocolURL(url);
         break;
+    case JitsiMeetProtocol:
+        result = handleDeepLink(url);
+        break;
+    case PlainRoomName:
+        result["valid"] = true;
+        result["type"] = static_cast<int>(PlainRoomName);
+        result["server"] = d->defaultServer;
+        result["roomName"] = url.trimmed();
+        result["parameters"] = QVariantMap();
+        break;
     case CustomURL:
         result = parseCustomURL(url);
         break;
-    case InvalidURL:
     default:
         result["valid"] = false;
-        result["error"] = "Invalid URL format";
+        result["error"] = "Unsupported URL type";
         break;
     }
     
@@ -90,6 +99,12 @@ bool URLHandler::validateURL(const QString& url)
         case JitsiProtocol:
             valid = d->jitsiProtocolPattern.match(url).hasMatch();
             break;
+        case JitsiMeetProtocol:
+            valid = url.startsWith("jitsi-meet://") && url.length() > 13;
+            break;
+        case PlainRoomName:
+            valid = validateRoomName(url.trimmed());
+            break;
         case CustomURL:
             // Check against custom patterns
             for (const auto& pattern : d->customPatterns) {
@@ -115,7 +130,12 @@ URLHandler::URLType URLHandler::getURLType(const QString& url)
         return InvalidURL;
     }
     
-    // Check for protocol URLs first
+    // Check for jitsi-meet:// protocol URLs first
+    if (url.startsWith("jitsi-meet://")) {
+        return JitsiMeetProtocol;
+    }
+    
+    // Check for other protocol URLs
     if (d->jitsiProtocolPattern.match(url).hasMatch()) {
         return JitsiProtocol;
     }
@@ -124,6 +144,11 @@ URLHandler::URLType URLHandler::getURLType(const QString& url)
     QUrl qurl(url);
     if (qurl.scheme() == "https" || qurl.scheme() == "http") {
         return JitsiMeetURL;
+    }
+    
+    // Check if it's a plain room name (no protocol, no dots)
+    if (!url.contains("://") && !url.contains(".") && !url.contains("/")) {
+        return PlainRoomName;
     }
     
     // Check custom patterns
@@ -379,6 +404,10 @@ void URLHandler::initializePatterns()
     // Initialize built-in patterns
     d->jitsiMeetPattern.setPattern(R"(^https?://([^/]+)/([^/?#]+)(?:\?([^#]*))?(?:#(.*))?$)");
     d->jitsiProtocolPattern.setPattern(R"(^(jitsi|meet|conference)://([^/]+)/([^/?#]+)(?:\?([^#]*))?(?:#(.*))?$)");
+    
+    // Add jitsi-meet:// protocol pattern
+    QRegularExpression jitsiMeetProtocolPattern(R"(^jitsi-meet://([^/]+)/([^/?#]+)(?:\?([^#]*))?(?:#(.*))?$)");
+    d->customPatterns["jitsi-meet-protocol"] = jitsiMeetProtocolPattern;
 }
 
 QVariantMap URLHandler::parseJitsiMeetURL(const QUrl& url)
@@ -519,4 +548,107 @@ QVariantMap URLHandler::matchPattern(const QString& url, const QRegularExpressio
     }
     
     return result;
+}
+
+QVariantMap URLHandler::parseFragmentConfig(const QString& fragment)
+{
+    QVariantMap config;
+    
+    if (fragment.isEmpty()) {
+        return config;
+    }
+    
+    // 解析类似 "config.p2p.enabled=false&config.startWithAudioMuted=true" 的片段
+    QStringList pairs = fragment.split('&');
+    
+    for (const QString& pair : pairs) {
+        QStringList keyValue = pair.split('=');
+        if (keyValue.size() == 2) {
+            QString key = keyValue[0].trimmed();
+            QString value = keyValue[1].trimmed();
+            
+            // 处理嵌套配置（如 config.p2p.enabled）
+            QStringList keyParts = key.split('.');
+            QVariantMap* currentMap = &config;
+            
+            for (int i = 0; i < keyParts.size() - 1; ++i) {
+                QString part = keyParts[i];
+                if (!currentMap->contains(part)) {
+                    currentMap->insert(part, QVariantMap());
+                }
+                QVariant& variant = (*currentMap)[part];
+                currentMap = reinterpret_cast<QVariantMap*>(&variant);
+            }
+            
+            // 设置最终值
+            QString finalKey = keyParts.last();
+            if (value.toLower() == "true") {
+                currentMap->insert(finalKey, true);
+            } else if (value.toLower() == "false") {
+                currentMap->insert(finalKey, false);
+            } else {
+                bool ok;
+                int intValue = value.toInt(&ok);
+                if (ok) {
+                    currentMap->insert(finalKey, intValue);
+                } else {
+                    currentMap->insert(finalKey, value);
+                }
+            }
+        }
+    }
+    
+    return config;
+}
+
+QVariantMap URLHandler::handleDeepLink(const QString& url)
+{
+    QVariantMap result;
+    
+    if (!url.startsWith("jitsi-meet://")) {
+        result["valid"] = false;
+        result["error"] = "Not a jitsi-meet:// deep link";
+        return result;
+    }
+    
+    // 移除协议前缀
+    QString cleanUrl = url.mid(13); // 移除 "jitsi-meet://"
+    
+    // 解析格式: server/room?params#config
+    QRegularExpression deepLinkPattern(R"(^([^/]+)/([^?#]+)(?:\?([^#]*))?(?:#(.*))?$)");
+    QRegularExpressionMatch match = deepLinkPattern.match(cleanUrl);
+    
+    if (!match.hasMatch()) {
+        result["valid"] = false;
+        result["error"] = "Invalid deep link format";
+        return result;
+    }
+    
+    result["valid"] = true;
+    result["type"] = static_cast<int>(JitsiMeetProtocol);
+    result["server"] = match.captured(1);
+    result["roomName"] = match.captured(2);
+    
+    // 解析查询参数
+    if (match.capturedLength(3) > 0) {
+        QUrlQuery query(match.captured(3));
+        QVariantMap params;
+        for (const auto& item : query.queryItems()) {
+            params[item.first] = item.second;
+        }
+        result["parameters"] = params;
+    }
+    
+    // 解析片段配置
+    if (match.capturedLength(4) > 0) {
+        result["config"] = parseFragmentConfig(match.captured(4));
+    }
+    
+    return result;
+}
+
+bool URLHandler::isSupportedFormat(const QString& url)
+{
+    URLType type = getURLType(url);
+    return type != InvalidURL;
 }

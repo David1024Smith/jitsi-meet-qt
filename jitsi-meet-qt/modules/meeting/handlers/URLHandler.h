@@ -21,10 +21,12 @@ public:
      * @brief URL类型枚举
      */
     enum URLType {
-        JitsiMeetURL,    ///< Jitsi Meet标准URL
-        JitsiProtocol,   ///< Jitsi协议URL
-        CustomURL,       ///< 自定义URL
-        InvalidURL       ///< 无效URL
+        JitsiMeetURL,      ///< Jitsi Meet标准URL (https://meet.jit.si/room)
+        JitsiProtocol,     ///< Jitsi协议URL (jitsi-meet://meet.jit.si/room)
+        JitsiMeetProtocol, ///< Jitsi Meet协议URL (jitsi-meet://)
+        CustomURL,         ///< 自定义URL
+        PlainRoomName,     ///< 纯房间名（使用默认服务器）
+        InvalidURL         ///< 无效URL
     };
     Q_ENUM(URLType)
 
@@ -87,6 +89,27 @@ public:
      * @return 参数映射
      */
     QVariantMap extractParameters(const QString& url);
+
+    /**
+     * @brief 解析URL片段中的配置参数
+     * @param fragment URL片段字符串
+     * @return 配置参数映射
+     */
+    QVariantMap parseFragmentConfig(const QString& fragment);
+
+    /**
+     * @brief 处理深度链接URL
+     * @param url 深度链接URL
+     * @return 处理结果映射
+     */
+    QVariantMap handleDeepLink(const QString& url);
+
+    /**
+     * @brief 支持的URL格式检查
+     * @param url URL字符串
+     * @return 是否为支持的格式
+     */
+    bool isSupportedFormat(const QString& url);
 
     /**
      * @brief 构建会议URL

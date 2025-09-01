@@ -100,8 +100,8 @@ add_subdirectory(modules/performance)
 add_subdirectory(modules/screenshare)
 add_subdirectory(modules/utils)
 # add_subdirectory(modules/ui)
-# add_subdirectory(modules/audio)
-# add_subdirectory(modules/camera)
+add_subdirectory(modules/audio)
+add_subdirectory(modules/camera)
 
 # Source files - only include existing files
 set(SOURCES
@@ -117,7 +117,6 @@ set(SOURCES
     src/WelcomeWindow.cpp
     src/ConferenceWindow.cpp
     src/SettingsDialog.cpp
-    src/ProtocolHandler.cpp
     src/TranslationManager.cpp
     src/NavigationBar.cpp
     src/RecentListWidget.cpp
@@ -134,6 +133,7 @@ set(SOURCES
     src/ErrorEventBus.cpp
     src/WindowStateManager.cpp
     src/ModuleError.cpp
+    modules/meeting/handlers/ProtocolHandler.cpp
 )
 
 # Header files - only existing files
@@ -149,7 +149,6 @@ set(HEADERS
     include/WelcomeWindow.h
     include/ConferenceWindow.h
     include/SettingsDialog.h
-    include/ProtocolHandler.h
     include/TranslationManager.h
     include/NavigationBar.h
     include/RecentListWidget.h
@@ -213,8 +212,8 @@ target_link_libraries(${PROJECT_NAME}
     # NetworkModule
     PerformanceModule
     # UIModule
-    # AudioModule
-    # CameraModule
+    AudioModule
+    CameraModule
 )
 
 # Add OpenSSL if found - temporarily disabled due to library path issues
@@ -382,6 +381,41 @@ if(BUILD_THEME_TEST)
     
     set_target_properties(test_theme_resources PROPERTIES
         WIN32_EXECUTABLE TRUE
+    )
+endif()
+
+# Protocol Handler Test
+if(BUILD_PROTOCOL_TEST)
+    add_executable(test_protocol_handler
+        test_protocol_handler.cpp
+        modules/meeting/handlers/ProtocolHandler.cpp
+    )
+    
+    target_link_libraries(test_protocol_handler
+        Qt6::Core
+        Qt6::Widgets
+        Qt6::Network
+    )
+    
+    set_target_properties(test_protocol_handler PROPERTIES
+        WIN32_EXECUTABLE FALSE
+    )
+endif()
+
+# Enhanced URL Parsing Test
+if(BUILD_URL_TEST)
+    add_executable(test_enhanced_url_parsing
+        test_enhanced_url_parsing.cpp
+        modules/meeting/handlers/URLHandler.cpp
+    )
+    
+    target_link_libraries(test_enhanced_url_parsing
+        Qt6::Core
+        Qt6::Network
+    )
+    
+    set_target_properties(test_enhanced_url_parsing PROPERTIES
+        WIN32_EXECUTABLE FALSE
     )
 endif()
 
