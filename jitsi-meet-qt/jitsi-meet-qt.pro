@@ -8,7 +8,7 @@ TARGET = jitsi-meet-qt
 INCLUDEPATH += . include
 
 # Qt Configuration
-QT += core widgets multimedia multimediawidgets network concurrent websockets xml
+QT += core widgets multimedia multimediawidgets network concurrent websockets xml sql charts
 
 # Compiler Configuration
 CONFIG += c++17
@@ -72,7 +72,6 @@ SOURCES += src/AuthenticationManager.cpp \
            src/ModuleError.cpp \
            src/NavigationBar.cpp \
            src/OptimizedRecentManager.cpp \
-           src/ProtocolHandler.cpp \
            src/RecentListWidget.cpp \
            src/SettingsDialog.cpp \
            src/StyleHelper.cpp \
@@ -84,7 +83,8 @@ SOURCES += src/AuthenticationManager.cpp \
            src/WindowStateManager.cpp \
            src/XMPPClient.cpp \
            src/models/ApplicationSettings.cpp \
-           src/models/RecentItem.cpp
+           src/models/RecentItem.cpp \
+           modules/meeting/handlers/ProtocolHandler.cpp
 
 # Updated Examples (Using Modular APIs) - Temporarily disabled
 # SOURCES += examples/complete_integration_test.cpp \

@@ -105,25 +105,27 @@ exists($$PWD/screenshare/screenshare.pri) {
 # Communication Modules (通信相关模块)
 ######################################################################
 
-# 7. 网络模块 (Network) - 网络通信
-exists($$PWD/network/network.pri) {
-    include($$PWD/network/network.pri)
-    message("✓ Network module loaded")
-    DEFINES += NETWORK_MODULE_AVAILABLE
-    CONFIG += network_module_loaded
-} else {
-    message("○ Network module not found - will be created")
-}
+# 7. 网络模块 (Network) - 网络通信 (DISABLED - matches CMakeLists.txt)
+# exists($$PWD/network/network.pri) {
+#     include($$PWD/network/network.pri)
+#     message("✓ Network module loaded")
+#     DEFINES += NETWORK_MODULE_AVAILABLE
+#     CONFIG += network_module_loaded
+# } else {
+#     message("○ Network module not found - will be created")
+# }
+message("○ Network module disabled (matches CMakeLists.txt configuration)")
 
-# 8. 聊天模块 (Chat) - 消息处理
-exists($$PWD/chat/chat.pri) {
-    include($$PWD/chat/chat.pri)
-    message("✓ Chat module loaded")
-    DEFINES += CHAT_MODULE_AVAILABLE
-    CONFIG += chat_module_loaded
-} else {
-    message("○ Chat module not found - will be created")
-}
+# 8. 聊天模块 (Chat) - 消息处理 (DISABLED - matches CMakeLists.txt)
+# exists($$PWD/chat/chat.pri) {
+#     include($$PWD/chat/chat.pri)
+#     message("✓ Chat module loaded")
+#     DEFINES += CHAT_MODULE_AVAILABLE
+#     CONFIG += chat_module_loaded
+# } else {
+#     message("○ Chat module not found - will be created")
+# }
+message("○ Chat module disabled (matches CMakeLists.txt configuration)")
 
 # 9. 会议模块 (Meeting) - 会议管理
 exists($$PWD/meeting/meeting.pri) {

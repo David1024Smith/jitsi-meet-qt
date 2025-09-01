@@ -173,7 +173,7 @@ bool ChatManager::initialize(const QVariantMap& config)
         // 连接消息处理器信号
         connect(d->messageHandler, &MessageHandler::messageProcessed,
                 this, [this](ChatMessage* message, MessageHandler::ProcessingResult result) {
-                    if (result == IMessageHandler::Success) {
+                    if (result == MessageHandler::Success) {
                         emit messageReceived(message);
                     }
                 });
