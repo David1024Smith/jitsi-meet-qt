@@ -50,14 +50,14 @@ class VersionManager:
                 "performance": "2.0.0",
                 "settings": "2.0.0",
                 "utils": "2.0.0",
-                "compatibility": "2.0.0"
+
             },
             "dependencies": {
                 "qt_version": self._get_qt_version(),
                 "cmake_version": self._get_cmake_version(),
                 "compiler": self._get_compiler_info()
             },
-            "compatibility": {
+            "system": {
                 "min_supported_version": "1.0.0",
                 "config_version": "2.0.0",
                 "api_version": "2.0.0"
@@ -347,7 +347,7 @@ class VersionManager:
             compatibility_info["errors"].append(f"不支持降级到较低主版本 ({current_major} → {target_major})")
             
         # 检查模块兼容性
-        min_supported = current_version.get("compatibility", {}).get("min_supported_version", "1.0.0")
+        min_supported = current_version.get("system", {}).get("min_supported_version", "1.0.0")
         if self._version_compare(target_version, min_supported) < 0:
             compatibility_info["compatible"] = False
             compatibility_info["errors"].append(f"目标版本 {target_version} 低于最低支持版本 {min_supported}")

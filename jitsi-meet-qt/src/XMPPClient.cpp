@@ -596,12 +596,10 @@ void XMPPClient::onWebSocketMessageReceived(const QString& message)
 
     // 解析XML消息
     QDomDocument doc;
-    QString errorMsg;
-    int errorLine, errorColumn;
-    
-    if (!doc.setContent(message, &errorMsg, &errorLine, &errorColumn)) {
-        qWarning() << "Failed to parse XML message:" << errorMsg 
-                   << "at line" << errorLine << "column" << errorColumn;
+    auto parseResult = doc.setContent(message);
+    if (!parseResult) {
+        qWarning() << "Failed to parse XML message:" << parseResult.errorMessage 
+                   << "at line" << parseResult.errorLine << "column" << parseResult.errorColumn;
         return;
     }
 

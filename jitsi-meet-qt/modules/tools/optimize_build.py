@@ -43,7 +43,7 @@ class BuildOptimizer:
             "module_build_order": [
                 "utils", "settings", "performance", "core",
                 "camera", "audio", "network", "screenshare",
-                "chat", "meeting", "ui", "compatibility"
+                "chat", "meeting", "ui"
             ]
         }
         
@@ -201,7 +201,7 @@ class BuildOptimizer:
             "chat": ["network", "utils"],
             "meeting": ["network", "utils"],
             "ui": ["settings"],
-            "compatibility": ["utils"]
+
         }
         
         return dependencies

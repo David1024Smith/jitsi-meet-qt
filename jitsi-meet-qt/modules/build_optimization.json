@@ -18,8 +18,7 @@
     "screenshare",
     "chat",
     "meeting",
-    "ui",
-    "compatibility"
+    "ui"
   ],
   "compiler_optimizations": {
     "gcc": {

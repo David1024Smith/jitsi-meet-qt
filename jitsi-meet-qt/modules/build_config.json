@@ -69,11 +69,7 @@
       "required": false,
       "description": "Meeting management"
     },
-    "compatibility": {
-      "enabled": true,
-      "required": false,
-      "description": "Legacy compatibility layer"
-    }
+
   },
   "features": {
     "advanced_audio": {

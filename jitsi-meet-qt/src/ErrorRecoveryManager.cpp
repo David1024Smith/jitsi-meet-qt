@@ -455,7 +455,7 @@ ErrorRecoveryManager::RecoveryResult ErrorRecoveryManager::handleConfigurationEr
     return result;
 }
 
-ErrorRecoveryManager::RecoveryResult ErrorRecoveryManager::handleProtocolErrorInternal(const JitsiError& error)
+ErrorRecoveryManager::RecoveryResult ErrorRecoveryManager::handleProtocolErrorInternal(const JitsiError& /* error */)
 {
     RecoveryResult result;
     result.strategy = RecoveryStrategy::Fallback;

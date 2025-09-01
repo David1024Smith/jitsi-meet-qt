@@ -222,21 +222,7 @@ ENABLE_EXPERIMENTAL_FEATURES = $$(JITSI_EXPERIMENTAL_FEATURES)
     }
 }
 
-######################################################################
-# Compatibility Module (兼容性模块，用于安全重构)
-######################################################################
 
-# 11. 兼容性模块 (Compatibility) - 兼容性适配器系统
-!contains(DISABLED_MODULES, compatibility) {
-    exists($PWD/compatibility/compatibility.pri) {
-        include($PWD/compatibility/compatibility.pri)
-        message("✓ Compatibility module loaded")
-        DEFINES += COMPATIBILITY_MODULE_AVAILABLE
-        CONFIG += compatibility_module_loaded
-    } else {
-        message("○ Compatibility module not found - will be created")
-    }
-}
 
 ######################################################################
 # Module Dependency Validation (Enhanced)
@@ -311,7 +297,7 @@ settings_module_loaded: loaded_modules = $num_add($loaded_modules, 1)
 chat_module_loaded: loaded_modules = $num_add($loaded_modules, 1)
 screenshare_module_loaded: loaded_modules = $num_add($loaded_modules, 1)
 meeting_module_loaded: loaded_modules = $num_add($loaded_modules, 1)
-compatibility_module_loaded: loaded_modules = $num_add($loaded_modules, 1)
+
 core_module_loaded: loaded_modules = $num_add($loaded_modules, 1)
 
 message("Loaded modules: $loaded_modules/12")

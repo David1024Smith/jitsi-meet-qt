@@ -153,15 +153,7 @@ exists($$PWD/ui/ui.pri) {
 # Compatibility Module (兼容性模块，用于安全重构)
 ######################################################################
 
-# 11. 兼容性模块 (Compatibility) - 兼容性适配器系统
-exists($PWD/compatibility/compatibility.pri) {
-    include($PWD/compatibility/compatibility.pri)
-    message("✓ Compatibility module loaded")
-    DEFINES += COMPATIBILITY_MODULE_AVAILABLE
-    CONFIG += compatibility_module_loaded
-} else {
-    message("○ Compatibility module not found - will be created")
-}
+
 
 ######################################################################
 # Module Dependency Validation
