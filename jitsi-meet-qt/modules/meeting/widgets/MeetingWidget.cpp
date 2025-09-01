@@ -31,6 +31,8 @@
 #include <QStyleOption>
 #include <QPainter>
 #include <QDebug>
+#include <QClipboard>
+#include <QApplication>
 
 class MeetingWidget::Private
 {
@@ -616,4 +618,228 @@ void MeetingWidget::paintEvent(QPaintEvent* event)
     style()->drawPrimitive(QStyle::PE_Widget, &opt, &p, this);
     
     QWidget::paintEvent(event);
+}
+
+/**
+ * @brief 停止加载动画
+ */
+void MeetingWidget::stopLoading()
+{
+    setLoading(false);
+}
+
+/**
+ * @brief 开始加载动画
+ */
+void MeetingWidget::startLoading()
+{
+    setLoading(true, tr("Loading..."));
+}
+
+/**
+ * @brief 显示状态信息
+ * @param status 状态信息
+ */
+void MeetingWidget::showStatus(const QString& status)
+{
+    if (d->statusLabel) {
+        d->statusLabel->setText(status);
+    }
+}
+
+/**
+ * @brief 显示错误信息
+ * @param error 错误信息
+ */
+void MeetingWidget::showError(const QString& error)
+{
+    if (d->statusLabel) {
+        d->statusLabel->setText(tr("Error: %1").arg(error));
+        d->statusLabel->setStyleSheet("color: red;");
+        
+        // 3秒后恢复正常状态
+        QTimer::singleShot(3000, this, [this]() {
+            d->statusLabel->setStyleSheet("");
+            d->statusLabel->setText(tr("Ready"));
+        });
+    }
+    
+    // 同时显示消息框
+    QMessageBox::warning(this, tr("Error"), error);
+}
+
+/**
+ * @brief 显示会议信息
+ * @param meetingInfo 会议信息映射
+ */
+void MeetingWidget::showMeetingInfo(const QVariantMap& meetingInfo)
+{
+    if (!d->infoLabel) {
+        return;
+    }
+    
+    QString name = meetingInfo.value("name").toString();
+    QString url = meetingInfo.value("url").toString();
+    QString status = meetingInfo.value("status").toString();
+    int participantCount = meetingInfo.value("participantCount", 0).toInt();
+    QString duration = meetingInfo.value("duration").toString();
+    
+    QString infoText;
+    if (!name.isEmpty()) {
+        infoText += tr("Meeting: %1").arg(name) + "\n";
+    }
+    if (!url.isEmpty()) {
+        infoText += tr("URL: %1").arg(url) + "\n";
+    }
+    if (!status.isEmpty()) {
+        infoText += tr("Status: %1").arg(status) + "\n";
+    }
+    if (participantCount > 0) {
+        infoText += tr("Participants: %1").arg(participantCount) + "\n";
+    }
+    if (!duration.isEmpty()) {
+        infoText += tr("Duration: %1").arg(duration);
+    }
+    
+    if (infoText.isEmpty()) {
+        infoText = tr("No meeting information available");
+    }
+    
+    d->infoLabel->setText(infoText);
+    
+    // 更新其他UI元素
+    if (d->meetingTitleLabel && !name.isEmpty()) {
+        d->meetingTitleLabel->setText(name);
+    }
+    if (d->meetingUrlLabel && !url.isEmpty()) {
+        d->meetingUrlLabel->setText(tr("URL: %1").arg(url));
+    }
+    if (d->meetingStatusLabel && !status.isEmpty()) {
+        d->meetingStatusLabel->setText(tr("Status: %1").arg(status));
+    }
+    if (d->participantCountLabel && participantCount > 0) {
+        d->participantCountLabel->setText(tr("Participants: %1").arg(participantCount));
+    }
+    if (d->meetingDurationLabel && !duration.isEmpty()) {
+        d->meetingDurationLabel->setText(tr("Duration: %1").arg(duration));
+    }
+}
+
+/**
+ * @brief 处理URL输入改变
+ * @param url 新URL
+ */
+void MeetingWidget::handleUrlChanged(const QString& url)
+{
+    // URL输入改变时的处理逻辑
+    if (d->urlInput) {
+        d->urlInput->setText(url);
+    }
+    
+    // 验证URL格式
+    bool isValid = !url.isEmpty() && (url.startsWith("http://") || url.startsWith("https://"));
+    if (d->joinButton) {
+        d->joinButton->setEnabled(isValid && d->meetingManager);
+    }
+}
+
+/**
+ * @brief 刷新界面
+ */
+void MeetingWidget::refresh()
+{
+    updateMeetingInfo();
+    updateControlsState();
+    updateParticipantsList();
+    updateStatistics();
+}
+
+/**
+ * @brief 处理设置按钮点击
+ */
+void MeetingWidget::handleSettingsClicked()
+{
+    emit showSettingsRequested();
+}
+
+/**
+ * @brief 处理创建按钮点击
+ */
+void MeetingWidget::handleCreateClicked()
+{
+    createMeeting();
+}
+
+/**
+ * @brief 处理离开按钮点击
+ */
+void MeetingWidget::handleLeaveClicked()
+{
+    leaveMeeting();
+}
+
+/**
+ * @brief 处理加入按钮点击
+ */
+void MeetingWidget::handleJoinClicked()
+{
+    joinMeeting();
+}
+
+/**
+ * @brief 处理邀请按钮点击
+ */
+void MeetingWidget::handleInviteClicked()
+{
+    // 处理邀请按钮点击
+    inviteParticipants();
+}
+
+/**
+ * @brief 处理连接质量改变
+ * @param quality 连接质量
+ */
+void MeetingWidget::handleConnectionQualityChanged(int quality)
+{
+    // 处理连接质量变化
+    qDebug() << "Connection quality changed:" << quality;
+    
+    // 更新UI显示连接质量
+    if (quality >= 80) {
+        showStatus("连接质量：优秀");
+    } else if (quality >= 60) {
+        showStatus("连接质量：良好");
+    } else if (quality >= 40) {
+        showStatus("连接质量：一般");
+    } else {
+        showStatus("连接质量：较差");
+    }
+}
+
+/**
+ * @brief 处理参与者加入
+ * @param participantInfo 参与者信息
+ */
+void MeetingWidget::handleParticipantJoined(const QVariantMap& participantInfo)
+{
+    // 处理参与者加入
+    QString name = participantInfo.value("name").toString();
+    QString id = participantInfo.value("id").toString();
+    
+    qDebug() << "Participant joined:" << name << "(" << id << ")";
+    
+    // 更新参与者列表
+    updateParticipantsList();
+    
+    // 显示通知
+    showStatus(QString("%1 加入了会议").arg(name));
+}
+
+/**
+ * @brief 处理复制链接点击
+ */
+void MeetingWidget::handleCopyLinkClicked()
+{
+    // 处理复制链接点击
+    copyMeetingLink();
 }

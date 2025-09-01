@@ -109,4 +109,6 @@ struct PerformanceMetrics
     bool isValid() const;
 };
 
+Q_DECLARE_METATYPE(PerformanceMetrics)
+
 #endif // PERFORMANCEMETRICS_H

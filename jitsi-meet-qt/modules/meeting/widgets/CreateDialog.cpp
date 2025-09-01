@@ -19,6 +19,8 @@
 #include <QRegularExpressionValidator>
 #include <QTimer>
 #include <QDebug>
+#include <QShowEvent>
+#include <QRandomGenerator>
 
 class CreateDialog::Private
 {
@@ -298,4 +300,160 @@ void CreateDialog::reject()
     }
     
     QDialog::reject();
+}
+
+void CreateDialog::showEvent(QShowEvent* event)
+{
+    QDialog::showEvent(event);
+    
+    // 设置焦点到会议名称输入框
+    if (d->meetingNameEdit) {
+        d->meetingNameEdit->setFocus();
+    }
+    
+    // 验证输入
+    validateInput();
+}
+
+void CreateDialog::handleScheduledTimeChanged(const QDateTime& dateTime)
+{
+    Q_UNUSED(dateTime)
+    // 处理预定时间改变
+    // 这里可以添加时间验证逻辑
+    qDebug() << "Scheduled time changed to:" << dateTime;
+}
+
+void CreateDialog::handleAddInvite()
+{
+    // 处理添加邀请
+    // 这里可以添加邀请对话框或输入框
+    qDebug() << "Add invite requested";
+}
+
+void CreateDialog::handleRemoveInvite()
+{
+    // 处理移除邀请
+    // 这里可以添加移除选中邀请的逻辑
+    qDebug() << "Remove invite requested";
+}
+
+void CreateDialog::handleImportFromContacts()
+{
+    // 处理从通讯录导入
+    // 这里可以添加通讯录选择对话框
+    qDebug() << "Import from contacts requested";
+}
+
+void CreateDialog::handleAdvancedSettingsToggled(bool show)
+{
+    Q_UNUSED(show)
+    // 处理高级设置切换
+    qDebug() << "Advanced settings toggled:" << show;
+}
+
+void CreateDialog::handleTemplateChanged(const QString& templateName)
+{
+    Q_UNUSED(templateName)
+    // 处理模板选择改变
+    qDebug() << "Template changed to:" << templateName;
+}
+
+void CreateDialog::handleServerChanged(const QString& server)
+{
+    Q_UNUSED(server)
+    // 处理服务器改变
+    qDebug() << "Server changed to:" << server;
+}
+
+void CreateDialog::handlePasswordRequiredChanged(bool required)
+{
+    // 处理密码要求改变
+    if (d->passwordEdit) {
+        d->passwordEdit->setEnabled(required);
+    }
+    qDebug() << "Password required changed:" << required;
+}
+
+void CreateDialog::handlePasswordChanged(const QString& password)
+{
+    Q_UNUSED(password)
+    // 处理密码改变
+    validateInput();
+    qDebug() << "Password changed";
+}
+
+void CreateDialog::handleGenerateRandomPassword()
+{
+    // 处理生成随机密码
+    if (d->passwordEdit) {
+        QString randomPassword = QString::number(QRandomGenerator::global()->bounded(100000, 999999));
+        d->passwordEdit->setText(randomPassword);
+    }
+    qDebug() << "Random password generated";
+}
+
+void CreateDialog::clearError()
+{
+    // 清除错误信息
+    qDebug() << "Error cleared";
+}
+
+void CreateDialog::showSuccess(const QString& message)
+{
+    Q_UNUSED(message)
+    // 显示成功信息
+    qDebug() << "Success message:" << message;
+}
+
+void CreateDialog::handleMeetingNameChanged(const QString& name)
+{
+    Q_UNUSED(name)
+    // 处理会议名称改变
+    validateInput();
+    qDebug() << "Meeting name changed to:" << name;
+}
+
+void CreateDialog::handleMeetingTypeChanged(int type)
+{
+    Q_UNUSED(type)
+    // 处理会议类型改变
+    qDebug() << "Meeting type changed to:" << type;
+}
+
+void CreateDialog::handlePreviewUrl()
+{
+    // 处理预览会议URL
+    qDebug() << "Preview URL requested";
+}
+
+void CreateDialog::handleCopyUrl()
+{
+    // 处理复制会议URL
+    qDebug() << "Copy URL requested";
+}
+
+void CreateDialog::showLoading(const QString& message)
+{
+    Q_UNUSED(message)
+    // 显示加载状态
+    qDebug() << "Loading:" << message;
+}
+
+void CreateDialog::hideLoading()
+{
+    // 隐藏加载状态
+    qDebug() << "Loading hidden";
+}
+
+void CreateDialog::showError(const QString& error)
+{
+    Q_UNUSED(error)
+    // 显示错误信息
+    qDebug() << "Error:" << error;
+}
+
+void CreateDialog::handleSaveTemplate()
+{
+    // 处理保存模板
+    qDebug() << "Save template requested";
 }

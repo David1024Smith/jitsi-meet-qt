@@ -1,4 +1,4 @@
-#include "ChatManager.h"
+#include "../include/ChatManager.h"
 #include "MessageHandler.h"
 #include "IMessageStorage.h"
 #include "ChatMessage.h"
@@ -593,5 +593,7 @@ void ChatManager::setCurrentRoom(const QString& roomId)
 void ChatManager::markAllAsRead()
 {
     // Mark all messages in current room as read
-    markRoomAsRead(d->currentRoomId);
+    if (!d->currentRoomId.isEmpty()) {
+        markRoomAsRead(d->currentRoomId);
+    }
 }

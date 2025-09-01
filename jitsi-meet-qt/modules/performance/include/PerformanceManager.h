@@ -16,48 +16,8 @@ class PerformanceConfig;
 class BaseMonitor;
 class BaseOptimizer;
 
-/**
- * @brief 性能指标数据结构
- */
-struct PerformanceMetrics {
-    struct AudioMetrics {
-        double latency = 0.0;           ///< 音频延迟 (ms)
-        double jitter = 0.0;            ///< 抖动 (ms)
-        double packetLoss = 0.0;        ///< 丢包率 (%)
-        int sampleRate = 0;             ///< 采样率 (Hz)
-        int bitrate = 0;                ///< 比特率 (kbps)
-    };
-    
-    struct VideoMetrics {
-        double frameRate = 0.0;         ///< 帧率 (fps)
-        QSize resolution;               ///< 分辨率
-        int bitrate = 0;                ///< 比特率 (kbps)
-        double encodingTime = 0.0;      ///< 编码时间 (ms)
-        double decodingTime = 0.0;      ///< 解码时间 (ms)
-    };
-    
-    struct NetworkMetrics {
-        double bandwidth = 0.0;         ///< 带宽 (Mbps)
-        double latency = 0.0;           ///< 网络延迟 (ms)
-        double packetLoss = 0.0;        ///< 丢包率 (%)
-        int connectionQuality = 0;      ///< 连接质量 (0-100)
-    };
-    
-    struct SystemMetrics {
-        double cpuUsage = 0.0;          ///< CPU使用率 (%)
-        size_t memoryUsage = 0;         ///< 内存使用 (MB)
-        double diskUsage = 0.0;         ///< 磁盘使用率 (%)
-        double temperature = 0.0;       ///< 系统温度 (°C)
-    };
-    
-    AudioMetrics audio;
-    VideoMetrics video;
-    NetworkMetrics network;
-    SystemMetrics system;
-    QDateTime timestamp;
-};
-
-Q_DECLARE_METATYPE(PerformanceMetrics)
+#include "PerformanceMetrics.h"
+#include "OptimizationType.h"
 
 /**
  * @brief 性能管理器类
@@ -71,6 +31,7 @@ Q_DECLARE_METATYPE(PerformanceMetrics)
 class PerformanceManager : public QObject, public IPerformanceMonitor
 {
     Q_OBJECT
+    Q_INTERFACES(IPerformanceMonitor)
 
 public:
     /**
@@ -84,16 +45,6 @@ public:
         Critical = 1        ///< 严重
     };
     Q_ENUM(PerformanceLevel)
-
-    /**
-     * @brief 优化策略枚举
-     */
-    enum OptimizationStrategy {
-        Conservative,       ///< 保守策略
-        Balanced,          ///< 平衡策略
-        Aggressive         ///< 激进策略
-    };
-    Q_ENUM(OptimizationStrategy)
 
     /**
      * @brief 构造函数
@@ -119,6 +70,12 @@ public:
      * @param config 配置对象
      */
     void setConfig(PerformanceConfig* config);
+    
+    /**
+     * @brief 设置配置（QObject*重载版本）
+     * @param config 配置对象
+     */
+    void setConfig(QObject* config);
 
     /**
      * @brief 获取配置

@@ -85,6 +85,7 @@ signals:
 private slots:
     void onThemeManagerError(const QString& error);
     void onLayoutManagerError(const QString& error);
+    void onThemeChanged(const QString& oldTheme, const QString& newTheme);
 
 private:
     void setupManagers();

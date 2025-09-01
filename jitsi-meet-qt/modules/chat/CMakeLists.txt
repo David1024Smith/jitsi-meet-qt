@@ -20,9 +20,9 @@ set(CHAT_SOURCES
     # Core chat files
     src/ChatManager.cpp
     src/MessageHandler.cpp
-    src/ChatMessage.cpp
-    src/ChatRoom.cpp
-    src/Participant.cpp
+    models/ChatMessage.cpp
+    models/ChatRoom.cpp
+    models/Participant.cpp
     
     # Storage
     storage/MessageStorage.cpp

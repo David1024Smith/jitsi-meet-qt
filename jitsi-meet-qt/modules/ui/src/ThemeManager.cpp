@@ -1,4 +1,4 @@
-#include "ThemeManager.h"
+#include "../include/ThemeManager.h"
 #include "ThemeFactory.h"
 #include "../themes/BaseTheme.h"
 #include <QApplication>
@@ -14,6 +14,8 @@ ThemeManager::ThemeManager(QObject *parent)
     , m_status(IThemeManager::NotInitialized) // 使用IThemeManager中定义的正确枚举值
     , m_currentThemeName("default")
 {
+    // 初始化主题工厂
+    m_themeFactory = std::make_unique<ThemeFactory>(this);
 }
 
 ThemeManager::~ThemeManager()
@@ -370,7 +372,10 @@ void ThemeManager::onThemeFactoryError(const QString& error)
 
 void ThemeManager::setupThemeFactory()
 {
-    m_themeFactory = std::make_unique<ThemeFactory>(this);
+    // m_themeFactory已经在构造函数中初始化
+    if (!m_themeFactory) {
+        m_themeFactory = std::make_unique<ThemeFactory>(this);
+    }
     
     connect(m_themeFactory.get(), &ThemeFactory::errorOccurred,
             this, &ThemeManager::onThemeFactoryError);

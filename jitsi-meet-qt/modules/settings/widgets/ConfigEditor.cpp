@@ -28,6 +28,15 @@
 #include <QClipboard>
 #include <QTimer>
 #include <QDebug>
+#include <QMimeData>
+#include <QDragEnterEvent>
+#include <QDropEvent>
+#include <QUrl>
+#include <QFile>
+#include <QKeyEvent>
+#include <QContextMenuEvent>
+#include <QMenu>
+#include <QInputDialog>
 
 class ConfigEditor::Private
 {
@@ -829,5 +838,250 @@ void ConfigEditor::saveAs()
             setCurrentFilePath(fileName);
             setModified(false);
         }
+    }
+}
+
+void ConfigEditor::dragEnterEvent(QDragEnterEvent* event)
+{
+    // 检查拖拽的数据是否包含文件URL或文本
+    if (event->mimeData()->hasUrls() || event->mimeData()->hasText()) {
+        // 检查文件扩展名是否为支持的配置文件格式
+        if (event->mimeData()->hasUrls()) {
+            const QList<QUrl> urls = event->mimeData()->urls();
+            if (!urls.isEmpty()) {
+                QString fileName = urls.first().toLocalFile();
+                if (fileName.endsWith(".json") || fileName.endsWith(".ini") || 
+                    fileName.endsWith(".xml") || fileName.endsWith(".yaml") || 
+                    fileName.endsWith(".yml") || fileName.endsWith(".toml")) {
+                    event->acceptProposedAction();
+                    return;
+                }
+            }
+        }
+        
+        // 如果是文本数据，也接受
+        if (event->mimeData()->hasText()) {
+            event->acceptProposedAction();
+            return;
+        }
+    }
+    
+    QWidget::dragEnterEvent(event);
+}
+
+void ConfigEditor::dropEvent(QDropEvent* event)
+{
+    // 处理文件拖拽
+    if (event->mimeData()->hasUrls()) {
+        const QList<QUrl> urls = event->mimeData()->urls();
+        if (!urls.isEmpty()) {
+            QString fileName = urls.first().toLocalFile();
+            if (QFile::exists(fileName)) {
+                // 加载配置文件
+                if (loadFromFile(fileName)) {
+                    event->acceptProposedAction();
+                    return;
+                }
+            }
+        }
+    }
+    
+    // 处理文本拖拽
+    if (event->mimeData()->hasText()) {
+        QString text = event->mimeData()->text();
+        if (!text.isEmpty()) {
+            setConfigText(text);
+            event->acceptProposedAction();
+            return;
+        }
+    }
+    
+    QWidget::dropEvent(event);
+}
+
+void ConfigEditor::showFindDialog()
+{
+    // 显示查找对话框的实现
+    // 这里可以创建一个查找对话框或使用现有的查找功能
+    // 暂时提供一个基本实现
+    if (d->textEditor) {
+        // 可以在这里实现查找对话框
+        // 目前只是一个占位符实现
+    }
+}
+
+void ConfigEditor::reload()
+{
+    // 重新加载配置文件的实现
+    if (!d->currentFilePath.isEmpty()) {
+        loadFromFile(d->currentFilePath);
+    }
+}
+
+void ConfigEditor::onSelectionChanged()
+{
+    // 处理选择变化的实现
+    bool hasSelection = false;
+    if (d->textEditor) {
+        hasSelection = d->textEditor->textCursor().hasSelection();
+    }
+    emit selectionChanged(hasSelection);
+}
+
+void ConfigEditor::keyPressEvent(QKeyEvent* event)
+{
+    // 处理按键事件的实现
+    if (event->key() == Qt::Key_F && event->modifiers() == Qt::ControlModifier) {
+        showFindDialog();
+        event->accept();
+        return;
+    }
+    
+    if (event->key() == Qt::Key_S && event->modifiers() == Qt::ControlModifier) {
+        save();
+        event->accept();
+        return;
+    }
+    
+    QWidget::keyPressEvent(event);
+}
+
+void ConfigEditor::contextMenuEvent(QContextMenuEvent* event)
+{
+    // 处理右键菜单事件的实现
+    QMenu contextMenu(this);
+    
+    // 添加基本的上下文菜单项
+    QAction* cutAction = contextMenu.addAction(tr("剪切"));
+    QAction* copyAction = contextMenu.addAction(tr("复制"));
+    QAction* pasteAction = contextMenu.addAction(tr("粘贴"));
+    contextMenu.addSeparator();
+    QAction* selectAllAction = contextMenu.addAction(tr("全选"));
+    contextMenu.addSeparator();
+    QAction* findAction = contextMenu.addAction(tr("查找"));
+    
+    // 连接动作到相应的槽函数
+    connect(cutAction, &QAction::triggered, this, &ConfigEditor::cut);
+    connect(copyAction, &QAction::triggered, this, &ConfigEditor::copy);
+    connect(pasteAction, &QAction::triggered, this, &ConfigEditor::paste);
+    connect(selectAllAction, &QAction::triggered, this, &ConfigEditor::selectAll);
+    connect(findAction, &QAction::triggered, this, &ConfigEditor::showFindDialog);
+    
+    // 显示上下文菜单
+    contextMenu.exec(event->globalPos());
+}
+
+void ConfigEditor::refresh()
+{
+    // 刷新编辑器内容的实现
+    if (d->currentMode == TreeMode && d->treeWidget) {
+        updateTreeFromText();
+    } else if (d->currentMode == TextMode && d->textEditor) {
+        // 文本模式下的刷新逻辑
+        onTextChanged();
+    }
+}
+
+void ConfigEditor::expandAll()
+{
+    // 展开所有树节点的实现
+    if (d->treeWidget) {
+        d->treeWidget->expandAll();
+    }
+}
+
+void ConfigEditor::collapseAll()
+{
+    // 折叠所有树节点的实现
+    if (d->treeWidget) {
+        d->treeWidget->collapseAll();
+    }
+}
+
+void ConfigEditor::clearBookmarks()
+{
+    // 清除所有书签的实现
+    d->bookmarks.clear();
+}
+
+void ConfigEditor::toggleBookmark()
+{
+    // 切换当前行书签的实现
+    if (d->textEditor) {
+        QTextCursor cursor = d->textEditor->textCursor();
+        int currentLine = cursor.blockNumber() + 1;
+        
+        if (d->bookmarks.contains(currentLine)) {
+            d->bookmarks.remove(currentLine);
+        } else {
+            d->bookmarks.insert(currentLine, QString("Bookmark %1").arg(currentLine));
+        }
+    }
+}
+
+void ConfigEditor::showGotoLineDialog()
+{
+    // 显示跳转到行对话框的实现
+    bool ok;
+    int line = QInputDialog::getInt(this, tr("跳转到行"), tr("行号:"), 1, 1, 10000, 1, &ok);
+    if (ok && d->textEditor) {
+        QTextCursor cursor = d->textEditor->textCursor();
+        cursor.movePosition(QTextCursor::Start);
+        cursor.movePosition(QTextCursor::Down, QTextCursor::MoveAnchor, line - 1);
+        d->textEditor->setTextCursor(cursor);
+        d->textEditor->ensureCursorVisible();
+    }
+}
+
+void ConfigEditor::showReplaceDialog()
+{
+    // 显示替换对话框的实现
+    // 这里可以创建一个替换对话框
+    // 暂时提供一个基本实现
+    if (d->textEditor) {
+        // 可以在这里实现替换对话框
+        // 目前只是一个占位符实现
+    }
+}
+
+/**
+ * @brief 剪切选中内容
+ */
+void ConfigEditor::cut()
+{
+    if (d->textEditor && !d->readOnly) {
+        d->textEditor->cut();
+        setModified(true);
+    }
+}
+
+/**
+ * @brief 复制选中内容
+ */
+void ConfigEditor::copy()
+{
+    if (d->textEditor) {
+        d->textEditor->copy();
+    }
+}
+
+/**
+ * @brief 粘贴内容
+ */
+void ConfigEditor::paste()
+{
+    if (d->textEditor && !d->readOnly) {
+        d->textEditor->paste();
+        setModified(true);
+    }
+}
+
+/**
+ * @brief 全选
+ */
+void ConfigEditor::selectAll()
+{
+    if (d->textEditor) {
+        d->textEditor->selectAll();
     }
 }

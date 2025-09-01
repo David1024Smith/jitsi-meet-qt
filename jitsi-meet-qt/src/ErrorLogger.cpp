@@ -1,5 +1,6 @@
 #include "../include/ErrorLogger.h"
 #include "../include/ErrorEventBus.h"
+#include "../modules/utils/include/Logger.h"
 #include <QTimer>
 #include <QDebug>
 #include <QLoggingCategory>
@@ -73,7 +74,7 @@ bool ErrorLogger::initialize()
     m_initialized = true;
 
     qCDebug(errorLogger) << "ErrorLogger: Error logger integration initialized successfully";
-    Logger::instance()->log(Logger::Info, "ErrorLogger", "Error logger integration initialized");
+    Logger::info("Error logger integration initialized", "ErrorLogger");
 
     return true;
 }
@@ -121,7 +122,14 @@ void ErrorLogger::logError(const ModuleError& error)
         default: logLevel = Logger::Error; break;
     }
     
-    Logger::instance()->log(logLevel, "ErrorLogger", message);
+    switch (logLevel) {
+        case Logger::Debug: Logger::debug(message, "ErrorLogger"); break;
+        case Logger::Info: Logger::info(message, "ErrorLogger"); break;
+        case Logger::Warning: Logger::warning(message, "ErrorLogger"); break;
+        case Logger::Error: Logger::error(message, "ErrorLogger"); break;
+        case Logger::Critical: Logger::critical(message, "ErrorLogger"); break;
+        default: Logger::info(message, "ErrorLogger"); break;
+    }
 }
 
 void ErrorLogger::setErrorLevelMapping(ModuleError::Severity errorSeverity, ILogger::LogLevel logLevel)
@@ -207,7 +215,7 @@ void ErrorLogger::onModuleErrorReported(const QString& moduleName, const ModuleE
                          .arg(ModuleError::severityName(error.severity()).toLower())
                          .arg(error.message());
         
-        Logger::instance()->log(Logger::Warning, "ModuleErrorTracker", message);
+        Logger::warning(message, "ModuleErrorTracker");
     }
 }
 
@@ -218,7 +226,7 @@ void ErrorLogger::onErrorRecoveryStarted(const ModuleError& error, const QString
                      .arg(strategy)
                      .arg(error.message());
     
-    Logger::instance()->log(Logger::Info, "ErrorRecovery", message);
+    Logger::info(message, "ErrorRecovery");
 }
 
 void ErrorLogger::onErrorRecoveryCompleted(const ModuleError& error, const QString& strategy, bool success)
@@ -230,7 +238,14 @@ void ErrorLogger::onErrorRecoveryCompleted(const ModuleError& error, const QStri
                      .arg(error.message());
     
     Logger::LogLevel level = success ? Logger::Info : Logger::Warning;
-    Logger::instance()->log(level, "ErrorRecovery", message);
+    switch (level) {
+        case Logger::Debug: Logger::debug(message, "ErrorRecovery"); break;
+        case Logger::Info: Logger::info(message, "ErrorRecovery"); break;
+        case Logger::Warning: Logger::warning(message, "ErrorRecovery"); break;
+        case Logger::Error: Logger::error(message, "ErrorRecovery"); break;
+        case Logger::Critical: Logger::critical(message, "ErrorRecovery"); break;
+        default: Logger::info(message, "ErrorRecovery"); break;
+    }
 }
 
 void ErrorLogger::logErrorStatistics()
@@ -251,7 +266,7 @@ void ErrorLogger::logErrorStatistics()
                      .arg(stats.errorRate, 0, 'f', 2)
                      .arg(stats.lastError.toString("yyyy-MM-dd hh:mm:ss"));
 
-    Logger::instance()->log(Logger::Info, "ErrorStatistics", message);
+    Logger::info(message, "ErrorStatistics");
 
     // 记录按类型分组的错误统计
     if (!stats.errorsByType.isEmpty()) {
@@ -261,7 +276,7 @@ void ErrorLogger::logErrorStatistics()
         }
         
         QString typeMessage = QString("Error Types - %1").arg(typeStats.join(", "));
-        Logger::instance()->log(Logger::Debug, "ErrorStatistics", typeMessage);
+        Logger::debug(typeMessage, "ErrorStatistics");
     }
 
     // 记录按严重程度分组的错误统计
@@ -272,7 +287,7 @@ void ErrorLogger::logErrorStatistics()
         }
         
         QString severityMessage = QString("Error Severities - %1").arg(severityStats.join(", "));
-        Logger::instance()->log(Logger::Debug, "ErrorStatistics", severityMessage);
+        Logger::debug(severityMessage, "ErrorStatistics");
     }
 
     // 记录按模块分组的错误统计
@@ -286,7 +301,7 @@ void ErrorLogger::logErrorStatistics()
         
         if (!moduleStats.isEmpty()) {
             QString moduleMessage = QString("Error Modules - %1").arg(moduleStats.join(", "));
-            Logger::instance()->log(Logger::Debug, "ErrorStatistics", moduleMessage);
+            Logger::debug(moduleMessage, "ErrorStatistics");
         }
     }
 }
@@ -354,18 +369,17 @@ ModuleLogHelper::ModuleLogHelper(const QString& moduleName)
 
 void ModuleLogHelper::log(ILogger::LogLevel level, const QString& message, const QString& category) const
 {
-    // 转换 ILogger::LogLevel 到 Logger::LogLevel
-    Logger::LogLevel loggerLevel = Logger::Info;
-    switch (level) {
-        case ILogger::Debug: loggerLevel = Logger::Debug; break;
-        case ILogger::Info: loggerLevel = Logger::Info; break;
-        case ILogger::Warning: loggerLevel = Logger::Warning; break;
-        case ILogger::Error: loggerLevel = Logger::Error; break;
-        case ILogger::Critical: loggerLevel = Logger::Critical; break;
-        default: loggerLevel = Logger::Info; break;
-    }
+    // 使用新Logger的静态方法
+    QString logCategory = category.isEmpty() ? m_moduleName : category;
     
-    Logger::instance()->log(loggerLevel, category.isEmpty() ? m_moduleName : category, message);
+    switch (level) {
+        case ILogger::Debug: Logger::debug(message, logCategory); break;
+        case ILogger::Info: Logger::info(message, logCategory); break;
+        case ILogger::Warning: Logger::warning(message, logCategory); break;
+        case ILogger::Error: Logger::error(message, logCategory); break;
+        case ILogger::Critical: Logger::critical(message, logCategory); break;
+        default: Logger::info(message, logCategory); break;
+    }
 }
 
 void ModuleLogHelper::logError(const ModuleError& error) const

@@ -180,11 +180,12 @@ private:
     class ConferenceManager* m_conferenceManager;
     class MediaManager* m_mediaManager;
     // class ChatManager* m_chatManager; // 暂时禁用聊天功能
-    class ScreenShareManager* m_screenShareManager;
+    // class ScreenShareManager* m_screenShareManager; // 使用模块化版本
     class AuthenticationManager* m_authenticationManager;
     class ErrorRecoveryManager* m_errorRecoveryManager;
     // class ThemeManager* m_themeManager; // 暂时禁用主题功能
     class PerformanceManager* m_performanceManager;
+    class OptimizedRecentManager* m_optimizedRecentManager;
     
     // Application state
     QString m_serverName;

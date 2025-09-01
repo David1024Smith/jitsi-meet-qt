@@ -424,6 +424,7 @@ QList<SchemaValidator::ValidationError> SchemaValidator::validateString(const QS
 
 QList<SchemaValidator::ValidationError> SchemaValidator::validateNumber(double number, const QJsonObject& schema, const QString& path, const ValidationOptions& options) const
 {
+    Q_UNUSED(options)
     QList<ValidationError> errors;
     
     // Range constraints
@@ -568,6 +569,11 @@ QList<SchemaValidator::ValidationError> SchemaValidator::validateProperties(cons
 
 QList<SchemaValidator::ValidationError> SchemaValidator::validateAdditionalProperties(const QJsonObject& object, const QJsonObject& schema, const QString& path, const ValidationOptions& options) const
 {
+    Q_UNUSED(object)
+    Q_UNUSED(schema)
+    Q_UNUSED(path)
+    Q_UNUSED(options)
+    
     // Simplified implementation
     return QList<ValidationError>();
 }
@@ -583,18 +589,33 @@ QList<SchemaValidator::ValidationError> SchemaValidator::validateAllOf(const QJs
 
 QList<SchemaValidator::ValidationError> SchemaValidator::validateAnyOf(const QJsonValue& value, const QJsonArray& anyOf, const QString& path, const ValidationOptions& options) const
 {
+    Q_UNUSED(value)
+    Q_UNUSED(anyOf)
+    Q_UNUSED(path)
+    Q_UNUSED(options)
+    
     // Simplified implementation - should check if at least one schema validates
     return QList<ValidationError>();
 }
 
 QList<SchemaValidator::ValidationError> SchemaValidator::validateOneOf(const QJsonValue& value, const QJsonArray& oneOf, const QString& path, const ValidationOptions& options) const
 {
+    Q_UNUSED(value)
+    Q_UNUSED(oneOf)
+    Q_UNUSED(path)
+    Q_UNUSED(options)
+    
     // Simplified implementation - should check if exactly one schema validates
     return QList<ValidationError>();
 }
 
 QList<SchemaValidator::ValidationError> SchemaValidator::validateNot(const QJsonValue& value, const QJsonObject& notSchema, const QString& path, const ValidationOptions& options) const
 {
+    Q_UNUSED(value)
+    Q_UNUSED(notSchema)
+    Q_UNUSED(path)
+    Q_UNUSED(options)
+    
     // Simplified implementation - should check that the schema does NOT validate
     return QList<ValidationError>();
 }
@@ -620,4 +641,41 @@ QJsonObject SchemaValidator::createSettingsConfigSchema()
     
     schema["properties"] = properties;
     return schema;
+}
+
+/**
+ * @brief 异步验证JSON对象
+ * @param json 待验证的JSON对象
+ */
+void SchemaValidator::validateAsync(const QJsonObject& json)
+{
+    // 使用QtConcurrent在后台线程中执行验证
+    QFuture<QList<ValidationError>> future = QtConcurrent::run([this, json]() {
+        return validate(json);
+    });
+    
+    // 监听验证完成
+    QFutureWatcher<QList<ValidationError>>* watcher = new QFutureWatcher<QList<ValidationError>>(this);
+    connect(watcher, &QFutureWatcher<QList<ValidationError>>::finished, [this, watcher, json]() {
+        QList<ValidationError> errors = watcher->result();
+        emit asyncValidationCompleted(json, errors);
+        emit validationCompleted(errors);
+        watcher->deleteLater();
+    });
+    
+    watcher->setFuture(future);
+}
+
+/**
+ * @brief 重新加载内置格式验证器
+ */
+void SchemaValidator::reloadBuiltinValidators()
+{
+    // 清除现有的格式验证器
+    d->formatValidators.clear();
+    
+    // 重新设置内置格式验证器
+    d->setupBuiltinFormatValidators();
+    
+    qDebug() << "Built-in format validators reloaded";
 }

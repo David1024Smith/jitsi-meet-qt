@@ -28,6 +28,13 @@
 #include <QJsonObject>
 #include <QJsonDocument>
 #include <QDebug>
+#include <QKeyEvent>
+#include <QCloseEvent>
+#include <QShowEvent>
+#include <QListWidget>
+#include <QDialogButtonBox>
+#include <QInputDialog>
+#include <QMessageBox>
 
 class PreferencesDialog::Private
 {
@@ -791,6 +798,132 @@ void PreferencesDialog::onExportButtonClicked()
     showExportDialog();
 }
 
+void PreferencesDialog::onProfileManagerButtonClicked()
+{
+    showProfileManager();
+}
+
+void PreferencesDialog::onSettingChanged(const QString& key, const QVariant& value)
+{
+    // 处理设置变化
+    d->currentSettings[key] = value;
+    
+    // 如果启用预览模式，立即应用设置
+    if (d->previewModeEnabled) {
+        applyPreviewSettings();
+    }
+    
+    // 更新按钮状态
+    updateButtonStates();
+    
+    emit settingChanged(key, value);
+}
+
+// Public slots implementation
+void PreferencesDialog::refresh()
+{
+    // 重新加载当前配置文件设置
+    loadProfileSettings();
+    
+    // 更新所有页面
+    for (const auto& pageInfo : d->pages) {
+        if (SettingsWidget* settingsWidget = qobject_cast<SettingsWidget*>(pageInfo.widget)) {
+            settingsWidget->refresh();
+        }
+    }
+    
+    // 更新界面
+    updateUI();
+    updatePageList();
+    updateButtonStates();
+    
+    emit refreshCompleted();
+}
+
+void PreferencesDialog::showAbout()
+{
+    QMessageBox::about(this, tr("About Preferences"), 
+                      tr("Jitsi Meet Qt Preferences Dialog\n\n"
+                         "Version: 1.0\n"
+                         "Built with Qt %1\n\n"
+                         "This dialog provides comprehensive settings management "
+                         "for the Jitsi Meet Qt application.").arg(QT_VERSION_STR));
+}
+
+void PreferencesDialog::togglePreviewMode()
+{
+    setPreviewMode(!d->previewModeEnabled);
+}
+
+void PreferencesDialog::showProfileManager()
+{
+    // 创建配置文件管理对话框
+    QDialog profileDialog(this);
+    profileDialog.setWindowTitle(tr("Profile Manager"));
+    profileDialog.setModal(true);
+    profileDialog.resize(400, 300);
+    
+    QVBoxLayout* layout = new QVBoxLayout(&profileDialog);
+    
+    // 配置文件列表
+    QListWidget* profileList = new QListWidget();
+    profileList->addItems(d->availableProfiles);
+    profileList->setCurrentRow(d->availableProfiles.indexOf(d->currentProfile));
+    layout->addWidget(profileList);
+    
+    // 按钮
+    QHBoxLayout* buttonLayout = new QHBoxLayout();
+    QPushButton* newButton = new QPushButton(tr("New"));
+    QPushButton* copyButton = new QPushButton(tr("Copy"));
+    QPushButton* deleteButton = new QPushButton(tr("Delete"));
+    QPushButton* renameButton = new QPushButton(tr("Rename"));
+    
+    buttonLayout->addWidget(newButton);
+    buttonLayout->addWidget(copyButton);
+    buttonLayout->addWidget(deleteButton);
+    buttonLayout->addWidget(renameButton);
+    buttonLayout->addStretch();
+    
+    layout->addLayout(buttonLayout);
+    
+    // 对话框按钮
+    QDialogButtonBox* dialogButtons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+    layout->addWidget(dialogButtons);
+    
+    connect(dialogButtons, &QDialogButtonBox::accepted, &profileDialog, &QDialog::accept);
+    connect(dialogButtons, &QDialogButtonBox::rejected, &profileDialog, &QDialog::reject);
+    
+    // 按钮事件处理
+    connect(newButton, &QPushButton::clicked, [this, profileList]() {
+        bool ok;
+        QString name = QInputDialog::getText(this, tr("New Profile"), 
+                                           tr("Profile name:"), QLineEdit::Normal, 
+                                           QString(), &ok);
+        if (ok && !name.isEmpty()) {
+            if (createProfile(name)) {
+                profileList->addItem(name);
+                emit profileCreated(name);
+            }
+        }
+    });
+    
+    connect(deleteButton, &QPushButton::clicked, [this, profileList]() {
+        QListWidgetItem* item = profileList->currentItem();
+        if (item && item->text() != d->defaultProfile) {
+            int ret = QMessageBox::question(this, tr("Delete Profile"), 
+                                          tr("Are you sure you want to delete profile '%1'?").arg(item->text()));
+            if (ret == QMessageBox::Yes) {
+                if (deleteProfile(item->text())) {
+                    delete item;
+                    emit profileDeleted(item->text());
+                }
+            }
+        }
+    });
+    
+    profileDialog.exec();
+}
+
 // Helper methods
 void PreferencesDialog::loadProfileSettings()
 {
@@ -885,7 +1018,425 @@ void PreferencesDialog::showHelp(const QString& topic)
     emit helpRequested(topic);
 }
 
+// Event handlers
+void PreferencesDialog::showEvent(QShowEvent* event)
+{
+    QDialog::showEvent(event);
+    
+    // 恢复对话框状态
+    restoreDialogState();
+    
+    // 加载当前配置文件设置
+    loadProfileSettings();
+    
+    // 更新界面
+    updateUI();
+    
+    emit dialogShown();
+}
+
+void PreferencesDialog::closeEvent(QCloseEvent* event)
+{
+    // 检查是否有未保存的更改
+    if (hasUnsavedChanges() && !confirmUnsavedChanges()) {
+        event->ignore();
+        return;
+    }
+    
+    // 保存对话框状态
+    saveDialogState();
+    
+    QDialog::closeEvent(event);
+    emit dialogClosed();
+}
+
+void PreferencesDialog::changeEvent(QEvent* event)
+{
+    QDialog::changeEvent(event);
+    
+    if (event->type() == QEvent::LanguageChange) {
+        // 重新翻译界面
+        retranslateUI();
+    } else if (event->type() == QEvent::StyleChange) {
+        // 应用新主题
+        applyTheme(d->currentTheme);
+    } else if (event->type() == QEvent::WindowStateChange) {
+        // 处理窗口状态变化
+        updateButtonStates();
+    }
+}
+
+void PreferencesDialog::keyPressEvent(QKeyEvent* event)
+{
+    switch (event->key()) {
+        case Qt::Key_F1:
+            // 显示帮助
+            showHelp();
+            event->accept();
+            break;
+            
+        case Qt::Key_F5:
+            // 刷新界面
+            refresh();
+            event->accept();
+            break;
+            
+        case Qt::Key_Escape:
+            // ESC键关闭对话框
+            if (hasUnsavedChanges() && !confirmUnsavedChanges()) {
+                event->ignore();
+                return;
+            }
+            reject();
+            event->accept();
+            break;
+            
+        default:
+            // 处理快捷键
+            if (event->modifiers() & Qt::ControlModifier) {
+                switch (event->key()) {
+                    case Qt::Key_S:
+                        // Ctrl+S 应用设置
+                        applySettings();
+                        event->accept();
+                        break;
+                        
+                    case Qt::Key_R:
+                        // Ctrl+R 重置设置
+                        resetToDefaults();
+                        event->accept();
+                        break;
+                        
+                    case Qt::Key_I:
+                        // Ctrl+I 导入设置
+                        showImportDialog();
+                        event->accept();
+                        break;
+                        
+                    case Qt::Key_E:
+                        // Ctrl+E 导出设置
+                        showExportDialog();
+                        event->accept();
+                        break;
+                        
+                    case Qt::Key_F:
+                        // Ctrl+F 聚焦搜索框
+                        if (d->searchBox) {
+                            d->searchBox->setFocus();
+                            d->searchBox->selectAll();
+                        }
+                        event->accept();
+                        break;
+                        
+                    default:
+                        QDialog::keyPressEvent(event);
+                        break;
+                }
+            } else {
+                QDialog::keyPressEvent(event);
+            }
+            break;
+    }
+}
+
+void PreferencesDialog::updateButtonStates()
+{
+    /**
+     * @brief 更新按钮状态
+     * 根据当前设置状态更新对话框按钮的启用/禁用状态
+     */
+    if (!d->buttonBox) return;
+    
+    // 检查是否有未保存的更改
+    bool hasChanges = hasUnsavedChanges();
+    
+    // 更新Apply按钮状态
+    if (QPushButton* applyButton = d->buttonBox->button(QDialogButtonBox::Apply)) {
+        applyButton->setEnabled(hasChanges);
+    }
+    
+    // 更新OK按钮状态
+    if (QPushButton* okButton = d->buttonBox->button(QDialogButtonBox::Ok)) {
+        okButton->setEnabled(true); // OK按钮始终可用
+    }
+    
+    // 更新Reset按钮状态
+    if (QPushButton* resetButton = d->buttonBox->button(QDialogButtonBox::Reset)) {
+        resetButton->setEnabled(hasChanges);
+    }
+}
+
+void PreferencesDialog::retranslateUI()
+{
+    /**
+     * @brief 重新翻译用户界面
+     * 当语言设置改变时更新所有界面文本
+     */
+    setWindowTitle(tr("Preferences"));
+    
+    // 更新顶部控件文本
+    if (d->topLayout) {
+        // 查找并更新标签文本
+        for (int i = 0; i < d->topLayout->count(); ++i) {
+            QLayoutItem* item = d->topLayout->itemAt(i);
+            if (QLabel* label = qobject_cast<QLabel*>(item->widget())) {
+                QString text = label->text();
+                if (text.contains("Profile")) {
+                    label->setText(tr("Profile:"));
+                } else if (text.contains("Search")) {
+                    label->setText(tr("Search:"));
+                }
+            }
+        }
+    }
+    
+    // 更新搜索框占位符文本
+    if (d->searchBox) {
+        d->searchBox->setPlaceholderText(tr("Search settings..."));
+    }
+    
+    // 更新预览模式复选框文本
+    if (d->previewModeCheckBox) {
+        d->previewModeCheckBox->setText(tr("Preview changes"));
+    }
+    
+    // 更新页面列表
+    updatePageList();
+    
+    // 更新所有页面的翻译
+    for (auto& pageInfo : d->pages) {
+        if (pageInfo.id == "general") {
+            pageInfo.title = tr("General");
+            pageInfo.description = tr("General application settings");
+        } else if (pageInfo.id == "audio") {
+            pageInfo.title = tr("Audio");
+            pageInfo.description = tr("Audio device and quality settings");
+        } else if (pageInfo.id == "video") {
+            pageInfo.title = tr("Video");
+            pageInfo.description = tr("Camera and video quality settings");
+        } else if (pageInfo.id == "network") {
+            pageInfo.title = tr("Network");
+            pageInfo.description = tr("Network and connection settings");
+        } else if (pageInfo.id == "ui") {
+            pageInfo.title = tr("Interface");
+            pageInfo.description = tr("User interface and appearance settings");
+        } else if (pageInfo.id == "advanced") {
+            pageInfo.title = tr("Advanced");
+            pageInfo.description = tr("Advanced configuration options");
+        }
+        
+        // 更新设置组件的翻译
+        if (SettingsWidget* settingsWidget = qobject_cast<SettingsWidget*>(pageInfo.widget)) {
+            // SettingsWidget没有retranslateUI方法，使用refresh代替
+            settingsWidget->refresh();
+        }
+    }
+}
+
+void PreferencesDialog::applyTheme(const QString& theme)
+{
+    /**
+     * @brief 应用主题到对话框
+     * @param theme 主题名称
+     */
+    if (d->currentTheme == theme) {
+        return; // 主题未改变，无需重新应用
+    }
+    
+    d->currentTheme = theme;
+    
+    // 应用主题到主对话框
+    QString styleSheet;
+    
+    if (theme == "dark") {
+        // 深色主题样式
+        styleSheet = QString(
+            "QDialog {"
+            "    background-color: #2b2b2b;"
+            "    color: #ffffff;"
+            "}"
+            "QLabel {"
+            "    color: #ffffff;"
+            "}"
+            "QLineEdit {"
+            "    background-color: #3c3c3c;"
+            "    border: 1px solid #555555;"
+            "    color: #ffffff;"
+            "    padding: 4px;"
+            "}"
+            "QComboBox {"
+            "    background-color: #3c3c3c;"
+            "    border: 1px solid #555555;"
+            "    color: #ffffff;"
+            "    padding: 4px;"
+            "}"
+            "QListWidget {"
+            "    background-color: #3c3c3c;"
+            "    border: 1px solid #555555;"
+            "    color: #ffffff;"
+            "}"
+            "QPushButton {"
+            "    background-color: #0078d4;"
+            "    border: 1px solid #005a9e;"
+            "    color: #ffffff;"
+            "    padding: 6px 12px;"
+            "    border-radius: 3px;"
+            "}"
+            "QPushButton:hover {"
+            "    background-color: #106ebe;"
+            "}"
+            "QPushButton:pressed {"
+            "    background-color: #005a9e;"
+            "}"
+        );
+    } else if (theme == "light") {
+        // 浅色主题样式
+        styleSheet = QString(
+            "QDialog {"
+            "    background-color: #ffffff;"
+            "    color: #000000;"
+            "}"
+            "QLabel {"
+            "    color: #000000;"
+            "}"
+            "QLineEdit {"
+            "    background-color: #ffffff;"
+            "    border: 1px solid #cccccc;"
+            "    color: #000000;"
+            "    padding: 4px;"
+            "}"
+            "QComboBox {"
+            "    background-color: #ffffff;"
+            "    border: 1px solid #cccccc;"
+            "    color: #000000;"
+            "    padding: 4px;"
+            "}"
+            "QListWidget {"
+            "    background-color: #ffffff;"
+            "    border: 1px solid #cccccc;"
+            "    color: #000000;"
+            "}"
+            "QPushButton {"
+            "    background-color: #0078d4;"
+            "    border: 1px solid #005a9e;"
+            "    color: #ffffff;"
+            "    padding: 6px 12px;"
+            "    border-radius: 3px;"
+            "}"
+            "QPushButton:hover {"
+            "    background-color: #106ebe;"
+            "}"
+            "QPushButton:pressed {"
+            "    background-color: #005a9e;"
+            "}"
+        );
+    } else {
+        // 默认主题或系统主题
+        styleSheet = "";
+    }
+    
+    // 应用样式表到对话框
+    setStyleSheet(styleSheet);
+    
+    // 应用主题到所有页面
+    for (const auto& pageInfo : d->pages) {
+        if (SettingsWidget* settingsWidget = qobject_cast<SettingsWidget*>(pageInfo.widget)) {
+            // 如果SettingsWidget有applyTheme方法，调用它
+            // settingsWidget->applyTheme(theme);
+        }
+    }
+    
+    // 发出主题改变信号
+    emit themeChanged(theme);
+}
+
+void PreferencesDialog::applyAndClose()
+{
+    /**
+     * @brief 应用设置并关闭对话框
+     */
+    if (applySettings()) {
+        accept();
+    }
+}
+
 // Static convenience methods
+void PreferencesDialog::restoreDialogState()
+{
+    // 恢复对话框的几何状态
+    if (d->preferencesHandler) {
+        QVariant geometry = d->preferencesHandler->preference("dialog", "geometry");
+        if (geometry.isValid()) {
+            restoreGeometry(geometry.toByteArray());
+        }
+        
+        // 恢复分割器状态
+        QVariant splitterState = d->preferencesHandler->preference("dialog", "splitterState");
+        if (splitterState.isValid() && d->splitter) {
+            d->splitter->restoreState(splitterState.toByteArray());
+        }
+        
+        // 恢复当前页面
+        QString lastPage = d->preferencesHandler->preference("dialog", "lastPage").toString();
+        if (!lastPage.isEmpty()) {
+            for (int i = 0; i < d->pageList->count(); ++i) {
+                QListWidgetItem* item = d->pageList->item(i);
+                if (item && item->data(Qt::UserRole).toString() == lastPage) {
+                    d->pageList->setCurrentItem(item);
+                    break;
+                }
+            }
+        }
+    }
+}
+
+void PreferencesDialog::saveDialogState()
+{
+    // 保存对话框的几何状态
+    if (d->preferencesHandler) {
+        d->preferencesHandler->setPreference("dialog", "geometry", saveGeometry());
+        
+        // 保存分割器状态
+        if (d->splitter) {
+            d->preferencesHandler->setPreference("dialog", "splitterState", d->splitter->saveState());
+        }
+        
+        // 保存当前页面
+        QListWidgetItem* currentItem = d->pageList->currentItem();
+        if (currentItem) {
+            d->preferencesHandler->setPreference("dialog", "lastPage", currentItem->data(Qt::UserRole).toString());
+        }
+    }
+}
+
+void PreferencesDialog::updateUI()
+{
+    // 更新界面元素的状态
+    if (d->settingsWidget) {
+        d->settingsWidget->refresh();
+    }
+    
+    // 更新按钮状态
+    updateButtonStates();
+    
+    // 更新配置文件选择器
+    if (d->profileSelector) {
+        d->profileSelector->clear();
+        d->profileSelector->addItems(availableProfiles());
+        d->profileSelector->setCurrentText(d->currentProfile);
+    }
+    
+    // 更新预览模式复选框
+    if (d->previewModeCheckBox) {
+        d->previewModeCheckBox->setChecked(d->previewModeEnabled);
+    }
+    
+    // 应用当前主题
+    if (!d->currentTheme.isEmpty()) {
+        applyTheme(d->currentTheme);
+    }
+}
+
 int PreferencesDialog::showPreferences(QWidget* parent, PreferencesHandler* handler)
 {
     PreferencesDialog dialog(parent);

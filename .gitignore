@@ -64,4 +64,5 @@ build/
 jitsi-meet-qt/docs/
 .kiro/specs/
 .cache/
-jitsi-meet-qt/错误日志.md
+.trae/
+.vscode/

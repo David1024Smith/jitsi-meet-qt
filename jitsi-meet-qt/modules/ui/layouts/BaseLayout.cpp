@@ -1,5 +1,5 @@
 #include "BaseLayout.h"
-#include "themes/BaseTheme.h"
+#include "../themes/BaseTheme.h"
 #include <QDebug>
 
 BaseLayout::BaseLayout(QObject *parent)
@@ -192,4 +192,26 @@ void BaseLayout::connectThemeSignals()
 {
     // Connect theme-related signals if needed
     // This can be overridden in derived classes
+}
+
+/**
+ * @brief 获取布局配置
+ * @return 当前布局配置
+ */
+QVariantMap BaseLayout::getLayoutConfiguration() const
+{
+    return m_configuration;
+}
+
+/**
+ * @brief 设置布局配置
+ * @param config 新的布局配置
+ */
+void BaseLayout::setLayoutConfiguration(const QVariantMap& config)
+{
+    if (m_configuration != config) {
+        m_configuration = config;
+        onConfigurationChanged(config);
+        emit configurationChanged();
+    }
 }

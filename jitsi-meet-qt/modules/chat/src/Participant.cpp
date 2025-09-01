@@ -47,6 +47,21 @@ Participant::Participant(const QString& id, const QString& name, QObject* parent
     d->lastActivity = QDateTime::currentDateTime();
 }
 
+Participant::Participant(const Participant& other)
+    : QObject(other.parent())
+    , d(new Private)
+{
+    *d = *other.d;
+}
+
+Participant& Participant::operator=(const Participant& other)
+{
+    if (this != &other) {
+        *d = *other.d;
+    }
+    return *this;
+}
+
 Participant::~Participant() = default;
 
 QString Participant::id() const
@@ -57,6 +72,14 @@ QString Participant::id() const
 QString Participant::name() const
 {
     return d->name;
+}
+
+void Participant::setName(const QString& name)
+{
+    if (d->name != name) {
+        d->name = name;
+        emit nameChanged(name);
+    }
 }
 
 QString Participant::displayName() const
@@ -193,10 +216,10 @@ void Participant::demoteToMember()
 
 void Participant::kick()
 {
-    emit kickRequested();
+    emit propertyChanged("kickRequested", true);
 }
 
 void Participant::ban()
 {
-    emit banRequested();
+    emit propertyChanged("banRequested", true);
 }

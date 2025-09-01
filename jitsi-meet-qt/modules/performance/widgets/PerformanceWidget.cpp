@@ -1,7 +1,7 @@
 #include "PerformanceWidget.h"
 #include "MetricsChart.h"
 #include "PerformanceManager.h"
-#include "PerformanceConfig.h"
+#include "../config/PerformanceConfig.h"
 #include "OptimizationType.h"
 #include <QApplication>
 #include <QMessageBox>
@@ -266,7 +266,7 @@ void PerformanceWidget::refreshDisplay()
     updateMetrics(metrics);
     
     // 更新性能等级
-    PerformanceLevel level = m_performanceManager->getCurrentPerformanceLevel();
+    PerformanceManager::PerformanceLevel level = m_performanceManager->getCurrentPerformanceLevel();
     updatePerformanceLevel(level);
     
     // 更新系统信息
@@ -429,7 +429,7 @@ void PerformanceWidget::updateMetrics(const PerformanceMetrics& metrics)
     updateChartsDisplay(metrics);
 }
 
-void PerformanceWidget::updatePerformanceLevel(PerformanceLevel level)
+void PerformanceWidget::updatePerformanceLevel(PerformanceManager::PerformanceLevel level)
 {
     if (!m_performanceLevelLabel) {
         return;
@@ -439,19 +439,19 @@ void PerformanceWidget::updatePerformanceLevel(PerformanceLevel level)
     QColor levelColor;
     
     switch (level) {
-    case PerformanceLevel::Excellent:
+    case PerformanceManager::PerformanceLevel::Excellent:
         levelText = "Excellent";
         levelColor = Qt::green;
         break;
-    case PerformanceLevel::Good:
+    case PerformanceManager::PerformanceLevel::Good:
         levelText = "Good";
         levelColor = QColor(144, 238, 144); // Light green
         break;
-    case PerformanceLevel::Fair:
+    case PerformanceManager::PerformanceLevel::Fair:
         levelText = "Fair";
         levelColor = Qt::yellow;
         break;
-    case PerformanceLevel::Poor:
+    case PerformanceManager::PerformanceLevel::Poor:
         levelText = "Poor";
         levelColor = Qt::red;
         break;
@@ -661,7 +661,7 @@ void PerformanceWidget::handleRealTimeUpdate()
     updateMetrics(metrics);
     
     // 更新性能等级
-    PerformanceLevel level = m_performanceManager->getCurrentPerformanceLevel();
+    PerformanceManager::PerformanceLevel level = m_performanceManager->getCurrentPerformanceLevel();
     updatePerformanceLevel(level);
 }
 
@@ -1188,13 +1188,13 @@ QString PerformanceWidget::formatTime(double milliseconds) const
     }
 }
 
-QColor PerformanceWidget::getPerformanceLevelColor(PerformanceLevel level) const
+QColor PerformanceWidget::getPerformanceLevelColor(PerformanceManager::PerformanceLevel level) const
 {
     switch (level) {
-    case PerformanceLevel::Excellent: return Qt::green;
-    case PerformanceLevel::Good: return QColor(144, 238, 144);
-    case PerformanceLevel::Fair: return Qt::yellow;
-    case PerformanceLevel::Poor: return Qt::red;
+    case PerformanceManager::PerformanceLevel::Excellent: return Qt::green;
+    case PerformanceManager::PerformanceLevel::Good: return QColor(144, 238, 144);
+    case PerformanceManager::PerformanceLevel::Fair: return Qt::yellow;
+    case PerformanceManager::PerformanceLevel::Poor: return Qt::red;
     default: return Qt::gray;
     }
 }

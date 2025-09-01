@@ -1,4 +1,5 @@
 #include "../include/PerformanceManager.h"
+#include "../config/PerformanceConfig.h"
 #include <QDebug>
 
 PerformanceManager::PerformanceManager(QObject* parent)
@@ -22,6 +23,36 @@ PerformanceManager::PerformanceManager(QObject* parent)
 PerformanceManager::~PerformanceManager()
 {
     stop();
+}
+
+void PerformanceManager::setConfig(PerformanceConfig* config)
+{
+    QMutexLocker locker(&m_mutex);
+    m_config = config;
+}
+
+void PerformanceManager::setConfig(QObject* config)
+{
+    QMutexLocker locker(&m_mutex);
+    m_config = qobject_cast<PerformanceConfig*>(config);
+}
+
+PerformanceConfig* PerformanceManager::config() const
+{
+    QMutexLocker locker(&m_mutex);
+    return m_config;
+}
+
+void PerformanceManager::setMetricsCollector(MetricsCollector* collector)
+{
+    QMutexLocker locker(&m_mutex);
+    m_metricsCollector = collector;
+}
+
+MetricsCollector* PerformanceManager::metricsCollector() const
+{
+    QMutexLocker locker(&m_mutex);
+    return m_metricsCollector;
 }
 
 bool PerformanceManager::initialize()
@@ -65,12 +96,6 @@ bool PerformanceManager::isRunning() const
 }
 
 // setConfig 函数实现已移除，使用基类实现
-
-void PerformanceManager::setMetricsCollector(MetricsCollector* collector)
-{
-    QMutexLocker locker(&m_mutex);
-    m_metricsCollector = collector;
-}
 
 QVariantMap PerformanceManager::getSystemInfo() const
 {
@@ -139,6 +164,12 @@ bool PerformanceManager::isMonitoringActive() const
     return m_isRunning;
 }
 
+PerformanceManager::PerformanceLevel PerformanceManager::getCurrentPerformanceLevel() const
+{
+    QMutexLocker locker(&m_mutex);
+    return m_currentLevel;
+}
+
 bool PerformanceManager::performOptimization()
 {
     qDebug() << "PerformanceManager: Performing optimization...";
@@ -154,6 +185,14 @@ void PerformanceManager::updateMetrics()
     }
     
     PerformanceMetrics metrics = getCurrentMetrics();
+    
+    // 检查性能等级变化
+    PerformanceLevel newLevel = calculatePerformanceLevel(metrics);
+    if (newLevel != m_currentLevel) {
+        m_currentLevel = newLevel;
+        emit performanceLevelChanged(newLevel);
+    }
+    
     emit metricsUpdated(metrics);
 }
 
@@ -165,4 +204,85 @@ void PerformanceManager::performAutoOptimization()
     
     qDebug() << "PerformanceManager: Performing auto optimization...";
     performOptimization();
+}
+
+PerformanceManager::PerformanceLevel PerformanceManager::calculatePerformanceLevel(const PerformanceMetrics& metrics) const
+{
+    // 简化的性能等级计算逻辑
+    double cpuUsage = metrics.system.cpuUsage;
+    double memoryUsage = metrics.system.memoryUsage;
+    
+    if (cpuUsage < 30.0 && memoryUsage < 1024.0) {
+        return PerformanceLevel::Excellent;
+    } else if (cpuUsage < 50.0 && memoryUsage < 2048.0) {
+        return PerformanceLevel::Good;
+    } else if (cpuUsage < 70.0 && memoryUsage < 4096.0) {
+        return PerformanceLevel::Fair;
+    } else if (cpuUsage < 85.0 && memoryUsage < 6144.0) {
+        return PerformanceLevel::Poor;
+    } else {
+        return PerformanceLevel::Critical;
+    }
+}
+
+void PerformanceManager::reset()
+{
+    QMutexLocker locker(&m_mutex);
+    
+    // 停止监控
+    if (m_isRunning) {
+        stop();
+    }
+    
+    // 重置状态
+    m_currentLevel = PerformanceLevel::Fair;
+    m_autoOptimizationEnabled = false;
+    
+    // 清理资源
+    if (m_metricsCollector) {
+        // 重置指标收集器
+    }
+}
+
+QString PerformanceManager::getMonitorName() const
+{
+    return "PerformanceManager";
+}
+
+QString PerformanceManager::getVersion() const
+{
+    return "1.0.0";
+}
+
+QVariantMap PerformanceManager::getStatus() const
+{
+    QMutexLocker locker(&m_mutex);
+    QVariantMap status;
+    status["isRunning"] = m_isRunning;
+    status["autoOptimizationEnabled"] = m_autoOptimizationEnabled;
+    status["currentLevel"] = static_cast<int>(m_currentLevel);
+    status["hasConfig"] = (m_config != nullptr);
+    status["hasMetricsCollector"] = (m_metricsCollector != nullptr);
+    return status;
+}
+
+QList<PerformanceMetrics> PerformanceManager::getHistoricalMetrics(const QDateTime& from, const QDateTime& to) const
+{
+    Q_UNUSED(from)
+    Q_UNUSED(to)
+    
+    // 暂时返回空列表，后续可以实现历史数据存储和检索
+    return QList<PerformanceMetrics>();
+}
+
+void PerformanceManager::checkThresholds()
+{
+    // 检查性能阈值的实现
+    // 暂时为空实现，后续可以添加阈值检查逻辑
+}
+
+void PerformanceManager::handleMonitorError(const QString& error)
+{
+    qWarning() << "Monitor error:" << error;
+    emit errorOccurred(error);
 }

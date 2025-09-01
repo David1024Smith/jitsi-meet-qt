@@ -1,7 +1,7 @@
 #include "PerformanceModule.h"
 #include "PerformanceManager.h"
 #include "MetricsCollector.h"
-#include "PerformanceConfig.h"
+#include "../config/PerformanceConfig.h"
 #include <QDebug>
 #include <QCoreApplication>
 

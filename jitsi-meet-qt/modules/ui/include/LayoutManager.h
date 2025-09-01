@@ -21,6 +21,7 @@ class SettingsLayout;
 class LayoutManager : public QObject, public ILayoutManager
 {
     Q_OBJECT
+    Q_INTERFACES(ILayoutManager)
 
 public:
     explicit LayoutManager(QObject *parent = nullptr);

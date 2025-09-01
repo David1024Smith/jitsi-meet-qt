@@ -149,7 +149,7 @@ void ChatRoom::setPrivate(bool isPrivate)
         } else {
             d->type = PublicRoom;
         }
-        emit privateStatusChanged(isPrivate);
+        emit privateChanged(isPrivate);
     }
 }
 
@@ -168,9 +168,13 @@ QDateTime ChatRoom::lastActivity() const
     return d->lastActivity;
 }
 
-QStringList ChatRoom::participants() const
+QList<Participant*> ChatRoom::participants() const
 {
-    return d->participants;
+    // 注意：这里需要返回实际的Participant对象列表
+    // 当前实现返回空列表，实际应用中需要维护真实的参与者对象
+    QList<Participant*> participantList;
+    // TODO: 实现从d->participants字符串列表转换为Participant对象列表
+    return participantList;
 }
 
 void ChatRoom::activate()
@@ -191,13 +195,13 @@ void ChatRoom::archive()
 void ChatRoom::lock()
 {
     d->hasPassword = true;
-    emit lockStatusChanged(true);
+    emit passwordChanged(true);
 }
 
 void ChatRoom::unlock()
 {
     d->hasPassword = false;
-    emit lockStatusChanged(false);
+    emit passwordChanged(false);
 }
 
 void ChatRoom::clearParticipants()
@@ -205,6 +209,6 @@ void ChatRoom::clearParticipants()
     if (!d->participants.isEmpty()) {
         d->participants.clear();
         d->participantCount = 0;
-        emit participantsChanged();
+        emit participantCountChanged(d->participantCount);
     }
 }

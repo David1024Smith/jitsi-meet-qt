@@ -37,8 +37,8 @@ public:
     virtual bool isApplied() const;
 
     // 布局配置
-    virtual QVariantMap getLayoutConfiguration() const = 0;
-    virtual void setLayoutConfiguration(const QVariantMap& config) = 0;
+    virtual QVariantMap getLayoutConfiguration() const;
+    virtual void setLayoutConfiguration(const QVariantMap& config);
     virtual void resetConfiguration();
     virtual bool validateConfiguration(const QVariantMap& config) const;
 

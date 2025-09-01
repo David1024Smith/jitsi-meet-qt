@@ -23,7 +23,7 @@
 #include "ConferenceManager.h"
 #include "MediaManager.h"
 // #include "ChatManager.h" // 暂时禁用聊天功能
-#include "ScreenShareManager.h"
+// #include "ScreenShareManager.h"  // 使用模块化版本
 #include "JitsiError.h"
 // #include "modules/chat/models/ChatMessage.h"  // Temporarily disabled
 
@@ -161,7 +161,7 @@ private:
     ConferenceManager* m_conferenceManager;
     MediaManager* m_mediaManager;
     // ChatManager* m_chatManager; // 暂时禁用聊天功能
-    ScreenShareManager* m_screenShareManager;
+    // ScreenShareManager* m_screenShareManager;  // 使用模块化版本
     
     // 新的模块化摄像头管理器
     class ICameraManager* m_cameraManager;

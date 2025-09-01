@@ -285,3 +285,75 @@ QStringList StartupOptimizer::getOptionalModules() const
 {
     return m_deferredModules;
 }
+
+/**
+ * @brief 获取优化前指标
+ * @return 优化前指标
+ */
+QVariantMap StartupOptimizer::getBeforeMetrics() const
+{
+    QVariantMap metrics;
+    
+    // 启动时间相关指标
+    metrics["startup_time_ms"] = m_lastStartupTime;
+    metrics["average_startup_time"] = m_averageStartupTime;
+    metrics["best_startup_time"] = m_bestStartupTime;
+    metrics["module_count"] = m_preloadedModules.size() + m_deferredModules.size();
+    metrics["preloaded_modules"] = m_preloadedModules.size();
+    metrics["deferred_modules"] = m_deferredModules.size();
+    
+    // 优化状态指标
+    metrics["cache_optimized"] = m_cacheOptimized;
+    metrics["config_optimized"] = m_configOptimized;
+    metrics["module_order_optimized"] = m_moduleOrderOptimized;
+    metrics["startup_timeout"] = m_startupTimeout;
+    
+    // 启动策略
+    metrics["startup_strategy"] = static_cast<int>(m_startupStrategy);
+    
+    qDebug() << "StartupOptimizer: 获取优化前指标，启动时间:" << m_lastStartupTime << "ms";
+    
+    return metrics;
+}
+
+/**
+ * @brief 获取优化后指标
+ * @return 优化后指标
+ */
+QVariantMap StartupOptimizer::getAfterMetrics() const
+{
+    QVariantMap metrics;
+    
+    // 当前启动时间指标
+    metrics["startup_time_ms"] = m_lastStartupTime;
+    
+    // 改善情况计算
+    if (m_averageStartupTime > 0 && m_lastStartupTime > 0) {
+        qint64 improvement = m_averageStartupTime - m_lastStartupTime;
+        double improvementPercent = (double)improvement / m_averageStartupTime * 100.0;
+        metrics["improvement_ms"] = improvement;
+        metrics["improvement_percent"] = improvementPercent;
+    } else {
+        metrics["improvement_ms"] = 0;
+        metrics["improvement_percent"] = 0.0;
+    }
+    
+    // 当前模块配置
+    metrics["module_count"] = m_preloadedModules.size() + m_deferredModules.size();
+    metrics["preloaded_modules"] = m_preloadedModules.size();
+    metrics["deferred_modules"] = m_deferredModules.size();
+    
+    // 优化后的状态
+    metrics["cache_optimized"] = m_cacheOptimized;
+    metrics["config_optimized"] = m_configOptimized;
+    metrics["module_order_optimized"] = m_moduleOrderOptimized;
+    metrics["startup_timeout"] = m_startupTimeout;
+    
+    // 性能指标
+    metrics["best_time_achieved"] = (m_lastStartupTime <= m_bestStartupTime);
+    metrics["optimization_success"] = (m_lastStartupTime < m_averageStartupTime);
+    
+    qDebug() << "StartupOptimizer: 获取优化后指标，当前启动时间:" << m_lastStartupTime << "ms，改善:" << (m_averageStartupTime - m_lastStartupTime) << "ms";
+    
+    return metrics;
+}

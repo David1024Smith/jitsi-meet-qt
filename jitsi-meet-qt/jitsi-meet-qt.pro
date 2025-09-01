@@ -16,8 +16,8 @@ CONFIG += c++17
 # Disable deprecated APIs
 DEFINES += QT_DISABLE_DEPRECATED_UP_TO=0x060000
 
-# Include modular architecture (safe mode)
-include(modules/modules_safe.pri)
+# Include modular architecture 
+include(modules/modules.pri)
 
 # Core Application Headers (Non-modular)
 HEADERS += include/AuthenticationManager.h \
@@ -32,7 +32,6 @@ HEADERS += include/AuthenticationManager.h \
            include/ILogger.h \
            include/JitsiConstants.h \
            include/JitsiError.h \
-           include/Logger.h \
            include/MainApplication.h \
            include/MediaManager.h \
            include/MemoryLeakDetector.h \
@@ -40,10 +39,8 @@ HEADERS += include/AuthenticationManager.h \
            include/ModuleError.h \
            include/NavigationBar.h \
            include/OptimizedRecentManager.h \
-           include/PerformanceManager.h \
            include/ProtocolHandler.h \
            include/RecentListWidget.h \
-           include/ScreenShareManager.h \
            include/SettingsDialog.h \
            include/StyleHelper.h \
            include/StyleUtils.h \
@@ -67,7 +64,6 @@ SOURCES += src/AuthenticationManager.cpp \
            src/ErrorRecoveryManager.cpp \
            src/ErrorUtils.cpp \
            src/JitsiError.cpp \
-           src/Logger.cpp \
            src/main.cpp \
            src/MainApplication.cpp \
            src/MediaManager.cpp \
@@ -76,10 +72,8 @@ SOURCES += src/AuthenticationManager.cpp \
            src/ModuleError.cpp \
            src/NavigationBar.cpp \
            src/OptimizedRecentManager.cpp \
-           src/PerformanceManager.cpp \
            src/ProtocolHandler.cpp \
            src/RecentListWidget.cpp \
-           src/ScreenShareManager.cpp \
            src/SettingsDialog.cpp \
            src/StyleHelper.cpp \
            src/StyleUtils.cpp \
@@ -135,7 +129,13 @@ CONFIG(release, debug|release) {
 win32 {
     DEFINES += WIN32_PLATFORM
     RC_FILE = resources/app.rc
-    QMAKE_LIBS_QT_ENTRY =
+    # Fix MinGW linking issues
+    CONFIG += no_lflags_merge
+    QMAKE_LFLAGS += -Wl,--allow-multiple-definition
+    # Explicitly exclude Qt6EntryPoint to avoid __imp___argc issue
+    QMAKE_LIBS_QT_ENTRY_POINT =
+    # Ensure proper linking order for MinGW
+    LIBS += -lkernel32 -luser32 -lgdi32 -lwinspool -lcomdlg32 -ladvapi32 -lshell32 -lole32 -loleaut32 -luuid -lodbc32 -lodbccp32
 }
 
 unix:!macx {
@@ -148,11 +148,11 @@ macx {
 
 # Output directories
 CONFIG(debug, debug|release) {
-    DESTDIR = debug
-    OBJECTS_DIR = debug/obj
-    MOC_DIR = debug/moc
-    RCC_DIR = debug/rcc
-    UI_DIR = debug/ui
+    DESTDIR = build/Desktop_Qt_6_8_3_MinGW_64_bit-Debug
+    OBJECTS_DIR = build/Desktop_Qt_6_8_3_MinGW_64_bit-Debug/obj
+    MOC_DIR = build/Desktop_Qt_6_8_3_MinGW_64_bit-Debug/moc
+    RCC_DIR = build/Desktop_Qt_6_8_3_MinGW_64_bit-Debug/rcc
+    UI_DIR = build/Desktop_Qt_6_8_3_MinGW_64_bit-Debug/ui
 }
 
 CONFIG(release, debug|release) {

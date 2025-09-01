@@ -69,12 +69,12 @@ signals:
     /**
      * @brief 屏幕共享开始信号
      */
-    void screenShareStarted();
+    void shareStarted();
 
     /**
      * @brief 屏幕共享停止信号
      */
-    void screenShareStopped();
+    void shareStopped();
 
     /**
      * @brief 远程屏幕共享接收信号

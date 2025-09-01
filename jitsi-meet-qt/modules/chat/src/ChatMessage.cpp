@@ -32,45 +32,26 @@ ChatMessage::ChatMessage(QObject* parent)
     d->type = TextMessage;
     d->timestamp = QDateTime::currentDateTime();
     d->status = Pending;
-    d->priority = NormalPriority;
+    d->priority = Normal;
     d->isRead = false;
     d->isEdited = false;
     d->fileSize = 0;
 }
 
 ChatMessage::ChatMessage(const QString& content, const QString& senderId, 
-                        const QString& senderName, MessageType type, QObject* parent)
+                        const QString& roomId, MessageType type, QObject* parent)
     : QObject(parent)
     , d(new Private)
 {
     d->id = QUuid::createUuid().toString(QUuid::WithoutBraces);
     d->content = content;
     d->senderId = senderId;
-    d->senderName = senderName;
-    d->type = type;
-    d->timestamp = QDateTime::currentDateTime();
-    d->status = Pending;
-    d->priority = NormalPriority;
-    d->isRead = false;
-    d->isEdited = false;
-    d->fileSize = 0;
-}
-
-ChatMessage::ChatMessage(const QString& content, const QString& senderId, 
-                        const QString& senderName, const QString& roomId, 
-                        MessageType type, QObject* parent)
-    : QObject(parent)
-    , d(new Private)
-{
-    d->id = QUuid::createUuid().toString(QUuid::WithoutBraces);
-    d->content = content;
-    d->senderId = senderId;
-    d->senderName = senderName;
+    d->senderName = QString(); // 初始化为空，可以后续设置
     d->roomId = roomId;
     d->type = type;
     d->timestamp = QDateTime::currentDateTime();
     d->status = Pending;
-    d->priority = NormalPriority;
+    d->priority = Normal;
     d->isRead = false;
     d->isEdited = false;
     d->fileSize = 0;
@@ -189,7 +170,8 @@ void ChatMessage::setPriority(MessagePriority priority)
 {
     if (d->priority != priority) {
         d->priority = priority;
-        emit priorityChanged(priority);
+        // Note: priorityChanged signal not declared in header, using propertyChanged instead
+        emit propertyChanged("priority", static_cast<int>(priority));
     }
 }
 
@@ -202,7 +184,7 @@ void ChatMessage::setRead(bool read)
 {
     if (d->isRead != read) {
         d->isRead = read;
-        emit readStatusChanged(read);
+        emit readChanged(read);
     }
 }
 
@@ -280,6 +262,7 @@ void ChatMessage::retrySend()
 {
     if (d->status == Failed) {
         setStatus(Pending);
-        emit retryRequested();
+        // Note: retryRequested signal not declared in header, using propertyChanged instead
+        emit propertyChanged("retryRequested", true);
     }
 }

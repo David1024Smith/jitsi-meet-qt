@@ -101,9 +101,6 @@ macx {
 # 调试配置
 CONFIG(debug, debug|release) {
     DEFINES += SCREENSHARE_DEBUG
-    TARGET = screenshare_debug
-} else {
-    TARGET = screenshare
 }
 
 # 输出信息

@@ -19,46 +19,55 @@ include_directories(
 set(SCREENSHARE_SOURCES
     # Core screenshare files
     src/ScreenShareManager.cpp
-    src/ScreenCapture.cpp
-    src/ScreenSelector.cpp
+    src/CaptureEngine.cpp
+    src/ScreenShareModule.cpp
     
     # Capture engines
     capture/WindowCapture.cpp
-    capture/DesktopCapture.cpp
     capture/RegionCapture.cpp
+    capture/ScreenCapture.cpp
     
-    # Processing
-    processing/VideoProcessor.cpp
-    processing/CompressionManager.cpp
+    # Encoding
+    encoding/VideoEncoder.cpp
+    encoding/FrameProcessor.cpp
     
-    # UI components
-    ui/ScreenShareWidget.cpp
-    ui/ScreenSelectorDialog.cpp
+    # Config
+    config/ScreenShareConfig.cpp
+    
+    # Widgets
+    widgets/ScreenShareWidget.cpp
+    widgets/ScreenSelector.cpp
+    widgets/CapturePreview.cpp
 )
 
 # Header files
 set(SCREENSHARE_HEADERS
     # Core headers
     include/ScreenShareManager.h
-    include/ScreenCapture.h
-    include/ScreenSelector.h
+    include/CaptureEngine.h
+    include/ScreenShareModule.h
     
     # Capture headers
     capture/WindowCapture.h
-    capture/DesktopCapture.h
     capture/RegionCapture.h
+    capture/ScreenCapture.h
     
-    # Processing headers
-    processing/VideoProcessor.h
-    processing/CompressionManager.h
+    # Encoding headers
+    encoding/VideoEncoder.h
+    encoding/FrameProcessor.h
     
-    # UI headers
-    ui/ScreenShareWidget.h
-    ui/ScreenSelectorDialog.h
+    # Config headers
+    config/ScreenShareConfig.h
+    
+    # Widget headers
+    widgets/ScreenShareWidget.h
+    widgets/ScreenSelector.h
+    widgets/CapturePreview.h
     
     # Interface headers
     interfaces/IScreenShareManager.h
     interfaces/IScreenCapture.h
+    interfaces/IDisplayManager.h
 )
 
 # Create the screenshare library
@@ -73,6 +82,7 @@ target_link_libraries(ScreenShareModule
     Qt6::Widgets
     Qt6::Network
     Qt6::Multimedia
+    Qt6::MultimediaWidgets
 )
 
 # Set target properties

@@ -1,13 +1,15 @@
 #ifndef NETWORKMONITOR_H
 #define NETWORKMONITOR_H
 
+#include <QObject>
 #include "BaseMonitor.h"
-#include <QNetworkInterface>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QTcpSocket>
 #include <QUdpSocket>
 #include <QTimer>
+
+class QNetworkInterface;
 
 /**
  * @brief 网络监控器类
@@ -128,10 +130,10 @@ public:
 
     /**
      * @brief 获取接口类型
-     * @param interface 网络接口
+     * @param interfaceName 接口名称
      * @return 接口类型
      */
-    InterfaceType getInterfaceType(const QNetworkInterface& interface) const;
+    InterfaceType getInterfaceType(const QString& interfaceName) const;
 
     /**
      * @brief 获取下载速度

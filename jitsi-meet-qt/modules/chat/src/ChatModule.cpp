@@ -1,5 +1,5 @@
 #include "ChatModule.h"
-#include "ChatManager.h"
+#include "../include/ChatManager.h"
 #include "MessageHandler.h"
 #include "ChatConfig.h"
 

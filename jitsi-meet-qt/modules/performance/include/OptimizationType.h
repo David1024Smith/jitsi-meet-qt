@@ -1,6 +1,8 @@
 #ifndef OPTIMIZATIONTYPE_H
 #define OPTIMIZATIONTYPE_H
 
+#include <QDebug>
+
 /**
  * @brief 优化类型枚举
  * 
@@ -74,5 +76,9 @@ enum class OptimizationResultStatus
     NotNeeded,         // 不需要优化
     NotSupported       // 不支持
 };
+
+// QDebug 操作符声明
+QDebug operator<<(QDebug debug, OptimizationStrategy strategy);
+QDebug operator<<(QDebug debug, OptimizationResultStatus result);
 
 #endif // OPTIMIZATIONTYPE_H

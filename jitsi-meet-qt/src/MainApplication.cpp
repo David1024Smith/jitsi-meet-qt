@@ -6,12 +6,13 @@
 #include "ConferenceManager.h"
 #include "MediaManager.h"
 // #include "ChatManager.h" // 暂时禁用聊天功能
-#include "ScreenShareManager.h"
+// #include "../modules/screenshare/include/ScreenShareManager.h" // 使用模块化版本
 #include "AuthenticationManager.h"
 #include "ErrorRecoveryManager.h"
 // #include "ThemeManager.h" // 暂时禁用主题功能
-#include "PerformanceManager.h"
-#include "Logger.h"
+#include "../modules/performance/include/PerformanceManager.h"
+#include "OptimizedRecentManager.h"
+#include "../modules/utils/include/Logger.h"
 #include "LogMacros.h"
 #include "ErrorLogger.h"
 #include "ErrorEventBus.h"
@@ -36,11 +37,12 @@ MainApplication::MainApplication(int argc, char *argv[])
     , m_mediaManager(nullptr)
     // , m_chatManager(nullptr) // 暂时禁用聊天功能
     , m_serverName(QString::fromUtf8(SERVER_NAME.data(), static_cast<int>(SERVER_NAME.size())))
-    , m_screenShareManager(nullptr)
+    // , m_screenShareManager(nullptr)  // 注释掉，使用模块化版本
     , m_authenticationManager(nullptr)
     , m_errorRecoveryManager(nullptr)
     // , m_themeManager(nullptr) // 暂时禁用主题功能
     , m_performanceManager(nullptr)
+    , m_optimizedRecentManager(nullptr)
 {
     // Set singleton instance
     s_instance = this;
@@ -96,6 +98,12 @@ MainApplication::~MainApplication() {
     //     m_themeManager = nullptr;
     // } // 暂时禁用主题功能
     
+    if (m_optimizedRecentManager) {
+        m_optimizedRecentManager->shutdown();
+        delete m_optimizedRecentManager;
+        m_optimizedRecentManager = nullptr;
+    }
+    
     if (m_errorRecoveryManager) {
         delete m_errorRecoveryManager;
         m_errorRecoveryManager = nullptr;
@@ -106,10 +114,10 @@ MainApplication::~MainApplication() {
         m_authenticationManager = nullptr;
     }
     
-    if (m_screenShareManager) {
-        delete m_screenShareManager;
-        m_screenShareManager = nullptr;
-    }
+    // if (m_screenShareManager) {
+    //     delete m_screenShareManager;
+    //     m_screenShareManager = nullptr;
+    // }  // 注释掉，使用模块化版本
     
     // if (m_chatManager) {
     //     delete m_chatManager;
@@ -451,11 +459,19 @@ void MainApplication::initializeManagers() {
     // }
     // qDebug() << "ChatManager initialized";
     
-    // 10. Initialize screen share manager
-    m_screenShareManager = new ScreenShareManager(this);
-    qDebug() << "ScreenShareManager initialized";
+    // 10. Initialize screen share manager (使用模块化版本)
+    // m_screenShareManager = new ScreenShareManager(this);
+    // qDebug() << "ScreenShareManager initialized";
     
-    // 11. Initialize window manager
+    // 11. Initialize OptimizedRecentManager (必须在WindowManager之前初始化)
+    m_optimizedRecentManager = new OptimizedRecentManager(this);
+    if (m_optimizedRecentManager->initialize()) {
+        qDebug() << "OptimizedRecentManager initialized successfully";
+    } else {
+        qWarning() << "Failed to initialize OptimizedRecentManager";
+    }
+    
+    // 12. Initialize window manager
     m_windowManager = new WindowManager(this);
     if (m_configurationManager) {
         m_windowManager->setConfigurationManager(m_configurationManager);
@@ -465,7 +481,7 @@ void MainApplication::initializeManagers() {
     }
     qDebug() << "WindowManager initialized";
     
-    // 12. Initialize protocol handler
+    // 13. Initialize protocol handler
     initializeProtocolHandler();
     
     qDebug() << "All manager components initialized successfully";
@@ -520,12 +536,12 @@ void MainApplication::setupComponentConnections() {
     // }
     
     // Connect screen share manager to conference manager
-    if (m_screenShareManager && m_conferenceManager) {
-        connect(m_conferenceManager, &ConferenceManager::conferenceJoined,
-                m_screenShareManager, [this](const ConferenceManager::ConferenceInfo& /*info*/) {
-                    qDebug() << "Conference joined, screen share manager ready";
-                });
-    }
+    // if (m_screenShareManager && m_conferenceManager) {
+    //     connect(m_conferenceManager, &ConferenceManager::conferenceJoined,
+    //             m_screenShareManager, [this](const ConferenceManager::ConferenceInfo& /*info*/) {
+    //                 qDebug() << "Conference joined, screen share manager ready";
+    //             });
+    // }  // 注释掉，使用模块化版本
     
     // Connect error recovery manager to all components
     if (m_errorRecoveryManager) {

@@ -20,24 +20,31 @@ set(UTILS_SOURCES
     # Core utility files
     src/UtilsModule.cpp
     src/Logger.cpp
-    src/FileUtils.cpp
+    src/FileManager.cpp
+    src/UtilsErrorHandler.cpp
+    src/UtilsSingletonManager.cpp
     
     # File operations
     file/ConfigFile.cpp
-    file/FileManager.cpp
-    file/PathUtils.cpp
+    file/FileWatcher.cpp
+    file/TempFile.cpp
     
-    # System utilities
-    system/SystemInfo.cpp
-    system/ProcessManager.cpp
+    # Config
+    config/UtilsConfig.cpp
     
     # Crypto utilities
-    crypto/CryptoUtils.cpp
-    crypto/HashGenerator.cpp
+    crypto/AESCrypto.cpp
+    crypto/HashUtils.cpp
+    crypto/RSACrypto.cpp
     
     # String utilities
     string/StringUtils.cpp
-    string/TextProcessor.cpp
+    string/Validator.cpp
+    
+    # Logging
+    logging/ConsoleLogger.cpp
+    logging/FileLogger.cpp
+    logging/NetworkLogger.cpp
 )
 
 # Header files
@@ -45,28 +52,36 @@ set(UTILS_HEADERS
     # Core headers
     include/UtilsModule.h
     include/Logger.h
-    include/FileUtils.h
+    include/FileManager.h
+    include/UtilsErrorHandler.h
+    include/UtilsSingletonManager.h
     
     # File headers
     file/ConfigFile.h
-    file/FileManager.h
-    file/PathUtils.h
+    file/FileWatcher.h
+    file/TempFile.h
     
-    # System headers
-    system/SystemInfo.h
-    system/ProcessManager.h
+    # Config headers
+    config/UtilsConfig.h
     
     # Crypto headers
-    crypto/CryptoUtils.h
-    crypto/HashGenerator.h
+    crypto/AESCrypto.h
+    crypto/HashUtils.h
+    crypto/RSACrypto.h
     
     # String headers
     string/StringUtils.h
-    string/TextProcessor.h
+    string/Validator.h
+    
+    # Logging headers
+    logging/ConsoleLogger.h
+    logging/FileLogger.h
+    logging/NetworkLogger.h
     
     # Interface headers
+    interfaces/ICryptoHandler.h
+    interfaces/IFileHandler.h
     interfaces/ILogger.h
-    interfaces/IFileManager.h
 )
 
 # Create the utils library
@@ -76,7 +91,7 @@ add_library(UtilsModule STATIC
 )
 
 # Link Qt libraries
-target_link_libraries(UtilsModule
+target_link_libraries(UtilsModule PRIVATE
     Qt6::Core
     Qt6::Widgets
     Qt6::Network
@@ -88,7 +103,14 @@ set_target_properties(UtilsModule PROPERTIES
     AUTOMOC ON
     AUTORCC ON
     AUTOUIC ON
+    INTERPROCEDURAL_OPTIMIZATION OFF
 )
+
+# Link OpenSSL libraries if found
+if(OPENSSL_FOUND)
+    target_link_libraries(UtilsModule PRIVATE ${OPENSSL_LIBRARIES})
+    target_include_directories(UtilsModule PRIVATE ${OPENSSL_INCLUDE_DIR})
+endif()
 
 # Export include directories
 target_include_directories(UtilsModule PUBLIC

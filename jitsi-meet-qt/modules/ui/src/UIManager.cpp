@@ -1,7 +1,7 @@
 #include "UIManager.h"
 #include "interfaces/IThemeManager.h"
 #include "../interfaces/ILayoutManager.h"
-#include "ThemeManager.h"
+#include "../include/ThemeManager.h"
 #include "ThemeFactory.h"
 #include "LayoutManager.h"
 #include "../config/UIConfig.h"
@@ -365,6 +365,13 @@ void UIManager::onLayoutManagerError(const QString& error)
     emit errorOccurred(QString("Layout Manager error: %1").arg(error));
 }
 
+void UIManager::onThemeChanged(const QString& oldTheme, const QString& newTheme)
+{
+    // 适配ThemeManager的双参数信号到UIManager的单参数信号
+    m_currentTheme = newTheme;
+    emit themeChanged(newTheme);
+}
+
 void UIManager::setupManagers()
 {
     // 创建主题管理器
@@ -387,8 +394,8 @@ void UIManager::setupConnections()
         ThemeManager* themeManager = static_cast<ThemeManager*>(m_themeManager.get());
         connect(themeManager, &ThemeManager::errorOccurred,
                 this, &UIManager::onThemeManagerError);
-        connect(themeManager, &ThemeManager::themeChanged,
-                this, &UIManager::themeChanged);
+        connect(themeManager, QOverload<const QString&, const QString&>::of(&ThemeManager::themeChanged),
+                this, &UIManager::onThemeChanged);
     }
 
     if (m_layoutManager) {

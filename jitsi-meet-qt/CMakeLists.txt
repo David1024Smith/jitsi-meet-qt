@@ -25,11 +25,11 @@ if(MINGW)
     set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -DQT_NO_DEBUG_OUTPUT")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libgcc -static-libstdc++")
     
-    # Enable LTO for release builds
-    if(CMAKE_BUILD_TYPE STREQUAL "Release")
-        set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -flto")
-        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -flto")
-    endif()
+    # Disable LTO for release builds to avoid symbol linking issues
+    # if(CMAKE_BUILD_TYPE STREQUAL "Release")
+    #     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -flto")
+    #     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -flto")
+    # endif()
 endif()
 
 # Configure version header
@@ -50,6 +50,7 @@ find_package(Qt6 6.8.3 REQUIRED COMPONENTS
     Sql
     LinguistTools
     Xml
+    Charts
 )
 
 # Find OpenSSL - make it optional for now
@@ -60,7 +61,7 @@ if(NOT OPENSSL_FOUND)
     message(WARNING "OpenSSL not found, trying alternative paths...")
     set(OPENSSL_ROOT_DIR "C:/Program Files/OpenSSL-Win64")
     set(OPENSSL_INCLUDE_DIR "${OPENSSL_ROOT_DIR}/include")
-    set(OPENSSL_LIBRARIES "${OPENSSL_ROOT_DIR}/lib/libssl.lib;${OPENSSL_ROOT_DIR}/lib/libcrypto.lib")
+    set(OPENSSL_LIBRARIES "${OPENSSL_ROOT_DIR}/lib/VC/x64/MD/libssl.lib;${OPENSSL_ROOT_DIR}/lib/VC/x64/MD/libcrypto.lib")
     
     # Check if the alternative path exists
     if(EXISTS "${OPENSSL_INCLUDE_DIR}/openssl/ssl.h")
@@ -95,9 +96,9 @@ add_subdirectory(modules/settings)
 # Temporarily disable other modules until we create missing source files
 # add_subdirectory(modules/chat)
 # add_subdirectory(modules/network)
-# add_subdirectory(modules/performance)
-# add_subdirectory(modules/screenshare)
-# add_subdirectory(modules/utils)
+add_subdirectory(modules/performance)
+add_subdirectory(modules/screenshare)
+add_subdirectory(modules/utils)
 # add_subdirectory(modules/ui)
 # add_subdirectory(modules/audio)
 # add_subdirectory(modules/camera)
@@ -129,6 +130,10 @@ set(SOURCES
     src/MemoryProfiler.cpp
     src/MemoryLeakDetector.cpp
     src/OptimizedRecentManager.cpp
+    src/ErrorLogger.cpp
+    src/ErrorEventBus.cpp
+    src/WindowStateManager.cpp
+    src/ModuleError.cpp
 )
 
 # Header files - only existing files
@@ -157,6 +162,10 @@ set(HEADERS
     include/MemoryProfiler.h
     include/MemoryLeakDetector.h
     include/OptimizedRecentManager.h
+    include/ModuleError.h
+    include/ErrorEventBus.h
+    include/WindowStateManager.h
+    include/ErrorLogger.h
     include/JitsiConstants.h
     include/version.h.in
 )
@@ -194,14 +203,15 @@ target_link_libraries(${PROJECT_NAME}
     Qt6::MultimediaWidgets
     Qt6::Sql
     Qt6::Xml
+    Qt6::Charts
     # Module libraries - only enabled modules
+    ScreenShareModule
     SettingsModule
+    UtilsModule
     # Temporarily disabled modules
     # ChatModule
     # NetworkModule
-    # PerformanceModule
-    # ScreenShareModule
-    # UtilsModule
+    PerformanceModule
     # UIModule
     # AudioModule
     # CameraModule

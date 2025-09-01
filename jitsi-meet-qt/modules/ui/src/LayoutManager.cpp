@@ -1,8 +1,8 @@
 #include "LayoutManager.h"
-#include "layouts/BaseLayout.h"
-#include "layouts/MainLayout.h"
-#include "layouts/ConferenceLayout.h"
-#include "layouts/SettingsLayout.h"
+#include "../layouts/BaseLayout.h"
+#include "../layouts/MainLayout.h"
+#include "../layouts/ConferenceLayout.h"
+#include "../layouts/SettingsLayout.h"
 #include <QWidget>
 #include <QDebug>
 
@@ -105,9 +105,11 @@ bool LayoutManager::updateLayout()
     for (auto it = m_appliedLayouts.begin(); it != m_appliedLayouts.end(); ++it) {
         auto layout = it.value();
         if (layout && layout->isApplied()) {
-            layout->updateLayout();
+            // 刷新布局主题
+            layout->refreshTheme();
         }
     }
+    emit layoutUpdated();
     return true;
 }
 
@@ -135,7 +137,7 @@ bool LayoutManager::applyLayoutToWidget(const QString& layoutName, QWidget* widg
     // 应用新布局
     if (layout->apply(widget)) {
         m_appliedLayouts[widget] = layout;
-        emit layoutApplied(layoutName, widget);
+        emit layoutAppliedToWidget(layoutName, widget);
         qDebug() << "Layout applied:" << layoutName << "to widget";
         return true;
     }
@@ -157,7 +159,7 @@ bool LayoutManager::removeLayoutFromWidget(QWidget* widget)
             layout->cleanup();
         }
         m_appliedLayouts.erase(it);
-        emit layoutRemoved(widget);
+        emit layoutRemovedFromWidget(widget);
         qDebug() << "Layout removed from widget";
         return true;
     }
@@ -303,15 +305,15 @@ void LayoutManager::onLayoutError(const QString& error)
 void LayoutManager::setupDefaultLayouts()
 {
     // 创建主布局
-    m_mainLayout = std::make_shared<MainLayout>();
+    m_mainLayout = std::make_shared<::MainLayout>();
     registerLayout("main", m_mainLayout);
 
     // 创建会议布局
-    m_conferenceLayout = std::make_shared<ConferenceLayout>();
+    m_conferenceLayout = std::make_shared<::ConferenceLayout>();
     registerLayout("conference", m_conferenceLayout);
 
     // 创建设置布局
-    m_settingsLayout = std::make_shared<SettingsLayout>();
+    m_settingsLayout = std::make_shared<::SettingsLayout>();
     registerLayout("settings", m_settingsLayout);
 
     qDebug() << "Default layouts created and registered";
@@ -345,20 +347,20 @@ bool LayoutManager::validateLayoutName(const QString& layoutName) const
     // 可以添加更多验证逻辑
     return true;
 }
-//
- ILayoutManager 接口的缺失实现
+
+// ILayoutManager 接口的缺失实现
 
 bool LayoutManager::setLayout(LayoutType layoutType)
 {
     QString layoutName;
     switch (layoutType) {
-        case MainLayout:
+        case ILayoutManager::MainLayout:
             layoutName = "main";
             break;
-        case ConferenceLayout:
+        case ILayoutManager::ConferenceLayout:
             layoutName = "conference";
             break;
-        case SettingsLayout:
+        case ILayoutManager::SettingsLayout:
             layoutName = "settings";
             break;
         default:

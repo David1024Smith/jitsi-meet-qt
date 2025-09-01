@@ -31,7 +31,7 @@ QString PerformanceUtils::formatBytes(qint64 bytes, SizeUnit unit, int precision
     } else if (bytes >= KB) {
         return QString("%1 KB").arg(bytes / (double)KB, 0, 'f', precision);
     } else {
-        return QString("%1 B").arg(bytes);
+        return QString("%1 B").arg(static_cast<double>(bytes));
     }
 }
 
@@ -45,7 +45,7 @@ QString PerformanceUtils::formatTime(qint64 milliseconds, TimeUnit unit, int pre
     if (milliseconds >= 1000) {
         return QString("%1 s").arg(milliseconds / 1000.0, 0, 'f', precision);
     } else {
-        return QString("%1 ms").arg(milliseconds, 0, 'f', precision);
+        return QString("%1 ms").arg(static_cast<double>(milliseconds), 0, 'f', precision);
     }
 }
 
@@ -57,23 +57,28 @@ QString PerformanceUtils::formatFrequency(double frequency, int precision)
 
 QString PerformanceUtils::formatBandwidth(qint64 bandwidth, int precision)
 {
-    return QString("%1 bps").arg(bandwidth, 0, 'f', precision);
+    return QString("%1 bps").arg(static_cast<double>(bandwidth), 0, 'f', precision);
 }
 
 double PerformanceUtils::convertBytes(qint64 bytes, SizeUnit fromUnit, SizeUnit toUnit)
 {
+    Q_UNUSED(fromUnit)
+    Q_UNUSED(toUnit)
     // Simple implementation - can be expanded
     return static_cast<double>(bytes);
 }
 
 double PerformanceUtils::convertTime(qint64 time, TimeUnit fromUnit, TimeUnit toUnit)
 {
+    Q_UNUSED(fromUnit)
+    Q_UNUSED(toUnit)
     // Simple implementation - can be expanded
     return static_cast<double>(time);
 }
 
 QJsonObject PerformanceUtils::metricsToJson(const PerformanceMetrics& metrics)
 {
+    Q_UNUSED(metrics)
     QJsonObject json;
     // Add basic implementation
     return json;
@@ -81,6 +86,7 @@ QJsonObject PerformanceUtils::metricsToJson(const PerformanceMetrics& metrics)
 
 PerformanceMetrics PerformanceUtils::metricsFromJson(const QJsonObject& json)
 {
+    Q_UNUSED(json)
     PerformanceMetrics metrics;
     // Add basic implementation
     return metrics;

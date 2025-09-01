@@ -28,6 +28,8 @@
 #include <QMessageBox>
 #include <QFileDialog>
 #include <QDebug>
+#include <QApplication>
+#include <QClipboard>
 
 class ChatWidget::Private
 {
@@ -776,4 +778,180 @@ void ChatWidget::applyTheme(const QString& themeName)
 {
     d->theme = themeName;
     applyStyles();
+}
+
+void ChatWidget::clearUnreadCount()
+{
+    /**
+     * @brief 清除未读计数
+     * 将所有消息标记为已读并重置未读计数器
+     */
+    if (d->chatManager) {
+        d->chatManager->markRoomAsRead(d->currentRoom);
+    }
+    
+    // 更新UI状态
+    updateStatusBar();
+}
+
+void ChatWidget::reloadMessages()
+{
+    /**
+     * @brief 重新加载消息
+     * 清除当前显示的消息并从聊天管理器重新加载
+     */
+    if (d->messageList) {
+        d->messageList->clearMessages();
+    }
+    
+    if (d->chatManager && !d->currentRoom.isEmpty()) {
+        // 刷新参与者列表，这会触发消息更新
+        d->chatManager->refreshParticipants();
+    }
+}
+
+void ChatWidget::markAllAsRead()
+{
+    // 标记所有消息为已读
+    if (d->chatManager) {
+        d->chatManager->markAllAsRead();
+    }
+    
+    // 清除未读计数
+    clearUnreadCount();
+}
+
+/**
+ * @brief 切换工具栏显示状态
+ */
+void ChatWidget::toggleToolbar()
+{
+    // 切换工具栏显示/隐藏
+    if (d->toolbar) {
+        d->toolbar->setVisible(!d->toolbar->isVisible());
+    }
+}
+
+/**
+ * @brief 切换全屏模式
+ */
+void ChatWidget::toggleFullScreen()
+{
+    // 切换全屏模式
+    if (isFullScreen()) {
+        showNormal();
+    } else {
+        showFullScreen();
+    }
+}
+
+/**
+ * @brief 复制选中的消息
+ */
+void ChatWidget::copySelectedMessages()
+{
+    // 复制选中的消息到剪贴板
+    QStringList selectedTexts;
+    
+    // TODO: 获取选中的消息文本
+    // 这里需要根据实际的消息列表实现来获取选中项
+    
+    if (!selectedTexts.isEmpty()) {
+        QClipboard* clipboard = QApplication::clipboard();
+        clipboard->setText(selectedTexts.join("\n"));
+    }
+}
+
+/**
+ * @brief 删除选中的消息
+ */
+void ChatWidget::deleteSelectedMessages()
+{
+    // 删除选中的消息
+    // TODO: 实现删除选中消息的逻辑
+    qDebug() << "Delete selected messages requested";
+}
+
+/**
+ * @brief 处理输入文本变化
+ * @param text 输入的文本
+ */
+void ChatWidget::handleInputTextChanged(const QString& text)
+{
+    // 处理输入文本变化
+    Q_UNUSED(text)
+    
+    // 可以在这里实现输入提示、字符计数等功能
+    // TODO: 根据需要实现具体逻辑
+}
+
+/**
+ * @brief 刷新参与者列表
+ */
+void ChatWidget::refreshParticipants()
+{
+    // 刷新参与者列表
+    if (d->chatManager) {
+        d->chatManager->refreshParticipants();
+    }
+}
+
+/**
+ * @brief 处理工具栏动作触发
+ */
+void ChatWidget::handleToolbarActionTriggered()
+{
+    // 处理工具栏动作触发
+    QAction* action = qobject_cast<QAction*>(sender());
+    if (action) {
+        qDebug() << "Toolbar action triggered:" << action->text();
+    }
+}
+
+/**
+ * @brief 显示表情选择器
+ */
+void ChatWidget::showEmojiPicker()
+{
+    // 显示表情选择器
+    // TODO: 实现表情选择器功能
+    qDebug() << "Show emoji picker requested";
+}
+
+/**
+ * @brief 显示文件对话框
+ */
+void ChatWidget::showFileDialog()
+{
+    // 显示文件选择对话框
+    QString fileName = QFileDialog::getOpenFileName(this, 
+        tr("选择文件"), 
+        QString(), 
+        tr("所有文件 (*.*)"));
+    
+    if (!fileName.isEmpty()) {
+        // TODO: 处理文件发送
+        qDebug() << "Selected file:" << fileName;
+    }
+}
+
+/**
+ * @brief 显示设置对话框
+ */
+void ChatWidget::showSettings()
+{
+    // 显示设置对话框
+    // TODO: 实现设置对话框
+    qDebug() << "Show settings requested";
+}
+
+/**
+ * @brief 切换参与者列表显示
+ */
+void ChatWidget::toggleParticipantList()
+{
+    // 切换参与者列表显示/隐藏
+    if (d->participantList) {
+        d->participantList->setVisible(!d->participantList->isVisible());
+    }
 }

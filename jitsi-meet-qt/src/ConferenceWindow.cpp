@@ -17,7 +17,7 @@ ConferenceWindow::ConferenceWindow(QWidget *parent)
     , m_conferenceManager(nullptr)
     , m_mediaManager(nullptr)
     // , m_chatManager(nullptr) // 暂时禁用聊天功能
-    , m_screenShareManager(nullptr)
+    // , m_screenShareManager(nullptr)  // 使用模块化版本
     , m_cameraManager(nullptr)
     , m_centralWidget(nullptr)
     , m_mainLayout(nullptr)
@@ -92,9 +92,9 @@ ConferenceWindow::~ConferenceWindow()
     // if (m_chatManager) {
     //     delete m_chatManager;
     // } // 暂时禁用聊天功能
-    if (m_screenShareManager) {
-        delete m_screenShareManager;
-    }
+    // if (m_screenShareManager) {
+    //     delete m_screenShareManager;
+    // }  // 使用模块化版本
 }
 
 void ConferenceWindow::setupUI()
@@ -145,9 +145,9 @@ void ConferenceWindow::setupManagers()
     // m_chatManager = new ChatManager(this);
     // qDebug() << "ChatManager created";
     
-    // 创建屏幕共享管理器
-    m_screenShareManager = new ScreenShareManager(this);
-    qDebug() << "ScreenShareManager created";
+    // 创建屏幕共享管理器 (使用模块化版本)
+    // m_screenShareManager = new ScreenShareManager(this);
+    // qDebug() << "ScreenShareManager created";
     
     // 设置管理器之间的依赖关系
     m_mediaManager->setWebRTCEngine(m_conferenceManager->webRTCEngine());
@@ -234,17 +234,17 @@ void ConferenceWindow::setupConnections()
     //     // Note: unreadCountChanged signal doesn't exist in ChatManager, removing this connection
     // }
     
-    // 屏幕共享管理器信号连接
-    if (m_screenShareManager) {
-        connect(m_screenShareManager, &ScreenShareManager::screenShareStarted,
-                this, &ConferenceWindow::onScreenShareStarted);
-        connect(m_screenShareManager, &ScreenShareManager::screenShareStopped,
-                this, &ConferenceWindow::onScreenShareStopped);
-        // connect(m_screenShareManager, &ScreenShareManager::remoteScreenShareReceived,
-        //         this, &ConferenceWindow::onRemoteScreenShareReceived);
-        // connect(m_screenShareManager, &ScreenShareManager::remoteScreenShareRemoved,
-        //         this, &ConferenceWindow::onRemoteScreenShareRemoved);
-    }
+    // 屏幕共享管理器信号连接 (使用模块化版本)
+    // if (m_screenShareManager) {
+    //     connect(m_screenShareManager, &ScreenShareManager::shareStarted,
+    //         this, &ConferenceWindow::onScreenShareStarted);
+    //     connect(m_screenShareManager, &ScreenShareManager::shareStopped,
+    //             this, &ConferenceWindow::onScreenShareStopped);
+    //     // connect(m_screenShareManager, &ScreenShareManager::remoteScreenShareReceived,
+    //     //         this, &ConferenceWindow::onRemoteScreenShareReceived);
+    //     // connect(m_screenShareManager, &ScreenShareManager::remoteScreenShareRemoved,
+    //     //         this, &ConferenceWindow::onRemoteScreenShareRemoved);
+    // }
     
     qDebug() << "All ConferenceWindow signal connections established";
 }
@@ -712,10 +712,10 @@ void ConferenceWindow::leaveConference()
     m_mediaManager->stopLocalVideo();
     m_mediaManager->stopLocalAudio();
     
-    // 停止屏幕共享
-    if (m_isScreenSharing) {
-        m_screenShareManager->stopScreenShare();
-    }
+    // 停止屏幕共享 (使用模块化版本)
+    // if (m_isScreenSharing) {
+    //     m_screenShareManager->stopScreenShare();
+    // }
     
     // 离开会议
     m_conferenceManager->leaveConference();
@@ -1034,14 +1034,15 @@ void ConferenceWindow::onMuteVideoClicked()
 
 void ConferenceWindow::onScreenShareClicked()
 {
-    if (m_isScreenSharing) {
-        m_screenShareManager->stopScreenShare();
-    } else {
-        // if (m_screenShareManager->showScreenSelectionDialog()) {
-        //     // 用户选择了屏幕，开始共享
-        //     // 实际的开始逻辑在ScreenShareManager中处理
-        // }
-    }
+    // 使用模块化版本的屏幕共享
+    // if (m_isScreenSharing) {
+    //     m_screenShareManager->stopScreenShare();
+    // } else {
+    //     // if (m_screenShareManager->showScreenSelectionDialog()) {
+    //     //     // 用户选择了屏幕，开始共享
+    //     //     // 实际的开始逻辑在ScreenShareManager中处理
+    //     // }
+    // }
 }
 
 void ConferenceWindow::onChatToggleClicked()

@@ -508,6 +508,34 @@ signals:
      */
     void errorOccurred(const QString& error);
 
+    /**
+     * @brief 对话框显示信号
+     */
+    void dialogShown();
+
+    /**
+     * @brief 对话框关闭信号
+     */
+    void dialogClosed();
+
+    /**
+     * @brief 设置变化信号
+     * @param key 设置键
+     * @param value 设置值
+     */
+    void settingChanged(const QString& key, const QVariant& value);
+
+    /**
+     * @brief 刷新完成信号
+     */
+    void refreshCompleted();
+
+    /**
+     * @brief 主题变化信号
+     * @param theme 新主题名称
+     */
+    void themeChanged(const QString& theme);
+
 private slots:
     void onPageSelectionChanged();
     void onProfileChanged(const QString& profile);

@@ -7,6 +7,10 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 
+#ifndef SCREENSHARE_MODULE_VERSION
+#define SCREENSHARE_MODULE_VERSION "1.0.0"
+#endif
+
 class ScreenShareModule::Private
 {
 public:

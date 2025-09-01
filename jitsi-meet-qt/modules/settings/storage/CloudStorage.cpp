@@ -638,6 +638,40 @@ void CloudStorage::detectConflicts(const QJsonObject& remoteData)
     }
 }
 
+/**
+ * @brief 处理网络回复
+ * @param reply 网络回复对象
+ */
+void CloudStorage::handleNetworkReply(QNetworkReply* reply)
+{
+    if (!reply) {
+        return;
+    }
+
+    // 检查网络错误
+    if (reply->error() != QNetworkReply::NoError) {
+        QString errorMsg = QString("网络请求失败: %1").arg(reply->errorString());
+        emit networkError(errorMsg);
+        emit errorOccurred(errorMsg);
+        
+        // 更新统计信息
+        updateStatistics("errors");
+        return;
+    }
+
+    // 读取响应数据
+    QByteArray responseData = reply->readAll();
+    
+    // 更新网络使用统计
+    updateStatistics("requests");
+    updateStatistics("download", responseData.size());
+    
+    // 处理响应数据
+    if (!responseData.isEmpty()) {
+        processResponse(responseData);
+    }
+}
+
 void CloudStorage::updateLocalCache(const QJsonObject& data)
 {
     QString cacheFile = d->cacheDir + "/cache.json";
@@ -695,6 +729,20 @@ void CloudStorage::updateStatistics(const QString& operation, qint64 bytes)
 }
 
 // Slot implementations
+/**
+ * @brief 网络回复完成处理槽函数
+ */
+void CloudStorage::onNetworkReplyFinished()
+{
+    QNetworkReply* reply = qobject_cast<QNetworkReply*>(sender());
+    if (!reply) {
+        return;
+    }
+
+    handleNetworkReply(reply);
+    reply->deleteLater();
+}
+
 void CloudStorage::onSyncTimer()
 {
     if (d->autoSyncEnabled && !d->offlineMode && d->connectionStatus == Connected) {

@@ -55,7 +55,9 @@ INCLUDEPATH += $$PWD/interfaces
 HEADERS += \
     $$PWD/include/NetworkModule.h \
     $$PWD/include/NetworkManager.h \
-    $$PWD/include/ConnectionFactory.h
+    $$PWD/include/ConnectionFactory.h \
+    $$PWD/src/BaseConnectionHandler.h \
+    $$PWD/src/NetworkManagerImpl.h
 
 # 接口头文件
 HEADERS += \
@@ -90,7 +92,9 @@ HEADERS += \
 SOURCES += \
     $$PWD/src/NetworkModule.cpp \
     $$PWD/src/NetworkManager.cpp \
-    $$PWD/src/ConnectionFactory.cpp
+    $$PWD/src/NetworkManagerImpl.cpp \
+    $$PWD/src/ConnectionFactory.cpp \
+    $$PWD/src/BaseConnectionHandler.cpp
 
 # 配置源文件
 SOURCES += \

@@ -37,6 +37,7 @@ HEADERS += \
     $$PERFORMANCE_INCLUDE_PATH/PerformanceModule.h \
     $$PERFORMANCE_INCLUDE_PATH/PerformanceManager.h \
     $$PERFORMANCE_INCLUDE_PATH/MetricsCollector.h \
+    $$PERFORMANCE_INCLUDE_PATH/OptimizationType.h \
     \
     # Interface headers
     $$PERFORMANCE_INTERFACES_PATH/IPerformanceMonitor.h \
@@ -71,6 +72,7 @@ SOURCES += \
     $$PERFORMANCE_SRC_PATH/PerformanceModule.cpp \
     $$PERFORMANCE_SRC_PATH/PerformanceManager.cpp \
     $$PERFORMANCE_SRC_PATH/MetricsCollector.cpp \
+    $$PERFORMANCE_SRC_PATH/OptimizationType.cpp \
     \
     # Configuration sources
     $$PERFORMANCE_CONFIG_PATH/PerformanceConfig.cpp \

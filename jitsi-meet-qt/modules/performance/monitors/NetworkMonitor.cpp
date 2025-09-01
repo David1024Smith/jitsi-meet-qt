@@ -1,4 +1,5 @@
 #include "NetworkMonitor.h"
+#include <QNetworkInterface>
 #include <QRegularExpression>
 #include <QDebug>
 #include <QCoreApplication>
@@ -133,14 +134,14 @@ QNetworkInterface NetworkMonitor::getPrimaryInterface() const
     
     // 优先选择以太网接口
     for (const QNetworkInterface& interface : activeInterfaces) {
-        if (getInterfaceType(interface) == Ethernet) {
+        if (getInterfaceType(interface.name()) == Ethernet) {
             return interface;
         }
     }
     
     // 其次选择WiFi接口
     for (const QNetworkInterface& interface : activeInterfaces) {
-        if (getInterfaceType(interface) == WiFi) {
+        if (getInterfaceType(interface.name()) == WiFi) {
             return interface;
         }
     }
@@ -165,9 +166,9 @@ QString NetworkMonitor::monitoredInterface() const
     return m_monitoredInterface;
 }
 
-NetworkMonitor::InterfaceType NetworkMonitor::getInterfaceType(const QNetworkInterface& interface) const
+NetworkMonitor::InterfaceType NetworkMonitor::getInterfaceType(const QString& interfaceName) const
 {
-    QString name = interface.name().toLower();
+    QString name = interfaceName.toLower();
     
     if (name.contains("eth") || name.contains("en") || name.contains("lan")) {
         return Ethernet;
@@ -350,6 +351,33 @@ void NetworkMonitor::handleLatencyTestFinished()
             m_latencyHistory.removeFirst();
         }
     }
+}
+
+void NetworkMonitor::handleSpeedTestFinished()
+{
+    if (!m_currentSpeedTest) {
+        return;
+    }
+    
+    QNetworkReply* reply = m_currentSpeedTest;
+    m_currentSpeedTest = nullptr;
+    
+    if (reply->error() == QNetworkReply::NoError) {
+        qint64 bytesReceived = reply->bytesAvailable();
+        qint64 elapsedTime = reply->property("startTime").toDateTime().msecsTo(QDateTime::currentDateTime());
+        
+        if (elapsedTime > 0) {
+            double speedMbps = (bytesReceived * 8.0 * 1000.0) / (elapsedTime * 1024.0 * 1024.0);
+            
+            QMutexLocker locker(&m_dataMutex);
+            // Store speed test result in history or emit signal
+            qDebug() << "NetworkMonitor: Speed test completed:" << speedMbps << "Mbps";
+        }
+    } else {
+        qDebug() << "NetworkMonitor: Speed test failed:" << reply->errorString();
+    }
+    
+    reply->deleteLater();
 }
 
 void NetworkMonitor::performPeriodicCheck()

@@ -38,6 +38,7 @@ HEADERS += \
     $$UI_INCLUDE_PATH/UIManager.h \
     $$UI_INCLUDE_PATH/ThemeFactory.h \
     $$UI_INCLUDE_PATH/ThemeManager.h \
+    $$UI_INCLUDE_PATH/LayoutManager.h \
     \
     # Interface headers
     $$UI_INTERFACES_PATH/IUIManager.h \
@@ -60,6 +61,7 @@ HEADERS += \
     $$UI_WIDGETS_PATH/ToolBar.h \
     \
     # Layout headers
+    $$UI_LAYOUTS_PATH/BaseLayout.h \
     $$UI_LAYOUTS_PATH/MainLayout.h \
     $$UI_LAYOUTS_PATH/ConferenceLayout.h \
     $$UI_LAYOUTS_PATH/SettingsLayout.h
@@ -71,6 +73,7 @@ SOURCES += \
     $$UI_SRC_PATH/UIManager.cpp \
     $$UI_SRC_PATH/ThemeFactory.cpp \
     $$UI_SRC_PATH/ThemeManager.cpp \
+    $$UI_SRC_PATH/LayoutManager.cpp \
     \
     # Configuration sources
     $$UI_CONFIG_PATH/UIConfig.cpp \
@@ -88,6 +91,7 @@ SOURCES += \
     $$UI_WIDGETS_PATH/ToolBar.cpp \
     \
     # Layout sources
+    $$UI_LAYOUTS_PATH/BaseLayout.cpp \
     $$UI_LAYOUTS_PATH/MainLayout.cpp \
     $$UI_LAYOUTS_PATH/ConferenceLayout.cpp \
     $$UI_LAYOUTS_PATH/SettingsLayout.cpp

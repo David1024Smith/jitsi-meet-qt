@@ -4,7 +4,6 @@
 #include <QObject>
 #include <QTimer>
 #include "ModuleError.h"
-#include "Logger.h"
 #include "ILogger.h"
 
 /**

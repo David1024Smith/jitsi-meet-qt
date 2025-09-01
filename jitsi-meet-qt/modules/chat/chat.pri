@@ -57,6 +57,11 @@ SOURCES += \
     $$CHAT_MODULE_ROOT/src/ChatManager.cpp \
     $$CHAT_MODULE_ROOT/src/MessageHandler.cpp \
     \
+    # 数据模型实现
+    $$CHAT_MODULE_ROOT/models/ChatMessage.cpp \
+    $$CHAT_MODULE_ROOT/models/ChatRoom.cpp \
+    $$CHAT_MODULE_ROOT/models/Participant.cpp \
+    \
     # 配置管理
     $$CHAT_MODULE_ROOT/config/ChatConfig.cpp \
     \

@@ -508,11 +508,13 @@ protected:
 
 private slots:
     void onSettingValueChanged();
+    void onSettingValueChanged(const QString& key, const QVariant& value);
     void onCategorySelectionChanged();
     void onSearchTextChanged(const QString& text);
     void onResetButtonClicked();
     void onApplyButtonClicked();
     void onCancelButtonClicked();
+    void onPreferenceChanged(const QString& category, const QString& key, const QVariant& value);
 
 private:
     void setupUI();
@@ -542,6 +544,7 @@ private:
     void loadTheme(const QString& theme);
     void saveWindowState();
     void restoreWindowState();
+    void updateTreeItemValues(QTreeWidgetItem* item);
 
     class Private;
     std::unique_ptr<Private> d;
