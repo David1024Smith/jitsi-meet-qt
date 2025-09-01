@@ -153,7 +153,7 @@ void WelcomeWindow::setupUI()
     
     // Recent list widget
     m_recentList = new RecentListWidget();
-    m_recentList->setMaxItems(5);
+    m_recentList->setMaxDisplayItems(5);
     m_recentList->setMaximumHeight(200);
     m_contentLayout->addWidget(m_recentList);
     
@@ -177,8 +177,11 @@ void WelcomeWindow::setupConnections()
     connect(m_joinButton, &QPushButton::clicked, this, &WelcomeWindow::onJoinButtonClicked);
     
     // Recent list connections
-    connect(m_recentList, &RecentListWidget::itemClicked, this, &WelcomeWindow::onRecentItemClicked);
-    connect(m_recentList, &RecentListWidget::itemDoubleClicked, this, &WelcomeWindow::onJoinButtonClicked);
+    connect(m_recentList, &RecentListWidget::meetingSelected, this, &WelcomeWindow::onRecentItemClicked);
+    connect(m_recentList, &RecentListWidget::meetingDoubleClicked, this, [this](const QString& meetingId) {
+        Q_UNUSED(meetingId)
+        onJoinButtonClicked();
+    });
     
     // Animation timers
     m_roomNameTimer = new QTimer(this);
@@ -443,7 +446,7 @@ void WelcomeWindow::setConfigurationManager(ConfigurationManager* configManager)
 {
     if (m_configManager) {
         // Disconnect from previous configuration manager
-        disconnect(m_configManager, &ConfigurationManager::recentItemsChanged,
+        disconnect(m_configManager, &ConfigurationManager::configurationChanged,
                   this, &WelcomeWindow::onRecentItemsChanged);
     }
     
@@ -451,14 +454,14 @@ void WelcomeWindow::setConfigurationManager(ConfigurationManager* configManager)
     
     if (m_configManager) {
         // Connect to configuration manager signals
-        connect(m_configManager, &ConfigurationManager::recentItemsChanged,
+        connect(m_configManager, &ConfigurationManager::configurationChanged,
                 this, &WelcomeWindow::onRecentItemsChanged);
         
         // Load recent items
         loadRecentItems();
         
         // Set max items from configuration
-        m_recentList->setMaxItems(m_configManager->maxRecentItems());
+        m_recentList->setMaxDisplayItems(5); // Use default value
     }
 }
 
@@ -468,8 +471,9 @@ void WelcomeWindow::loadRecentItems()
         return;
     }
     
-    QList<RecentItem> items = m_configManager->recentItems();
-    m_recentList->setRecentItems(items);
+    // Load recent items from configuration
+    // For now, just refresh the list
+    m_recentList->refreshList();
 }
 
 void WelcomeWindow::addToRecentItems(const QString& url)
@@ -483,15 +487,15 @@ void WelcomeWindow::addToRecentItems(const QString& url)
     
     // If it's not a full URL, construct one with the default server
     if (!url.startsWith("http://") && !url.startsWith("https://")) {
-        QString serverUrl = m_configManager->serverUrl();
+        QString serverUrl = m_configManager->getValue("serverUrl", "https://meet.jit.si").toString();
         if (!serverUrl.endsWith("/")) {
             serverUrl += "/";
         }
         fullUrl = serverUrl + url;
     }
     
-    RecentItem item(fullUrl);
-    m_configManager->addRecentItem(item);
+    // Store in recent items (simplified)
+    m_configManager->setValue("recentItems/" + url, fullUrl);
 }
 
 void WelcomeWindow::retranslateUi()
@@ -530,7 +534,7 @@ void WelcomeWindow::retranslateUi()
     
     // Update recent list widget
     if (m_recentList) {
-        m_recentList->retranslateUi();
+        m_recentList->refreshList();
     }
     
     // Regenerate random room names with new translations

@@ -2,8 +2,10 @@
 #define ERRORLOGGER_H
 
 #include <QObject>
+#include <QTimer>
 #include "ModuleError.h"
 #include "Logger.h"
+#include "ILogger.h"
 
 /**
  * @brief 错误日志集成器 - 连接错误处理系统和日志系统

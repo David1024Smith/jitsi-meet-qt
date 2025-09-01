@@ -6,7 +6,7 @@
 #include <QDebug>
 #include <QThread>
 #include <QFuture>
-#include <QtConcurrent>
+#include <QtConcurrent/QtConcurrent>
 
 class SchemaValidator::Private
 {

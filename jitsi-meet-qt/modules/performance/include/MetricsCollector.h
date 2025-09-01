@@ -8,7 +8,7 @@
 #include <QDateTime>
 #include <QVariantMap>
 #include <QSharedPointer>
-#include "PerformanceManager.h"
+#include "PerformanceMetrics.h"
 
 class BaseMonitor;
 class PerformanceConfig;

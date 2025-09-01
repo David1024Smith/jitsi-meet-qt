@@ -1,4 +1,4 @@
-#include "JitsiError.h"
+#include "../include/JitsiError.h"
 #include <QCryptographicHash>
 #include <QRandomGenerator>
 

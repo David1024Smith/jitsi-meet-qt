@@ -1,7 +1,7 @@
 #include "ConfigFile.h"
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QDomDocument>
+#include <QtXml/QDomDocument>
 #include <QDir>
 #include <QTimer>
 #include <QDebug>
@@ -405,7 +405,7 @@ bool ConfigFile::contains(const QString& key) const
     return m_data.contains(fullKey);
 }
 
-void ConfigFile::remove(const QString& key)
+void ConfigFile::removeKey(const QString& key)
 {
     QMutexLocker locker(&m_mutex);
     
@@ -485,7 +485,7 @@ QStringList ConfigFile::childGroups(const QString& prefix) const
         }
     }
     
-    return groups.toList();
+    return QList<QString>(groups.begin(), groups.end());
 }
 
 void ConfigFile::beginGroup(const QString& group)
@@ -913,7 +913,11 @@ bool ConfigFile::saveXmlFormat()
     }
     
     QTextStream stream(&file);
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
     stream.setCodec("UTF-8");
+#else
+    stream.setEncoding(QStringConverter::Utf8);
+#endif
     stream << doc.toString();
     
     return true;

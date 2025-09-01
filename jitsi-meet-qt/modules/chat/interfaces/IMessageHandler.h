@@ -16,9 +16,8 @@ class IMessageStorage;
  * IMessageHandler定义了消息处理器的标准接口，
  * 提供消息处理功能的抽象定义。
  */
-class IMessageHandler : public QObject
+class IMessageHandler
 {
-    Q_OBJECT
 
 public:
     /**
@@ -30,7 +29,6 @@ public:
         Paused,             ///< 暂停
         Error               ///< 错误
     };
-    Q_ENUM(ProcessingStatus)
 
     /**
      * @brief 消息优先级枚举
@@ -41,7 +39,6 @@ public:
         High = 2,           ///< 高优先级
         Critical = 3        ///< 关键优先级
     };
-    Q_ENUM(MessagePriority)
 
     /**
      * @brief 处理结果枚举
@@ -53,7 +50,6 @@ public:
         Queued,             ///< 已排队
         Rejected            ///< 被拒绝
     };
-    Q_ENUM(ProcessingResult)
 
     /**
      * @brief 虚析构函数
@@ -181,7 +177,6 @@ public:
      */
     virtual QList<QVariantMap> getQueuedMessages() const = 0;
 
-public slots:
     /**
      * @brief 开始处理
      */
@@ -217,66 +212,22 @@ public slots:
      */
     virtual void clearStatistics() = 0;
 
-signals:
-    /**
-     * @brief 消息处理完成信号
-     * @param message 处理完成的消息
-     * @param result 处理结果
-     */
-    void messageProcessed(ChatMessage* message, ProcessingResult result);
-
-    /**
-     * @brief 消息验证失败信号
-     * @param data 消息数据
-     * @param reason 失败原因
-     */
-    void messageValidationFailed(const QVariantMap& data, const QString& reason);
-
-    /**
-     * @brief 消息过滤信号
-     * @param data 被过滤的消息数据
-     */
-    void messageFiltered(const QVariantMap& data);
-
-    /**
-     * @brief 处理启用状态改变信号
-     * @param enabled 是否启用
-     */
-    void processingEnabledChanged(bool enabled);
-
-    /**
-     * @brief 处理状态改变信号
-     * @param status 新状态
-     */
-    void processingStatusChanged(ProcessingStatus status);
-
-    /**
-     * @brief 队列大小改变信号
-     * @param size 新的队列大小
-     */
-    void queueSizeChanged(int size);
-
-    /**
-     * @brief 已处理数量改变信号
-     * @param count 新的已处理数量
-     */
-    void processedCountChanged(int count);
-
-    /**
-     * @brief 处理错误信号
-     * @param error 错误信息
-     */
-    void processingError(const QString& error);
-
-    /**
-     * @brief 队列已满信号
-     */
-    void queueFull();
-
-    /**
-     * @brief 队列为空信号
-     */
-    void queueEmpty();
+// 信号接口（由实现类提供）
+    // 消息处理相关
+    // void messageProcessed(ChatMessage* message, ProcessingResult result);
+    // void messageValidationFailed(const QVariantMap& data, const QString& reason);
+    // void messageFiltered(const QVariantMap& data);
+    
+    // 状态相关
+    // void processingEnabledChanged(bool enabled);
+    // void processingStatusChanged(ProcessingStatus status);
+    // void queueSizeChanged(int size);
+    // void processedCountChanged(int count);
+    
+    // 错误和通知
+    // void processingError(const QString& error);
+    // void queueFull();
+    // void queueEmpty();
 };
 
 Q_DECLARE_INTERFACE(IMessageHandler, "org.jitsi.chat.IMessageHandler/1.0")

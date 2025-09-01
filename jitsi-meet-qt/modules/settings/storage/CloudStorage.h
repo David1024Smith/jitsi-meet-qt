@@ -526,7 +526,7 @@ signals:
 private slots:
     void onNetworkReplyFinished();
     void onSyncTimer();
-    void onNetworkAccessibleChanged(QNetworkAccessManager::NetworkAccessibility accessible);
+    void onNetworkAccessibleChanged(bool accessible);
 
 private:
     void setConnectionStatus(ConnectionStatus status);
@@ -539,6 +539,7 @@ private:
     void updateLocalCache(const QJsonObject& data);
     void scheduleSync();
     void updateStatistics(const QString& operation, qint64 bytes = 0);
+    void loadLocalCache();
     QString providerToString(CloudProvider provider) const;
     CloudProvider stringToProvider(const QString& str) const;
 

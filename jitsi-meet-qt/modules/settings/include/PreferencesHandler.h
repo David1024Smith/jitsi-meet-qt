@@ -1,7 +1,7 @@
 #ifndef PREFERENCESHANDLER_H
 #define PREFERENCESHANDLER_H
 
-#include "interfaces/IPreferencesHandler.h"
+#include "../interfaces/IPreferencesHandler.h"
 #include <QJsonDocument>
 #include <QMutex>
 #include <memory>

@@ -4,6 +4,7 @@
 #include <QCoreApplication>
 #include <QStandardPaths>
 #include <QDir>
+#include <QRandomGenerator>
 
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -257,20 +258,15 @@ ResourceUsage CPUMonitor::collectResourceUsage()
 {
     ResourceUsage usage;
     usage.timestamp = QDateTime::currentDateTime();
-    usage.resourceType = IResourceTracker::CPU;
     
     // 收集CPU使用率
     double cpuUsage = readCPUUsage();
-    usage.cpuUsage = cpuUsage;
+    usage.cpu.totalUsage = cpuUsage;
     
     // 根据监控模式收集不同级别的数据
     if (m_monitoringMode >= DetailedMode) {
         QList<double> coreUsages = readCoreUsages();
-        QVariantList coreUsageList;
-        for (double coreUsage : coreUsages) {
-            coreUsageList.append(coreUsage);
-        }
-        usage.additionalData["coreUsages"] = coreUsageList;
+        usage.cpu.coreCount = coreUsages.size();
         
         // 更新缓存
         QMutexLocker locker(&m_dataMutex);
@@ -281,8 +277,8 @@ ResourceUsage CPUMonitor::collectResourceUsage()
         double frequency = readCPUFrequency();
         double temperature = readCPUTemperature();
         
-        usage.additionalData["frequency"] = frequency;
-        usage.additionalData["temperature"] = temperature;
+        usage.cpu.frequency = frequency;
+        usage.cpu.temperature = temperature;
         
         // 更新缓存
         QMutexLocker locker(&m_dataMutex);
@@ -292,14 +288,7 @@ ResourceUsage CPUMonitor::collectResourceUsage()
     
     if (m_monitoringMode == ProcessMode || m_monitoringMode == AdvancedMode) {
         double processUsage = getCurrentProcessCPUUsage();
-        usage.additionalData["processUsage"] = processUsage;
-        
-        QList<double> loadAverages = readLoadAverages();
-        QVariantList loadList;
-        for (double load : loadAverages) {
-            loadList.append(load);
-        }
-        usage.additionalData["loadAverages"] = loadList;
+        usage.process.cpuUsage = processUsage;
     }
     
     // 更新历史数据
@@ -541,7 +530,7 @@ double CPUMonitor::readCPUTemperature()
 #endif
 }
 
-QList<double> CPUMonitor::readLoadAverages()
+QList<double> CPUMonitor::readLoadAverages() const
 {
 #ifdef Q_OS_LINUX
     return parseProcLoadavg();
@@ -620,7 +609,7 @@ double CPUMonitor::readCPUTemperatureWindows()
 {
     // Windows下读取CPU温度比较复杂，需要WMI或特殊驱动
     // 这里返回一个模拟值
-    return 45.0 + (qrand() % 20); // 45-65度的模拟温度
+    return 45.0 + QRandomGenerator::global()->bounded(20); // 45-65度的模拟温度
 }
 #endif
 

@@ -1,6 +1,7 @@
-#include "ModuleError.h"
+#include "../include/ModuleError.h"
 #include <QDebug>
 #include <QJsonDocument>
+#include <QJsonArray>
 #include <QMetaEnum>
 
 ModuleError::ModuleError(ErrorType type, Severity severity, const QString& message, const QString& moduleName)

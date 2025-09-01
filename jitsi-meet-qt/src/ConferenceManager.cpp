@@ -1,6 +1,6 @@
-#include "ConferenceManager.h"
-#include "AuthenticationManager.h"
-#include "JitsiError.h"
+#include "../include/ConferenceManager.h"
+#include "../include/AuthenticationManager.h"
+#include "../include/JitsiError.h"
 #include <QUrl>
 #include <QUrlQuery>
 #include <QRegularExpression>
@@ -74,20 +74,16 @@ void ConferenceManager::initializeComponents()
     // 连接WebRTC引擎信号
     connect(m_webrtcEngine, &WebRTCEngine::connectionStateChanged,
             this, &ConferenceManager::onWebRTCConnectionStateChanged);
-    connect(m_webrtcEngine, &WebRTCEngine::localStreamReady,
-            this, &ConferenceManager::onWebRTCLocalStreamReady);
-    connect(m_webrtcEngine, &WebRTCEngine::remoteStreamReceived,
-            this, &ConferenceManager::onWebRTCRemoteStreamReceived);
-    connect(m_webrtcEngine, &WebRTCEngine::remoteStreamRemoved,
-            this, &ConferenceManager::onWebRTCRemoteStreamRemoved);
-    connect(m_webrtcEngine, &WebRTCEngine::iceCandidate,
-            this, &ConferenceManager::onWebRTCIceCandidate);
-    connect(m_webrtcEngine, &WebRTCEngine::offerCreated,
-            this, &ConferenceManager::onWebRTCOfferCreated);
-    connect(m_webrtcEngine, &WebRTCEngine::answerCreated,
-            this, &ConferenceManager::onWebRTCAnswerCreated);
-    connect(m_webrtcEngine, &WebRTCEngine::error,
-            this, &ConferenceManager::onWebRTCError);
+    connect(m_webrtcEngine, &WebRTCEngine::participantJoined,
+            this, &ConferenceManager::onWebRTCParticipantJoined);
+    connect(m_webrtcEngine, &WebRTCEngine::participantLeft,
+            this, &ConferenceManager::onWebRTCParticipantLeft);
+    connect(m_webrtcEngine, &WebRTCEngine::streamAdded,
+            this, &ConferenceManager::onWebRTCStreamAdded);
+    connect(m_webrtcEngine, &WebRTCEngine::streamRemoved,
+            this, &ConferenceManager::onWebRTCStreamRemoved);
+    connect(m_webrtcEngine, &WebRTCEngine::messageReceived,
+            this, &ConferenceManager::onWebRTCMessageReceived);
     
     // 创建认证管理器
     m_authManager = new AuthenticationManager(this);
@@ -114,7 +110,7 @@ void ConferenceManager::cleanup()
     }
     
     if (m_webrtcEngine) {
-        m_webrtcEngine->closePeerConnection();
+        m_webrtcEngine->disconnect();
     }
     
     m_participants.clear();
@@ -184,7 +180,7 @@ void ConferenceManager::leaveConference()
     
     // 关闭WebRTC连接
     if (m_webrtcEngine) {
-        m_webrtcEngine->closePeerConnection();
+        m_webrtcEngine->disconnect();
     }
     
     // 断开XMPP连接
@@ -426,7 +422,7 @@ void ConferenceManager::establishWebRTCConnection()
     }
     
     qDebug() << "Establishing WebRTC connection";
-    m_webrtcEngine->createPeerConnection();
+    // WebRTC 连接将在 connect 方法中建立
 }
 
 void ConferenceManager::handleAuthentication()
@@ -710,51 +706,7 @@ void ConferenceManager::onWebRTCConnectionStateChanged(WebRTCEngine::ConnectionS
     }
 }
 
-void ConferenceManager::onWebRTCLocalStreamReady(QVideoWidget* videoWidget)
-{
-    qDebug() << "WebRTC local stream ready";
-    // 本地视频流准备就绪，可以通知UI层显示
-}
-
-void ConferenceManager::onWebRTCRemoteStreamReceived(const QString& participantId, QVideoWidget* videoWidget)
-{
-    qDebug() << "WebRTC remote stream received from" << participantId;
-    
-    // 更新参与者媒体状态
-    handleMediaStreamEvent(participantId, true, true);
-}
-
-void ConferenceManager::onWebRTCRemoteStreamRemoved(const QString& participantId)
-{
-    qDebug() << "WebRTC remote stream removed from" << participantId;
-    
-    // 更新参与者媒体状态
-    handleMediaStreamEvent(participantId, false, false);
-}
-
-void ConferenceManager::onWebRTCIceCandidate(const WebRTCEngine::IceCandidate& candidate)
-{
-    qDebug() << "WebRTC ICE candidate:" << candidate.candidate;
-    // ICE候选者需要通过XMPP发送给其他参与者
-}
-
-void ConferenceManager::onWebRTCOfferCreated(const QString& sdp)
-{
-    qDebug() << "WebRTC offer created";
-    // SDP offer需要通过XMPP发送给其他参与者
-}
-
-void ConferenceManager::onWebRTCAnswerCreated(const QString& sdp)
-{
-    qDebug() << "WebRTC answer created";
-    // SDP answer需要通过XMPP发送给其他参与者
-}
-
-void ConferenceManager::onWebRTCError(const QString& message)
-{
-    qWarning() << "WebRTC error:" << message;
-    emitError(::ErrorType::WebRTCError, "WebRTC error", message);
-}
+// 旧的 WebRTC 方法已被删除，使用新的方法实现
 
 void ConferenceManager::handleMediaStreamEvent(const QString& participantJid, bool hasVideo, bool hasAudio)
 {
@@ -785,4 +737,32 @@ void ConferenceManager::onReconnectTimer()
 void ConferenceManager::onConnectionHealthCheck()
 {
     checkConnectionHealth();
+}
+
+// New WebRTC event handling methods
+void ConferenceManager::onWebRTCParticipantJoined(const QString& participantId, const QVariantMap& info)
+{
+    qDebug() << "WebRTC participant joined:" << participantId;
+    // These methods will replace old WebRTC methods
+    Q_UNUSED(info)
+}
+
+void ConferenceManager::onWebRTCParticipantLeft(const QString& participantId)
+{
+    qDebug() << "WebRTC participant left:" << participantId;
+}
+
+void ConferenceManager::onWebRTCStreamAdded(const QString& streamId, const WebRTCEngine::MediaStreamInfo& info)
+{
+    qDebug() << "WebRTC stream added:" << streamId << "from participant:" << info.participantId;
+}
+
+void ConferenceManager::onWebRTCStreamRemoved(const QString& streamId)
+{
+    qDebug() << "WebRTC stream removed:" << streamId;
+}
+
+void ConferenceManager::onWebRTCMessageReceived(const QString& message, const QString& from)
+{
+    qDebug() << "WebRTC message received from" << from << ":" << message;
 }

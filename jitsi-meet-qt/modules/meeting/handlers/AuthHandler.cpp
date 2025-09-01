@@ -634,7 +634,7 @@ void AuthHandler::stopTokenRefreshTimer()
     }
 }
 
-QVariantMap AuthHandler::parseJWT(const QString& jwt)
+QVariantMap AuthHandler::parseJWT(const QString& jwt) const
 {
     QStringList parts = jwt.split('.');
     if (parts.size() != 3) {

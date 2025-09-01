@@ -1,8 +1,8 @@
 #include "ThemeFactory.h"
-#include "themes/BaseTheme.h"
-#include "themes/DefaultTheme.h"
-#include "themes/DarkTheme.h"
-#include "themes/LightTheme.h"
+#include "../themes/BaseTheme.h"
+#include "../themes/DefaultTheme.h"
+#include "../themes/DarkTheme.h"
+#include "../themes/LightTheme.h"
 #include <QDebug>
 #include <QVariantMap>
 
@@ -33,6 +33,9 @@ std::shared_ptr<BaseTheme> ThemeFactory::createTheme(const QString& themeName)
         if (cached) {
             qDebug() << "Returning cached theme:" << themeName;
             return cached;
+        } else {
+            // 如果缓存项已失效，清除缓存
+            clearThemeCache(themeName);
         }
     }
 
@@ -325,8 +328,8 @@ std::shared_ptr<BaseTheme> ThemeFactory::getCachedTheme(const QString& themeName
         if (theme) {
             return theme;
         } else {
-            // 弱引用已失效，清除缓存项
-            m_themeCache.erase(it);
+            // 弱引用已失效，需要清除缓存项，但由于const限制，不能直接修改
+            // 这里返回nullptr，让调用者处理缓存清理
         }
     }
     return nullptr;

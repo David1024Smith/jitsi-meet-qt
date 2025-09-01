@@ -298,7 +298,9 @@ void ConnectionWidget::testConnection()
     d->testStartTime = QTime::currentTime();
     
     // 发送测试请求
-    QNetworkRequest request(QUrl(url));
+    QUrl requestUrl(url);
+    QNetworkRequest request;
+    request.setUrl(requestUrl);
     request.setRawHeader("User-Agent", "Jitsi-Meet-Qt Connection Test");
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, 
                         QNetworkRequest::NoLessSafeRedirectPolicy);

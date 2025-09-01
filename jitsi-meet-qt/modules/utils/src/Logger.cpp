@@ -5,6 +5,7 @@
 #include <QCoreApplication>
 #include <QThread>
 #include <QDebug>
+#include <QDir>
 
 // 静态成员初始化
 Logger* Logger::s_instance = nullptr;
@@ -95,9 +96,10 @@ void Logger::addLogger(std::shared_ptr<ILogger> logger)
     logger->setLogLevel(static_cast<ILogger::LogLevel>(m_globalLogLevel));
     logger->setFormat(m_logFormat);
     
-    // 连接信号
-    connect(logger.get(), &ILogger::logRecorded, 
-            this, &Logger::logRecorded);
+    // 连接信号 - 使用静态类型转换解决接口类信号槽连接问题
+    // 修复信号槽连接问题，使用旧式连接语法
+    connect(logger.get(), SIGNAL(logRecorded(const ILogger::LogEntry&)),
+            this, SLOT(logRecorded(const Logger::LogEntry&)));
     
     m_loggers.append(logger);
 }

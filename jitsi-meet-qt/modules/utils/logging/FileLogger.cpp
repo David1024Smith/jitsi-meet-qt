@@ -263,7 +263,8 @@ bool FileLogger::openLogFile()
     }
     
     m_stream = new QTextStream(m_logFile);
-    m_stream->setCodec("UTF-8");
+    // 在Qt 6中，QTextStream不再支持setCodec
+    // 使用默认编码
     
     return true;
 }
@@ -343,9 +344,9 @@ QString FileLogger::generateBackupFileName(int index) const
     QString dir = fileInfo.absolutePath();
     
     if (suffix.isEmpty()) {
-        return QString("%1/%2.%3").arg(dir, baseName).arg(index);
+        return QString("%1/%2.%3").arg(dir).arg(baseName).arg(index);
     } else {
-        return QString("%1/%2.%3.%4").arg(dir, baseName).arg(index, suffix);
+        return QString("%1/%2.%3.%4").arg(dir).arg(baseName).arg(index).arg(suffix);
     }
 }
 

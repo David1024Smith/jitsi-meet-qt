@@ -159,6 +159,10 @@ private:
     void setupLayout();
     void createRegions();
     void arrangeRegions();
+    void arrangeGridView();
+    void arrangeSpeakerView();
+    void arrangePresentationView();
+    void arrangeFullScreenView();
     void updateViewMode();
     void updateVideoGrid();
     void updateRegionVisibility();

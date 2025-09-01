@@ -8,43 +8,34 @@
 #include <QDateTime>
 #include <QUrl>
 #include <QDebug>
-#include <QtConcurrent>
+#include <QtConcurrent/QtConcurrent>
 
+// Private implementation class
 class ConfigValidator::Private
 {
 public:
-    QMap<QString, QList<ValidationRuleInfo>> rules;
+    QMap<QString, QList<ConfigValidator::ValidationRuleInfo>> rules;
     QMap<QString, CustomValidatorFunction> customValidators;
     QMap<QString, QMap<QString, QVariant>> dependencyRules;
     QList<CustomValidatorFunction> globalValidators;
-    
     QJsonObject jsonSchema;
-    bool strictMode;
-    ValidationSeverity defaultSeverity;
     ValidationContext context;
     
-    int validationTimeout;
-    bool parallelValidationEnabled;
-    int maxValidationDepth;
+    bool strictMode = false;
+    ValidationSeverity defaultSeverity = ErrorLevel;
+    int validationTimeout = 5000;
+    bool parallelValidation = false;
+    int maxValidationDepth = 10;
     
-    // Statistics
+    mutable QMutex mutex;
     QVariantMap statistics;
-    QMutex statisticsMutex;
+    QList<ValidationError> lastErrors;
+    QStringList warnings;
     
-    Private()
-        : strictMode(false)
-        , defaultSeverity(Error)
-        , validationTimeout(5000) // 5 seconds
-        , parallelValidationEnabled(false)
-        , maxValidationDepth(10)
-    {
-        statistics["validations"] = 0;
-        statistics["successes"] = 0;
-        statistics["failures"] = 0;
-        statistics["warnings"] = 0;
-        statistics["errors"] = 0;
-    }
+    static ConfigValidator* s_instance;
 };
+
+ConfigValidator* ConfigValidator::Private::s_instance = nullptr;
 
 ConfigValidator::ConfigValidator(QObject* parent)
     : IConfigValidator(parent)
@@ -57,404 +48,604 @@ ConfigValidator::~ConfigValidator() = default;
 
 ConfigValidator* ConfigValidator::instance()
 {
-    static ConfigValidator* instance = nullptr;
-    if (!instance) {
-        instance = new ConfigValidator();
+    if (!Private::s_instance) {
+        Private::s_instance = new ConfigValidator();
     }
-    return instance;
+    return Private::s_instance;
 }
 
 bool ConfigValidator::initialize()
 {
-    // Load predefined rule sets
-    createPredefinedRuleSet("audio");
-    createPredefinedRuleSet("video");
-    createPredefinedRuleSet("network");
-    createPredefinedRuleSet("ui");
-    createPredefinedRuleSet("performance");
-    createPredefinedRuleSet("security");
+    QMutexLocker locker(&d->mutex);
+    
+    // 清理现有规则
+    d->rules.clear();
+    d->customValidators.clear();
+    d->dependencyRules.clear();
+    d->globalValidators.clear();
+    
+    // 添加内置规则
+    addBuiltinRules();
+    
+    // 重置统计
+    resetStatistics();
     
     return true;
 }
 
-void ConfigValidator::addRule(const QString& key, ValidationRule rule, 
-                             const QVariantList& parameters, ValidationSeverity severity)
+void ConfigValidator::addBuiltinRules()
 {
-    ValidationRuleInfo ruleInfo(rule, parameters, severity);
-    addRule(key, ruleInfo);
+    // 添加一些内置的验证规则
+    // 服务器配置规则
+    addRule("server.host", Required, QVariantList(), ErrorLevel);
+    addRule("server.port", Range, QVariantList() << 1 << 65535, ErrorLevel);
+    
+    // 用户配置规则
+    addRule("user.name", Required, QVariantList(), ErrorLevel);
+    addRule("user.name", MinLength, QVariantList() << 1, ErrorLevel);
+    addRule("user.name", MaxLength, QVariantList() << 50, Warning);
+    
+    // 网络配置规则
+    addRule("network.timeout", Range, QVariantList() << 1000 << 30000, Warning);
+    addRule("network.retries", Range, QVariantList() << 1 << 10, Warning);
 }
 
-void ConfigValidator::addRule(const QString& key, const ValidationRuleInfo& ruleInfo)
+// 添加validateJsonValue函数的实现
+IConfigValidator::ValidationResult ConfigValidator::validateJsonValue(const QString& key, const QJsonValue& value, const QJsonObject& schema) const
 {
-    if (!d->rules.contains(key)) {
-        d->rules[key] = QList<ValidationRuleInfo>();
+    ValidationResult result;
+    result.isValid = true;
+    result.key = key;
+    result.value = value.toVariant();
+    result.severityLevel = 0; // Info
+    result.message = "Validation passed";
+    
+    // 检查类型
+    if (schema.contains("type")) {
+        QString expectedType = schema["type"].toString();
+        bool typeValid = false;
+        
+        if (expectedType == "string" && value.isString()) {
+            typeValid = true;
+        } else if (expectedType == "number" && (value.isDouble() || value.isString())) {
+            typeValid = true;
+        } else if (expectedType == "integer" && (value.isDouble() || value.isString())) {
+            // 检查是否为整数
+            bool ok;
+            value.toVariant().toInt(&ok);
+            typeValid = ok;
+        } else if (expectedType == "boolean" && value.isBool()) {
+            typeValid = true;
+        } else if (expectedType == "object" && value.isObject()) {
+            typeValid = true;
+        } else if (expectedType == "array" && value.isArray()) {
+            typeValid = true;
+        } else if (expectedType == "null" && value.isNull()) {
+            typeValid = true;
+        }
+        
+        if (!typeValid) {
+            result.isValid = false;
+            result.severityLevel = 2; // Error
+            result.message = QString("Type mismatch for '%1': expected %2").arg(key, expectedType);
+            return result;
+        }
     }
     
-    // Remove existing rule of the same type
-    auto& ruleList = d->rules[key];
-    ruleList.removeIf([&](const ValidationRuleInfo& existing) {
-        return existing.rule == ruleInfo.rule;
-    });
+    // 检查必需属性
+    if (schema.contains("required") && schema["required"].isBool() && schema["required"].toBool()) {
+        if (value.isNull() || (value.isString() && value.toString().isEmpty())) {
+            result.isValid = false;
+            result.severityLevel = 2; // Error
+            result.message = QString("Required property '%1' is missing or empty").arg(key);
+            return result;
+        }
+    }
     
-    ruleList.append(ruleInfo);
+    // 检查最小值
+    if (schema.contains("minimum") && (value.isDouble() || value.isString())) {
+        double minValue = schema["minimum"].toDouble();
+        double actualValue = value.toVariant().toDouble();
+        
+        if (actualValue < minValue) {
+            result.isValid = false;
+            result.severityLevel = 2; // Error
+            result.message = QString("Value for '%1' is less than minimum: %2 < %3").arg(key).arg(actualValue).arg(minValue);
+            return result;
+        }
+    }
+    
+    // 检查最大值
+    if (schema.contains("maximum") && (value.isDouble() || value.isString())) {
+        double maxValue = schema["maximum"].toDouble();
+        double actualValue = value.toVariant().toDouble();
+        
+        if (actualValue > maxValue) {
+            result.isValid = false;
+            result.severityLevel = 2; // Error
+            result.message = QString("Value for '%1' is greater than maximum: %2 > %3").arg(key).arg(actualValue).arg(maxValue);
+            return result;
+        }
+    }
+    
+    // 检查字符串长度
+    if (schema.contains("minLength") && value.isString()) {
+        int minLength = schema["minLength"].toInt();
+        int actualLength = value.toString().length();
+        
+        if (actualLength < minLength) {
+            result.isValid = false;
+            result.severityLevel = 2; // Error
+            result.message = QString("String length for '%1' is less than minimum: %2 < %3").arg(key).arg(actualLength).arg(minLength);
+            return result;
+        }
+    }
+    
+    if (schema.contains("maxLength") && value.isString()) {
+        int maxLength = schema["maxLength"].toInt();
+        int actualLength = value.toString().length();
+        
+        if (actualLength > maxLength) {
+            result.isValid = false;
+            result.severityLevel = 2; // Error
+            result.message = QString("String length for '%1' is greater than maximum: %2 > %3").arg(key).arg(actualLength).arg(maxLength);
+            return result;
+        }
+    }
+    
+    // 检查模式
+    if (schema.contains("pattern") && value.isString()) {
+        QString pattern = schema["pattern"].toString();
+        QRegularExpression regex(pattern);
+        
+        if (!regex.isValid()) {
+            result.isValid = false;
+            result.severityLevel = 1; // Warning
+            result.message = QString("Invalid regex pattern for '%1': %2").arg(key, regex.errorString());
+            return result;
+        }
+        
+        QRegularExpressionMatch match = regex.match(value.toString());
+        if (!match.hasMatch()) {
+            result.isValid = false;
+            result.severityLevel = 2; // Error
+            result.message = QString("Value for '%1' does not match pattern: %2").arg(key, pattern);
+            return result;
+        }
+    }
+    
+    // 检查枚举值
+    if (schema.contains("enum") && schema["enum"].isArray()) {
+        QJsonArray enumValues = schema["enum"].toArray();
+        bool found = false;
+        
+        for (const QJsonValue& enumValue : enumValues) {
+            if (value == enumValue) {
+                found = true;
+                break;
+            }
+        }
+        
+        if (!found) {
+            result.isValid = false;
+            result.severityLevel = 2; // Error
+            result.message = QString("Value for '%1' is not one of the allowed values").arg(key);
+            return result;
+        }
+    }
+    
+    return result;
+}void 
+ConfigValidator::addRule(const QString& key, ValidationRule rule, 
+                             const QVariantList& parameters, 
+                             ValidationSeverity severity)
+{
+    QMutexLocker locker(&d->mutex);
+    ValidationRuleInfo ruleInfo(rule, parameters, severity);
+    d->rules[key].append(ruleInfo);
 }
 
 void ConfigValidator::addCustomValidator(const QString& key, CustomValidatorFunction validator, 
-                                        ValidationSeverity severity)
+                                       ValidationSeverity severity)
 {
+    QMutexLocker locker(&d->mutex);
     d->customValidators[key] = validator;
-    
-    ValidationRuleInfo ruleInfo(Custom, QVariantList(), severity);
-    addRule(key, ruleInfo);
 }
 
 void ConfigValidator::removeRule(const QString& key, ValidationRule rule)
 {
-    if (!d->rules.contains(key)) {
-        return;
-    }
-    
-    auto& ruleList = d->rules[key];
-    if (rule == Custom) {
-        // Remove all rules for this key
-        ruleList.clear();
-        d->customValidators.remove(key);
-    } else {
-        // Remove specific rule type
-        ruleList.removeIf([rule](const ValidationRuleInfo& ruleInfo) {
-            return ruleInfo.rule == rule;
-        });
-    }
-    
-    if (ruleList.isEmpty()) {
-        d->rules.remove(key);
+    QMutexLocker locker(&d->mutex);
+    if (d->rules.contains(key)) {
+        auto& ruleList = d->rules[key];
+        ruleList.erase(std::remove_if(ruleList.begin(), ruleList.end(),
+                                     [rule](const ValidationRuleInfo& info) {
+                                         return info.rule == rule;
+                                     }), ruleList.end());
+        if (ruleList.isEmpty()) {
+            d->rules.remove(key);
+        }
     }
 }
 
-ValidationResult ConfigValidator::validateValue(const QString& key, const QVariant& value) const
+IConfigValidator::ValidationResult ConfigValidator::validateValue(const QString& key, const QVariant& value) const
 {
-    updateStatistics("validation");
-    
-    if (!d->rules.contains(key)) {
-        ValidationResult result;
-        result.isValid = true;
-        result.key = key;
-        result.value = value;
-        result.severity = Info;
-        result.message = "No validation rules defined";
-        return result;
-    }
-    
-    const auto& ruleList = d->rules[key];
-    
-    for (const ValidationRuleInfo& ruleInfo : ruleList) {
-        if (!ruleInfo.enabled) {
-            continue;
-        }
-        
-        ValidationResult result = executeRule(key, value, ruleInfo);
-        
-        if (!result.isValid) {
-            updateStatistics(result.severity == Warning ? "warnings" : "errors");
-            updateStatistics("failures");
-            return result;
-        }
-    }
-    
-    // Check custom validators
-    if (d->customValidators.contains(key)) {
-        CustomValidatorFunction validator = d->customValidators[key];
-        ValidationResult result = validator(key, value);
-        
-        if (!result.isValid) {
-            updateStatistics(result.severity == Warning ? "warnings" : "errors");
-            updateStatistics("failures");
-            return result;
-        }
-    }
-    
-    // Check global validators
-    for (const CustomValidatorFunction& validator : d->globalValidators) {
-        ValidationResult result = validator(key, value);
-        
-        if (!result.isValid) {
-            updateStatistics(result.severity == Warning ? "warnings" : "errors");
-            updateStatistics("failures");
-            return result;
-        }
-    }
-    
-    updateStatistics("successes");
+    QMutexLocker locker(&d->mutex);
     
     ValidationResult result;
     result.isValid = true;
     result.key = key;
     result.value = value;
-    result.severity = Info;
+    result.severityLevel = 0;
     result.message = "Validation passed";
-    return result;
-}
-
-QList<ValidationResult> ConfigValidator::validateConfig(const QVariantMap& config) const
-{
-    QList<ValidationResult> results;
     
-    // Set validation context
-    ValidationContext context;
-    context.fullConfig = config;
-    const_cast<ConfigValidator*>(this)->setValidationContext(context);
-    
-    if (d->parallelValidationEnabled && config.size() > 10) {
-        // Use parallel validation for large configs
-        QList<QString> keys = config.keys();
-        
-        auto validateKey = [this, &config](const QString& key) -> ValidationResult {
-            return validateValue(key, config[key]);
-        };
-        
-        results = QtConcurrent::blockingMapped(keys, validateKey);
-    } else {
-        // Sequential validation
-        for (auto it = config.constBegin(); it != config.constEnd(); ++it) {
-            ValidationResult result = validateValue(it.key(), it.value());
-            results.append(result);
-            
-            // Check validation depth
-            if (d->context.depth >= d->maxValidationDepth) {
-                ValidationResult depthResult;
-                depthResult.isValid = false;
-                depthResult.key = it.key();
-                depthResult.severity = Warning;
-                depthResult.message = "Maximum validation depth exceeded";
-                results.append(depthResult);
-                break;
+    // 检查是否有针对此键的规则
+    if (d->rules.contains(key)) {
+        const auto& ruleList = d->rules[key];
+        for (const auto& ruleInfo : ruleList) {
+            ValidationResult ruleResult = validateWithRule(key, value, ruleInfo);
+            if (!ruleResult.isValid) {
+                return ruleResult;
             }
         }
     }
     
-    // Check dependencies
-    for (auto it = config.constBegin(); it != config.constEnd(); ++it) {
-        if (!checkDependencies(it.key(), config)) {
-            ValidationResult result;
-            result.isValid = false;
-            result.key = it.key();
-            result.severity = Error;
-            result.message = "Dependency validation failed";
-            results.append(result);
-        }
+    // 检查自定义验证器
+    if (d->customValidators.contains(key)) {
+        return d->customValidators[key](key, value);
+    }
+    
+    return result;
+}
+
+QList<IConfigValidator::ValidationResult> ConfigValidator::validateConfig(const QVariantMap& config) const
+{
+    QList<ValidationResult> results;
+    
+    for (auto it = config.begin(); it != config.end(); ++it) {
+        ValidationResult keyResult = validateValue(it.key(), it.value());
+        results.append(keyResult);
     }
     
     return results;
 }
 
-QList<ValidationResult> ConfigValidator::validateJson(const QJsonObject& json) const
+QList<IConfigValidator::ValidationResult> ConfigValidator::validateJson(const QJsonObject& json) const
 {
-    QVariantMap config = json.toVariantMap();
-    return validateConfig(config);
+    QList<ValidationResult> results;
+    
+    // 如果有 JSON Schema，使用它进行验证
+    if (!d->jsonSchema.isEmpty()) {
+        return validateWithSchema(json);
+    }
+    
+    // 否则使用基本验证
+    for (auto it = json.begin(); it != json.end(); ++it) {
+        QVariant value = it.value().toVariant();
+        ValidationResult keyResult = validateValue(it.key(), value);
+        results.append(keyResult);
+    }
+    
+    return results;
+}
+
+QList<IConfigValidator::ValidationError> ConfigValidator::getLastErrors() const
+{
+    QMutexLocker locker(&d->mutex);
+    return d->lastErrors;
+}
+
+QStringList ConfigValidator::getWarnings() const
+{
+    QMutexLocker locker(&d->mutex);
+    return d->warnings;
 }
 
 bool ConfigValidator::setJsonSchema(const QJsonObject& schema)
 {
-    if (!validateJsonSchema(schema)) {
-        return false;
-    }
-    
+    QMutexLocker locker(&d->mutex);
     d->jsonSchema = schema;
     return true;
 }
 
-bool ConfigValidator::loadJsonSchema(const QString& schemaFilePath)
+bool ConfigValidator::loadJsonSchema(const QString& filePath)
 {
-    QFile file(schemaFilePath);
+    QFile file(filePath);
     if (!file.open(QIODevice::ReadOnly)) {
         return false;
     }
     
-    QByteArray data = file.readAll();
-    file.close();
-    
     QJsonParseError error;
-    QJsonDocument doc = QJsonDocument::fromJson(data, &error);
+    QJsonDocument doc = QJsonDocument::fromJson(file.readAll(), &error);
     
     if (error.error != QJsonParseError::NoError) {
         return false;
     }
     
-    return setJsonSchema(doc.object());
+    setJsonSchema(doc.object());
+    return true;
 }
 
-QList<ValidationResult> ConfigValidator::validateWithSchema(const QJsonObject& json) const
+QList<IConfigValidator::ValidationResult> ConfigValidator::validateWithSchema(const QJsonObject& json) const
 {
     QList<ValidationResult> results;
     
-    if (d->jsonSchema.isEmpty()) {
-        ValidationResult result;
-        result.isValid = false;
-        result.severity = Error;
-        result.message = "No JSON schema loaded";
-        results.append(result);
-        return results;
-    }
-    
-    // Basic schema validation implementation
-    // This is a simplified version - a full implementation would be much more complex
-    
-    QJsonObject properties = d->jsonSchema["properties"].toObject();
-    QJsonArray required = d->jsonSchema["required"].toArray();
-    
-    // Check required properties
-    for (const QJsonValue& reqValue : required) {
-        QString reqKey = reqValue.toString();
-        if (!json.contains(reqKey)) {
-            ValidationResult result;
-            result.isValid = false;
-            result.key = reqKey;
-            result.severity = Error;
-            result.message = QString("Required property '%1' is missing").arg(reqKey);
-            results.append(result);
-        }
-    }
-    
-    // Validate properties
-    for (auto it = json.constBegin(); it != json.constEnd(); ++it) {
-        const QString& key = it.key();
-        const QJsonValue& value = it.value();
+    // 简化的 JSON Schema 验证实现
+    if (d->jsonSchema.contains("properties")) {
+        QJsonObject properties = d->jsonSchema["properties"].toObject();
         
-        if (properties.contains(key)) {
-            QJsonObject propSchema = properties[key].toObject();
-            ValidationResult result = validateJsonValue(key, value, propSchema);
-            if (!result.isValid) {
+        for (auto it = properties.begin(); it != properties.end(); ++it) {
+            QString key = it.key();
+            QJsonObject propertySchema = it.value().toObject();
+            
+            if (json.contains(key)) {
+                ValidationResult propertyResult = validateJsonValue(key, json[key], propertySchema);
+                results.append(propertyResult);
+            } else if (propertySchema.contains("required") && propertySchema["required"].toBool()) {
+                ValidationResult result;
+                result.isValid = false;
+                result.severityLevel = 2;
+                result.key = key;
+                result.message = QString("Required property '%1' is missing").arg(key);
                 results.append(result);
             }
-        } else if (d->strictMode) {
-            ValidationResult result;
-            result.isValid = false;
-            result.key = key;
-            result.severity = Warning;
-            result.message = QString("Unknown property '%1'").arg(key);
-            results.append(result);
         }
     }
     
     return results;
 }
 
-QMap<QString, QList<ValidationRule>> ConfigValidator::getAllRules() const
+QMap<QString, QList<IConfigValidator::ValidationRule>> ConfigValidator::getAllRules() const
 {
-    QMap<QString, QList<ValidationRule>> allRules;
+    QMutexLocker locker(&d->mutex);
+    QMap<QString, QList<ValidationRule>> rules;
     
-    for (auto it = d->rules.constBegin(); it != d->rules.constEnd(); ++it) {
-        const QString& key = it.key();
-        const QList<ValidationRuleInfo>& ruleInfoList = it.value();
-        
-        QList<ValidationRule> rules;
-        for (const ValidationRuleInfo& ruleInfo : ruleInfoList) {
-            rules.append(ruleInfo.rule);
+    for (auto it = d->rules.begin(); it != d->rules.end(); ++it) {
+        QList<ValidationRule> ruleList;
+        for (const auto& ruleInfo : it.value()) {
+            ruleList.append(ruleInfo.rule);
         }
-        
-        allRules[key] = rules;
+        rules[it.key()] = ruleList;
     }
     
-    return allRules;
+    return rules;
 }
 
 bool ConfigValidator::hasRules(const QString& key) const
 {
-    return d->rules.contains(key) && !d->rules[key].isEmpty();
+    QMutexLocker locker(&d->mutex);
+    return d->rules.contains(key) || d->customValidators.contains(key);
 }
 
 void ConfigValidator::clearRules()
 {
+    QMutexLocker locker(&d->mutex);
     d->rules.clear();
     d->customValidators.clear();
-    d->dependencyRules.clear();
-    d->globalValidators.clear();
 }
 
 void ConfigValidator::setStrictMode(bool strict)
 {
+    QMutexLocker locker(&d->mutex);
     d->strictMode = strict;
 }
 
 bool ConfigValidator::isStrictMode() const
 {
+    QMutexLocker locker(&d->mutex);
     return d->strictMode;
 }
 
 void ConfigValidator::setDefaultSeverity(ValidationSeverity severity)
 {
+    QMutexLocker locker(&d->mutex);
     d->defaultSeverity = severity;
 }
 
-ValidationSeverity ConfigValidator::defaultSeverity() const
+IConfigValidator::ValidationSeverity ConfigValidator::defaultSeverity() const
 {
+    QMutexLocker locker(&d->mutex);
     return d->defaultSeverity;
 }
 
 QJsonObject ConfigValidator::exportRulesToJson() const
 {
-    QJsonObject json;
+    QMutexLocker locker(&d->mutex);
+    QJsonObject rulesJson;
     
-    for (auto it = d->rules.constBegin(); it != d->rules.constEnd(); ++it) {
-        const QString& key = it.key();
-        const QList<ValidationRuleInfo>& ruleList = it.value();
-        
-        QJsonArray rulesArray;
-        for (const ValidationRuleInfo& ruleInfo : ruleList) {
+    for (auto it = d->rules.begin(); it != d->rules.end(); ++it) {
+        QJsonArray ruleArray;
+        for (const auto& ruleInfo : it.value()) {
             QJsonObject ruleObj;
-            ruleObj["rule"] = ruleToString(ruleInfo.rule);
-            ruleObj["parameters"] = QJsonArray::fromVariantList(ruleInfo.parameters);
-            ruleObj["severity"] = severityToString(ruleInfo.severity);
-            ruleObj["description"] = ruleInfo.description;
-            ruleObj["enabled"] = ruleInfo.enabled;
-            
-            rulesArray.append(ruleObj);
+            ruleObj["rule"] = static_cast<int>(ruleInfo.rule);
+            ruleObj["severity"] = static_cast<int>(ruleInfo.severity);
+            // 参数序列化可以根据需要实现
+            ruleArray.append(ruleObj);
         }
-        
-        json[key] = rulesArray;
+        rulesJson[it.key()] = ruleArray;
     }
     
-    return json;
+    return rulesJson;
 }
 
-bool ConfigValidator::importRulesFromJson(const QJsonObject& json)
+bool ConfigValidator::importRulesFromJson(const QJsonObject& rulesJson)
 {
-    clearRules();
+    QMutexLocker locker(&d->mutex);
     
-    for (auto it = json.constBegin(); it != json.constEnd(); ++it) {
-        const QString& key = it.key();
-        const QJsonArray& rulesArray = it.value().toArray();
-        
-        for (const QJsonValue& ruleValue : rulesArray) {
-            QJsonObject ruleObj = ruleValue.toObject();
+    try {
+        for (auto it = rulesJson.begin(); it != rulesJson.end(); ++it) {
+            QString key = it.key();
+            QJsonArray ruleArray = it.value().toArray();
             
-            ValidationRuleInfo ruleInfo;
-            ruleInfo.rule = stringToRule(ruleObj["rule"].toString());
-            ruleInfo.parameters = ruleObj["parameters"].toArray().toVariantList();
-            ruleInfo.severity = stringToSeverity(ruleObj["severity"].toString());
-            ruleInfo.description = ruleObj["description"].toString();
-            ruleInfo.enabled = ruleObj["enabled"].toBool(true);
+            QList<ValidationRuleInfo> ruleList;
+            for (const QJsonValue& ruleValue : ruleArray) {
+                QJsonObject ruleObj = ruleValue.toObject();
+                ValidationRule rule = static_cast<ValidationRule>(ruleObj["rule"].toInt());
+                ValidationSeverity severity = static_cast<ValidationSeverity>(ruleObj["severity"].toInt());
+                
+                ValidationRuleInfo ruleInfo(rule, QVariantList(), severity);
+                ruleList.append(ruleInfo);
+            }
             
-            addRule(key, ruleInfo);
+            d->rules[key] = ruleList;
         }
+        return true;
+    } catch (...) {
+        return false;
     }
-    
-    return true;
 }
 
 void ConfigValidator::createPredefinedRuleSet(const QString& ruleSetName)
 {
-    if (ruleSetName == "audio") {
-        createAudioRuleSet();
-    } else if (ruleSetName == "video") {
-        createVideoRuleSet();
+    QMutexLocker locker(&d->mutex);
+    
+    if (ruleSetName == "basic") {
+        // 添加基本规则集
+        addRule("server.host", Required, QVariantList(), ErrorLevel);
+        addRule("server.port", Range, QVariantList() << 1 << 65535, ErrorLevel);
+        addRule("user.name", Required, QVariantList(), ErrorLevel);
     } else if (ruleSetName == "network") {
-        createNetworkRuleSet();
-    } else if (ruleSetName == "ui") {
-        createUIRuleSet();
-    } else if (ruleSetName == "performance") {
-        createPerformanceRuleSet();
-    } else if (ruleSetName == "security") {
-        createSecurityRuleSet();
+        // 添加网络相关规则集
+        addRule("network.timeout", Range, QVariantList() << 1000 << 30000, IConfigValidator::Warning);
+        addRule("network.retries", Range, QVariantList() << 1 << 10, IConfigValidator::Warning);
     }
+}
+
+void ConfigValidator::validateConfigAsync(const QVariantMap& config)
+{
+    QtConcurrent::run([this, config]() {
+        QList<ValidationResult> results = validateConfig(config);
+        // 发出第一个结果或创建汇总结果
+        ValidationResult summaryResult;
+        summaryResult.isValid = true;
+        summaryResult.message = "Async validation completed";
+        
+        for (const auto& result : results) {
+            if (!result.isValid) {
+                summaryResult = result;
+                break;
+            }
+        }
+        
+        emit validationFinished(summaryResult);
+    });
+}
+
+void ConfigValidator::validateJsonAsync(const QJsonObject& json)
+{
+    QtConcurrent::run([this, json]() {
+        QList<ValidationResult> results = validateJson(json);
+        // 发出第一个结果或创建汇总结果
+        ValidationResult summaryResult;
+        summaryResult.isValid = true;
+        summaryResult.message = "Async JSON validation completed";
+        
+        for (const auto& result : results) {
+            if (!result.isValid) {
+                summaryResult = result;
+                break;
+            }
+        }
+        
+        emit validationFinished(summaryResult);
+    });
+}
+
+void ConfigValidator::reloadRules()
+{
+    QMutexLocker locker(&d->mutex);
+    // 重新加载规则的实现
+    clearRules();
+    addBuiltinRules();
+    emit rulesReloaded();
+}
+
+void ConfigValidator::optimizeRules()
+{
+    QMutexLocker locker(&d->mutex);
+    // 优化规则的实现
+    // 这里可以添加规则优化逻辑
+    emit rulesOptimized();
+}
+
+void ConfigValidator::onAsyncValidationFinished()
+{
+    // 异步验证完成的处理
+    emit asyncValidationCompleted();
+}
+
+void ConfigValidator::resetStatistics()
+{
+    QMutexLocker locker(&d->mutex);
+    d->statistics.clear();
+    d->lastErrors.clear();
+    d->warnings.clear();
+}
+
+IConfigValidator::ValidationResult ConfigValidator::validateWithRule(const QString& key, const QVariant& value, const ValidationRuleInfo& ruleInfo) const
+{
+    ValidationResult result;
+    result.isValid = true;
+    result.key = key;
+    result.value = value;
+    result.severityLevel = static_cast<int>(ruleInfo.severity);
+    result.message = "Validation passed";
+    
+    switch (ruleInfo.rule) {
+        case Required:
+            if (value.toString().isEmpty()) {
+                result.isValid = false;
+                result.message = QString("Value for '%1' cannot be empty").arg(key);
+            }
+            break;
+            
+        case Range:
+            if (ruleInfo.parameters.size() >= 2) {
+                double min = ruleInfo.parameters[0].toDouble();
+                double max = ruleInfo.parameters[1].toDouble();
+                double val = value.toDouble();
+                
+                if (val < min || val > max) {
+                    result.isValid = false;
+                    result.message = QString("Value for '%1' must be between %2 and %3").arg(key).arg(min).arg(max);
+                }
+            }
+            break;
+            
+        case MinLength:
+            if (!ruleInfo.parameters.isEmpty()) {
+                int minLen = ruleInfo.parameters[0].toInt();
+                if (value.toString().length() < minLen) {
+                    result.isValid = false;
+                    result.message = QString("Value for '%1' must be at least %2 characters long").arg(key).arg(minLen);
+                }
+            }
+            break;
+            
+        case MaxLength:
+            if (!ruleInfo.parameters.isEmpty()) {
+                int maxLen = ruleInfo.parameters[0].toInt();
+                if (value.toString().length() > maxLen) {
+                    result.isValid = false;
+                    result.message = QString("Value for '%1' must be at most %2 characters long").arg(key).arg(maxLen);
+                }
+            }
+            break;
+            
+        case Pattern:
+            if (!ruleInfo.parameters.isEmpty()) {
+                QString pattern = ruleInfo.parameters[0].toString();
+                QRegularExpression regex(pattern);
+                if (!regex.match(value.toString()).hasMatch()) {
+                    result.isValid = false;
+                    result.message = QString("Value for '%1' does not match required pattern").arg(key);
+                }
+            }
+            break;
+            
+        case Custom:
+            // 自定义规则处理
+            break;
+    }
+    
+    return result;
 }

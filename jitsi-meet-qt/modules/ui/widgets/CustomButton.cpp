@@ -178,14 +178,16 @@ void CustomButton::updateThemeColors()
 
 void CustomButton::updateThemeFonts()
 {
-    setFont(getFontForButtonSize(m_buttonSize));
+    // 修复多继承歧义问题，明确指定QPushButton的setFont方法
+    QPushButton::setFont(getFontForButtonSize(m_buttonSize));
 }
 
 void CustomButton::updateThemeSizes()
 {
     QSize size = getSizeForButtonSize(m_buttonSize);
-    setMinimumSize(size);
-    setMaximumSize(size.width() * 3, size.height());
+    // 修复多继承歧义问题，明确指定QPushButton的setMinimumSize和setMaximumSize方法
+    QPushButton::setMinimumSize(size);
+    QPushButton::setMaximumSize(size.width() * 3, size.height());
 }
 
 QVariantMap CustomButton::getDefaultConfiguration() const
@@ -223,7 +225,7 @@ void CustomButton::paintEvent(QPaintEvent *event)
     QPushButton::paintEvent(event);
 }
 
-void CustomButton::enterEvent(QEvent *event)
+void CustomButton::enterEvent(QEnterEvent *event)
 {
     m_hovered = true;
     updateButtonStyle();
@@ -272,10 +274,10 @@ void CustomButton::onReleased()
 
 void CustomButton::setupButton()
 {
-    // 连接信号
-    connect(this, &QPushButton::clicked, this, &CustomButton::onClicked);
-    connect(this, &QPushButton::pressed, this, &CustomButton::onPressed);
-    connect(this, &QPushButton::released, this, &CustomButton::onReleased);
+    // 修复信号槽连接 - 明确指定 QObject::connect
+    QObject::connect(this, QOverload<bool>::of(&QPushButton::clicked), [this](bool) { onClicked(); });
+    QObject::connect(this, &QPushButton::pressed, [this]() { onPressed(); });
+    QObject::connect(this, &QPushButton::released, [this]() { onReleased(); });
     
     // 设置初始样式
     updateButtonStyle();
@@ -285,14 +287,16 @@ void CustomButton::setupButton()
 
 void CustomButton::updateButtonStyle()
 {
-    setStyleSheet(generateStyleSheet());
+    // 修复多继承歧义问题，明确指定QPushButton的setStyleSheet方法
+    QPushButton::setStyleSheet(generateStyleSheet());
 }
 
 void CustomButton::updateButtonSize()
 {
     QSize size = getSizeForButtonSize(m_buttonSize);
-    setMinimumSize(size);
-    setFont(getFontForButtonSize(m_buttonSize));
+    // 修复多继承歧义问题，明确指定QPushButton的方法
+    QPushButton::setMinimumSize(size);
+    QPushButton::setFont(getFontForButtonSize(m_buttonSize));
 }
 
 void CustomButton::updateIcon()

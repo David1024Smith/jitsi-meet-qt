@@ -75,8 +75,9 @@ void MetricsChart::setChartType(ChartType type)
 MetricsChart::ChartType MetricsChart::chartType() const
 {
     return m_chartType;
-}v
-oid MetricsChart::setMetricType(MetricType type)
+}
+
+void MetricsChart::setMetricType(MetricType type)
 {
     if (m_metricType == type) {
         return;
@@ -190,8 +191,9 @@ void MetricsChart::setYAxisLabel(const QString& label)
 QString MetricsChart::yAxisLabel() const
 {
     return m_yAxis ? m_yAxis->titleText() : QString();
-}void Metr
-icsChart::setMaxDataPoints(int maxPoints)
+}
+
+void MetricsChart::setMaxDataPoints(int maxPoints)
 {
     if (maxPoints < 10 || maxPoints > 10000) {
         qWarning() << "MetricsChart: Invalid max data points:" << maxPoints;
@@ -301,8 +303,9 @@ void MetricsChart::addDataPoints(const QList<QPair<QDateTime, double>>& dataPoin
     }
     
     updateChartData();
-}void M
-etricsChart::setDataSeries(const QList<QPair<QDateTime, double>>& dataPoints)
+}
+
+void MetricsChart::setDataSeries(const QList<QPair<QDateTime, double>>& dataPoints)
 {
     QMutexLocker locker(&m_mutex);
     
@@ -437,8 +440,9 @@ void MetricsChart::removeThresholdLine()
         delete m_thresholdSeries;
         m_thresholdSeries = nullptr;
     }
-}vo
-id MetricsChart::setChartTheme(QChart::ChartTheme theme)
+}
+
+void MetricsChart::setChartTheme(QChart::ChartTheme theme)
 {
     if (m_chart) {
         m_chart->setTheme(theme);
@@ -553,8 +557,9 @@ void MetricsChart::handleChartTypeChanged(int index)
 void MetricsChart::handleMaxDataPointsChanged(int maxPoints)
 {
     setMaxDataPoints(maxPoints);
-}void Met
-ricsChart::initializeUI()
+}
+
+void MetricsChart::initializeUI()
 {
     m_mainLayout = new QVBoxLayout(this);
     m_mainLayout->setContentsMargins(5, 5, 5, 5);
@@ -661,8 +666,9 @@ QWidget* MetricsChart::createControlPanel()
     m_controlLayout->addWidget(m_exportButton);
     
     return controlWidget;
-}void Me
-tricsChart::updateChartData()
+}
+
+void MetricsChart::updateChartData()
 {
     if (!m_chart) {
         return;
@@ -793,8 +799,9 @@ void MetricsChart::configureAxes()
             break;
         }
     }
-}vo
-id MetricsChart::applyChartType()
+}
+
+void MetricsChart::applyChartType()
 {
     if (!m_chart) {
         return;
@@ -862,7 +869,14 @@ id MetricsChart::applyChartType()
         scatterSeries->attachAxis(m_xAxis);
         scatterSeries->attachAxis(m_yAxis);
         // 将散点图系列存储在线系列指针中以便统一处理
-        m_lineSeries = scatterSeries;
+        // 使用新的线系列对象替代
+        m_lineSeries = new QLineSeries();
+        // 复制数据点
+        for (int i = 0; i < scatterSeries->count(); ++i) {
+            m_lineSeries->append(scatterSeries->at(i));
+        }
+        m_chart->removeSeries(scatterSeries);
+        m_chart->addSeries(m_lineSeries);
         break;
     }
     }
@@ -924,8 +938,9 @@ QString MetricsChart::getMetricUnit() const
     default:
         return "";
     }
-}qi
-nt64 MetricsChart::getTimeRangeMilliseconds(TimeRange range) const
+}
+
+qint64 MetricsChart::getTimeRangeMilliseconds(TimeRange range) const
 {
     switch (range) {
     case Last1Minute:

@@ -1,7 +1,7 @@
 #ifndef SETTINGSMANAGER_H
 #define SETTINGSMANAGER_H
 
-#include "interfaces/ISettingsManager.h"
+#include "../interfaces/ISettingsManager.h"
 #include <QSettings>
 #include <QTimer>
 #include <QMutex>

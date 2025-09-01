@@ -155,6 +155,18 @@ public slots:
      */
     void updateMeetingSettings(const QVariantMap& settings);
 
+signals:
+    /**
+     * @brief 配置改变信号
+     * @param config 新配置
+     */
+    void configurationChanged(const QVariantMap& config);
+    
+    /**
+     * @brief 配置改变信号（无参数）
+     */
+    void configurationChanged();
+
 private slots:
     /**
      * @brief 处理连接超时

@@ -2,6 +2,7 @@
 #include "MetricsChart.h"
 #include "PerformanceManager.h"
 #include "PerformanceConfig.h"
+#include "OptimizationType.h"
 #include <QApplication>
 #include <QMessageBox>
 #include <QFileDialog>
@@ -53,15 +54,16 @@ PerformanceWidget::PerformanceWidget(QWidget *parent)
 {
     initializeUI();
     
-    // 连接定时器
+    // 连接定时�?
     connect(m_updateTimer, &QTimer::timeout, this, &PerformanceWidget::handleRealTimeUpdate);
 }
 
 PerformanceWidget::~PerformanceWidget()
 {
     stopRealTimeUpdate();
-}void Pe
-rformanceWidget::setPerformanceManager(PerformanceManager* manager)
+}
+
+void PerformanceWidget::setPerformanceManager(PerformanceManager* manager)
 {
     QMutexLocker locker(&m_mutex);
     
@@ -69,14 +71,14 @@ rformanceWidget::setPerformanceManager(PerformanceManager* manager)
         return;
     }
     
-    // 断开旧连接
+    // 断开旧连�?
     if (m_performanceManager) {
         disconnect(m_performanceManager, nullptr, this, nullptr);
     }
     
     m_performanceManager = manager;
     
-    // 建立新连接
+    // 建立新连�?
     if (m_performanceManager) {
         connect(m_performanceManager, &PerformanceManager::metricsUpdated,
                 this, &PerformanceWidget::updateMetrics);
@@ -84,7 +86,8 @@ rformanceWidget::setPerformanceManager(PerformanceManager* manager)
                 this, &PerformanceWidget::updatePerformanceLevel);
         connect(m_performanceManager, &PerformanceManager::thresholdExceeded,
                 this, &PerformanceWidget::showThresholdWarning);
-        connect(m_performanceManager, &PerformanceManager::optimizationCompleted,
+        connect(m_performanceManager, 
+                QOverload<bool, const QVariantMap&>::of(&PerformanceManager::optimizationCompleted),
                 this, &PerformanceWidget::showOptimizationResult);
     }
     
@@ -105,14 +108,14 @@ void PerformanceWidget::setConfig(PerformanceConfig* config)
         return;
     }
     
-    // 断开旧连接
+    // 断开旧连�?
     if (m_config) {
         disconnect(m_config, nullptr, this, nullptr);
     }
     
     m_config = config;
     
-    // 建立新连接
+    // 建立新连�?
     if (m_config) {
         connect(m_config, &PerformanceConfig::configChanged,
                 this, [this](PerformanceConfig::ConfigCategory category, const QString& key, const QVariant& value) {
@@ -139,8 +142,9 @@ PerformanceConfig* PerformanceWidget::config() const
 {
     QMutexLocker locker(&m_mutex);
     return m_config;
-}void Per
-formanceWidget::setDisplayMode(DisplayMode mode)
+}
+
+void PerformanceWidget::setDisplayMode(DisplayMode mode)
 {
     QMutexLocker locker(&m_mutex);
     
@@ -173,7 +177,7 @@ void PerformanceWidget::setUpdateInterval(int interval)
         m_updateTimer->setInterval(m_updateInterval);
     }
     
-    // 更新图表的更新间隔
+    // 更新图表的更新间�?
     if (m_cpuChart) {
         m_cpuChart->setUpdateInterval(m_updateInterval);
     }
@@ -202,7 +206,7 @@ void PerformanceWidget::startRealTimeUpdate()
     m_realTimeUpdateActive = true;
     m_updateTimer->start(m_updateInterval);
     
-    // 启动图表的实时更新
+    // 启动图表的实时更�?
     if (m_cpuChart) {
         m_cpuChart->startRealTimeUpdate();
     }
@@ -229,7 +233,7 @@ void PerformanceWidget::stopRealTimeUpdate()
     m_realTimeUpdateActive = false;
     m_updateTimer->stop();
     
-    // 停止图表的实时更新
+    // 停止图表的实时更�?
     if (m_cpuChart) {
         m_cpuChart->stopRealTimeUpdate();
     }
@@ -243,8 +247,9 @@ void PerformanceWidget::stopRealTimeUpdate()
     updateStatusDisplay();
     
     qDebug() << "PerformanceWidget: Real-time update stopped";
-}boo
-l PerformanceWidget::isRealTimeUpdateActive() const
+}
+
+bool PerformanceWidget::isRealTimeUpdateActive() const
 {
     QMutexLocker locker(&m_mutex);
     return m_realTimeUpdateActive;
@@ -256,18 +261,18 @@ void PerformanceWidget::refreshDisplay()
         return;
     }
     
-    // 获取最新指标
+    // 获取最新指�?
     PerformanceMetrics metrics = m_performanceManager->getCurrentMetrics();
     updateMetrics(metrics);
     
     // 更新性能等级
-    PerformanceManager::PerformanceLevel level = m_performanceManager->getCurrentPerformanceLevel();
+    PerformanceLevel level = m_performanceManager->getCurrentPerformanceLevel();
     updatePerformanceLevel(level);
     
     // 更新系统信息
     updateSystemInfo();
     
-    // 更新状态显示
+    // 更新状态显�?
     updateStatusDisplay();
 }
 
@@ -284,7 +289,7 @@ void PerformanceWidget::resetInterface()
         m_networkChart->clearData();
     }
     
-    // 重置进度条
+    // 重置进度�?
     if (m_cpuProgressBar) {
         m_cpuProgressBar->setValue(0);
     }
@@ -347,7 +352,7 @@ bool PerformanceWidget::exportPerformanceData(const QString& filePath, const QSt
             exportData["networkStatistics"] = m_networkChart->getStatistics();
         }
         
-        // 保存到文件
+        // 保存到文�?
         QJsonDocument doc = QJsonDocument::fromVariant(exportData);
         
         QFile file(filePath);
@@ -366,8 +371,9 @@ bool PerformanceWidget::exportPerformanceData(const QString& filePath, const QSt
         qCritical() << "PerformanceWidget: Exception during export:" << e.what();
         return false;
     }
-}QVaria
-ntMap PerformanceWidget::getInterfaceState() const
+}
+
+QVariantMap PerformanceWidget::getInterfaceState() const
 {
     QMutexLocker locker(&m_mutex);
     
@@ -423,7 +429,7 @@ void PerformanceWidget::updateMetrics(const PerformanceMetrics& metrics)
     updateChartsDisplay(metrics);
 }
 
-void PerformanceWidget::updatePerformanceLevel(PerformanceManager::PerformanceLevel level)
+void PerformanceWidget::updatePerformanceLevel(PerformanceLevel level)
 {
     if (!m_performanceLevelLabel) {
         return;
@@ -433,24 +439,20 @@ void PerformanceWidget::updatePerformanceLevel(PerformanceManager::PerformanceLe
     QColor levelColor;
     
     switch (level) {
-    case PerformanceManager::Excellent:
+    case PerformanceLevel::Excellent:
         levelText = "Excellent";
         levelColor = Qt::green;
         break;
-    case PerformanceManager::Good:
+    case PerformanceLevel::Good:
         levelText = "Good";
         levelColor = QColor(144, 238, 144); // Light green
         break;
-    case PerformanceManager::Fair:
+    case PerformanceLevel::Fair:
         levelText = "Fair";
         levelColor = Qt::yellow;
         break;
-    case PerformanceManager::Poor:
+    case PerformanceLevel::Poor:
         levelText = "Poor";
-        levelColor = QColor(255, 165, 0); // Orange
-        break;
-    case PerformanceManager::Critical:
-        levelText = "Critical";
         levelColor = Qt::red;
         break;
     default:
@@ -465,8 +467,9 @@ void PerformanceWidget::updatePerformanceLevel(PerformanceManager::PerformanceLe
     QPalette palette = m_performanceLevelLabel->palette();
     palette.setColor(QPalette::WindowText, levelColor);
     m_performanceLevelLabel->setPalette(palette);
-}void Per
-formanceWidget::showThresholdWarning(const QString& metricName, double value, double threshold)
+}
+
+void PerformanceWidget::showThresholdWarning(const QString& metricName, double value, double threshold)
 {
     QString message = QString("Performance threshold exceeded!\n\n"
                              "Metric: %1\n"
@@ -539,7 +542,7 @@ void PerformanceWidget::performManualOptimization()
         m_optimizeButton->setText("Optimizing...");
     }
     
-    // 更新状态
+    // 更新状�?
     if (m_optimizationStatusLabel) {
         m_optimizationStatusLabel->setText("Optimization in progress...");
         QPalette palette = m_optimizationStatusLabel->palette();
@@ -550,7 +553,7 @@ void PerformanceWidget::performManualOptimization()
     // 执行优化
     bool success = m_performanceManager->performOptimization();
     
-    // 恢复按钮状态
+    // 恢复按钮状�?
     if (m_optimizeButton) {
         m_optimizeButton->setEnabled(true);
         m_optimizeButton->setText("Optimize Now");
@@ -559,8 +562,9 @@ void PerformanceWidget::performManualOptimization()
     if (!success) {
         showOptimizationResult(false, QVariantMap());
     }
-}void P
-erformanceWidget::openConfigurationDialog()
+}
+
+void PerformanceWidget::openConfigurationDialog()
 {
     if (!m_config) {
         QMessageBox::warning(this, "Error", "No configuration available");
@@ -622,7 +626,7 @@ void PerformanceWidget::resizeEvent(QResizeEvent* event)
 {
     QWidget::resizeEvent(event);
     
-    // 应用显示模式以适应新尺寸
+    // 应用显示模式以适应新尺�?
     applyDisplayMode();
 }
 
@@ -630,7 +634,7 @@ void PerformanceWidget::showEvent(QShowEvent* event)
 {
     QWidget::showEvent(event);
     
-    // 如果配置允许，启动实时更新
+    // 如果配置允许，启动实时更�?
     if (m_config && m_config->isRealTimeDisplayEnabled() && !m_realTimeUpdateActive) {
         startRealTimeUpdate();
     }
@@ -657,19 +661,20 @@ void PerformanceWidget::handleRealTimeUpdate()
     updateMetrics(metrics);
     
     // 更新性能等级
-    PerformanceManager::PerformanceLevel level = m_performanceManager->getCurrentPerformanceLevel();
+    PerformanceLevel level = m_performanceManager->getCurrentPerformanceLevel();
     updatePerformanceLevel(level);
-}void Perf
-ormanceWidget::handleTabChanged(int index)
+}
+
+void PerformanceWidget::handleTabChanged(int index)
 {
     Q_UNUSED(index)
     
-    // 根据当前标签页调整更新策略
+    // 根据当前标签页调整更新策�?
     if (m_tabWidget) {
         QString tabText = m_tabWidget->tabText(index);
         
         if (tabText == "Charts" && m_realTimeUpdateActive) {
-            // 图表标签页需要更频繁的更新
+            // 图表标签页需要更频繁的更�?
             if (m_cpuChart) m_cpuChart->startRealTimeUpdate();
             if (m_memoryChart) m_memoryChart->startRealTimeUpdate();
             if (m_networkChart) m_networkChart->startRealTimeUpdate();
@@ -681,7 +686,7 @@ void PerformanceWidget::handleMonitorStatusChanged(const QString& monitorName, c
 {
     qDebug() << "PerformanceWidget: Monitor status changed -" << monitorName << ":" << status;
     
-    // 更新状态显示
+    // 更新状态显�?
     updateStatusDisplay();
 }
 
@@ -691,17 +696,17 @@ void PerformanceWidget::initializeUI()
     m_mainLayout->setContentsMargins(10, 10, 10, 10);
     m_mainLayout->setSpacing(10);
     
-    // 创建标签页组件
+    // 创建标签页组�?
     m_tabWidget = new QTabWidget(this);
     
-    // 创建各个标签页
+    // 创建各个标签�?
     m_tabWidget->addTab(createOverviewTab(), "Overview");
     m_tabWidget->addTab(createDetailsTab(), "Details");
     m_tabWidget->addTab(createChartsTab(), "Charts");
     m_tabWidget->addTab(createOptimizationTab(), "Optimization");
     m_tabWidget->addTab(createSettingsTab(), "Settings");
     
-    // 连接标签页切换信号
+    // 连接标签页切换信�?
     connect(m_tabWidget, QOverload<int>::of(&QTabWidget::currentChanged),
             this, &PerformanceWidget::handleTabChanged);
     
@@ -722,23 +727,24 @@ QWidget* PerformanceWidget::createOverviewTab()
     QWidget* overviewWidget = new QWidget();
     QVBoxLayout* layout = new QVBoxLayout(overviewWidget);
     
-    // 创建系统信息组
+    // 创建系统信息�?
     QGroupBox* systemGroup = createSystemInfoGroup();
     layout->addWidget(systemGroup);
     
-    // 创建性能指标组
+    // 创建性能指标�?
     QGroupBox* metricsGroup = createMetricsGroup();
     layout->addWidget(metricsGroup);
     
-    // 创建控制面板组
+    // 创建控制面板�?
     QGroupBox* controlGroup = createControlPanelGroup();
     layout->addWidget(controlGroup);
     
     layout->addStretch();
     
     return overviewWidget;
-}QWidge
-t* PerformanceWidget::createDetailsTab()
+}
+
+QWidget* PerformanceWidget::createDetailsTab()
 {
     QWidget* detailsWidget = new QWidget();
     QVBoxLayout* layout = new QVBoxLayout(detailsWidget);
@@ -822,13 +828,14 @@ QWidget* PerformanceWidget::createChartsTab()
     layout->addWidget(chartsContainer);
     
     return chartsWidget;
-}QWidget*
- PerformanceWidget::createOptimizationTab()
+}
+
+QWidget* PerformanceWidget::createOptimizationTab()
 {
     QWidget* optimizationWidget = new QWidget();
     QVBoxLayout* layout = new QVBoxLayout(optimizationWidget);
     
-    // 优化控制组
+    // 优化控制�?
     QGroupBox* controlGroup = new QGroupBox("Optimization Control");
     QVBoxLayout* controlLayout = new QVBoxLayout(controlGroup);
     
@@ -866,7 +873,7 @@ QWidget* PerformanceWidget::createSettingsTab()
     QWidget* settingsWidget = new QWidget();
     QVBoxLayout* layout = new QVBoxLayout(settingsWidget);
     
-    // 设置控制组
+    // 设置控制�?
     QGroupBox* settingsGroup = new QGroupBox("Settings");
     QVBoxLayout* settingsLayout = new QVBoxLayout(settingsGroup);
     
@@ -900,8 +907,9 @@ QWidget* PerformanceWidget::createSettingsTab()
     layout->addStretch();
     
     return settingsWidget;
-}QGroup
-Box* PerformanceWidget::createSystemInfoGroup()
+}
+
+QGroupBox* PerformanceWidget::createSystemInfoGroup()
 {
     QGroupBox* systemGroup = new QGroupBox("System Information");
     QVBoxLayout* layout = new QVBoxLayout(systemGroup);
@@ -922,7 +930,7 @@ QGroupBox* PerformanceWidget::createMetricsGroup()
     QGroupBox* metricsGroup = new QGroupBox("Performance Metrics");
     QGridLayout* layout = new QGridLayout(metricsGroup);
     
-    // CPU使用率
+    // CPU使用�?
     layout->addWidget(new QLabel("CPU Usage:"), 0, 0);
     m_cpuUsageLabel = new QLabel("0%");
     layout->addWidget(m_cpuUsageLabel, 0, 1);
@@ -1008,7 +1016,7 @@ void PerformanceWidget::updateMetricsDisplay(const PerformanceMetrics& metrics)
         m_cpuUsageLabel->setText(formatPercentage(cpuUsage));
         m_cpuProgressBar->setValue(static_cast<int>(cpuUsage));
         
-        // 设置进度条颜色
+        // 设置进度条颜�?
         QString style = QString("QProgressBar::chunk { background-color: %1; }")
                        .arg(cpuUsage > 80 ? "red" : (cpuUsage > 60 ? "orange" : "green"));
         m_cpuProgressBar->setStyleSheet(style);
@@ -1071,8 +1079,9 @@ void PerformanceWidget::updateMetricsDisplay(const PerformanceMetrics& metrics)
         
         m_networkMetricsLabel->setText(networkInfo.join("\n"));
     }
-}v
-oid PerformanceWidget::updateChartsDisplay(const PerformanceMetrics& metrics)
+}
+
+void PerformanceWidget::updateChartsDisplay(const PerformanceMetrics& metrics)
 {
     QDateTime currentTime = QDateTime::currentDateTime();
     
@@ -1130,7 +1139,7 @@ void PerformanceWidget::applyDisplayMode()
         break;
         
     case DashboardMode:
-        // 显示概览和图表
+        // 显示概览和图�?
         m_tabWidget->setTabVisible(0, true);  // Overview
         m_tabWidget->setTabVisible(1, false); // Details
         m_tabWidget->setTabVisible(2, true);  // Charts
@@ -1139,7 +1148,7 @@ void PerformanceWidget::applyDisplayMode()
         break;
         
     case MinimalMode:
-        // 只显示基本信息
+        // 只显示基本信�?
         for (int i = 1; i < m_tabWidget->count(); ++i) {
             m_tabWidget->setTabVisible(i, false);
         }
@@ -1179,14 +1188,13 @@ QString PerformanceWidget::formatTime(double milliseconds) const
     }
 }
 
-QColor PerformanceWidget::getPerformanceLevelColor(PerformanceManager::PerformanceLevel level) const
+QColor PerformanceWidget::getPerformanceLevelColor(PerformanceLevel level) const
 {
     switch (level) {
-    case PerformanceManager::Excellent: return Qt::green;
-    case PerformanceManager::Good: return QColor(144, 238, 144);
-    case PerformanceManager::Fair: return Qt::yellow;
-    case PerformanceManager::Poor: return QColor(255, 165, 0);
-    case PerformanceManager::Critical: return Qt::red;
+    case PerformanceLevel::Excellent: return Qt::green;
+    case PerformanceLevel::Good: return QColor(144, 238, 144);
+    case PerformanceLevel::Fair: return Qt::yellow;
+    case PerformanceLevel::Poor: return Qt::red;
     default: return Qt::gray;
     }
 }

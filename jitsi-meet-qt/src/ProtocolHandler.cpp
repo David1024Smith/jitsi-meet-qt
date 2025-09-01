@@ -3,8 +3,10 @@
 
 #include <QApplication>
 #include <QUrl>
+#include <QUrlQuery>
 #include <QRegularExpression>
 #include <QDebug>
+#include <QSettings>
 
 #ifdef Q_OS_WIN
 #include <QDir>
@@ -12,8 +14,7 @@
 #include <windows.h>
 #endif
 
-// 静态常量定义
-const QString ProtocolHandler::PROTOCOL_SCHEME = JitsiConstants::PROTOCOL_SCHEME;
+const QString ProtocolHandler::PROTOCOL_SCHEME = "jitsi-meet";
 
 ProtocolHandler::ProtocolHandler(QObject* parent)
     : QObject(parent)
@@ -41,11 +42,13 @@ bool ProtocolHandler::registerProtocol()
     if (success) {
         m_registered = true;
         qDebug() << "Protocol registered successfully";
+        return true;
     } else {
         qWarning() << "Failed to register protocol";
+        return false;
     }
-    return success;
 #else
+    // For other platforms, we would implement the registration here
     qWarning() << "Protocol registration not implemented for this platform";
     return false;
 #endif
@@ -72,38 +75,25 @@ QString ProtocolHandler::parseProtocolUrl(const QString& url)
         return QString();
     }
     
-    qDebug() << "Parsing protocol URL:" << url;
+    QUrl protocolUrl(url);
+    QString host = protocolUrl.host();
+    QString path = protocolUrl.path();
     
-    // 移除协议前缀
-    QString cleanUrl = url;
-    if (cleanUrl.startsWith(JitsiConstants::PROTOCOL_PREFIX)) {
-        cleanUrl = cleanUrl.mid(JitsiConstants::PROTOCOL_PREFIX.length());
+    // Remove leading slash from path
+    if (path.startsWith('/')) {
+        path = path.mid(1);
     }
     
-    // 解析URL格式
-    // 支持的格式:
-    // 1. room-name -> https://meet.jit.si/room-name
-    // 2. server.com/room-name -> https://server.com/room-name
-    // 3. https://server.com/room-name -> https://server.com/room-name
-    
-    if (cleanUrl.isEmpty()) {
-        qWarning() << "Empty room name in protocol URL";
+    // Extract room information
+    QString roomInfo = extractRoomInfo(url);
+    if (roomInfo.isEmpty()) {
+        qWarning() << "Could not extract room information from URL:" << url;
         return QString();
     }
     
-    // 如果已经是完整的HTTP(S) URL，直接返回
-    if (cleanUrl.startsWith("http://") || cleanUrl.startsWith("https://")) {
-        return cleanUrl;
-    }
-    
-    // 检查是否包含服务器地址
-    if (cleanUrl.contains('/')) {
-        // 格式: server.com/room-name
-        return "https://" + cleanUrl;
-    } else {
-        // 格式: room-name，使用默认服务器
-        return JitsiConstants::DEFAULT_SERVER_URL + "/" + cleanUrl;
-    }
+    // Build conference URL
+    QString serverUrl = host.isEmpty() ? "meet.jit.si" : host;
+    return buildConferenceUrl(serverUrl, roomInfo);
 }
 
 bool ProtocolHandler::isValidProtocolUrl(const QString& url) const
@@ -112,44 +102,44 @@ bool ProtocolHandler::isValidProtocolUrl(const QString& url) const
         return false;
     }
     
-    // 检查协议前缀
-    if (!url.startsWith(JitsiConstants::PROTOCOL_PREFIX)) {
-        return false;
-    }
-    
-    // 提取房间信息
-    QString roomInfo = extractRoomInfo(url);
-    if (roomInfo.isEmpty()) {
-        return false;
-    }
-    
-    // 验证房间名格式（允许字母、数字、连字符、下划线、点号、斜杠）
-    QRegularExpression roomRegex("^[a-zA-Z0-9._/-]+$");
-    return roomRegex.match(roomInfo).hasMatch();
+    QUrl protocolUrl(url);
+    return protocolUrl.scheme() == PROTOCOL_SCHEME && protocolUrl.isValid();
 }
 
 QString ProtocolHandler::extractRoomInfo(const QString& url) const
 {
-    if (!url.startsWith(JitsiConstants::PROTOCOL_PREFIX)) {
-        return QString();
+    QUrl protocolUrl(url);
+    QString path = protocolUrl.path();
+    
+    // Remove leading slash
+    if (path.startsWith('/')) {
+        path = path.mid(1);
     }
     
-    return url.mid(JitsiConstants::PROTOCOL_PREFIX.length());
+    // Extract room name from path
+    QStringList pathParts = path.split('/', Qt::SkipEmptyParts);
+    if (!pathParts.isEmpty()) {
+        return pathParts.first();
+    }
+    
+    // Try to get room from query parameters
+    QUrlQuery query(protocolUrl);
+    if (query.hasQueryItem("room")) {
+        return query.queryItemValue("room");
+    }
+    
+    return QString();
 }
 
 QString ProtocolHandler::buildConferenceUrl(const QString& serverUrl, const QString& roomName) const
 {
-    QString cleanServerUrl = serverUrl;
-    if (cleanServerUrl.endsWith('/')) {
-        cleanServerUrl.chop(1);
+    if (serverUrl.isEmpty() || roomName.isEmpty()) {
+        return QString();
     }
     
-    QString cleanRoomName = roomName;
-    if (cleanRoomName.startsWith('/')) {
-        cleanRoomName = cleanRoomName.mid(1);
-    }
-    
-    return cleanServerUrl + "/" + cleanRoomName;
+    QString url = QString("https://%1/%2").arg(serverUrl, roomName);
+    qDebug() << "Built conference URL:" << url;
+    return url;
 }
 
 #ifdef Q_OS_WIN
@@ -157,42 +147,39 @@ bool ProtocolHandler::registerWindowsProtocol()
 {
     QString executablePath = getExecutablePath();
     if (executablePath.isEmpty()) {
-        qWarning() << "Failed to get executable path";
+        qWarning() << "Could not determine executable path";
         return false;
     }
     
-    // 注册协议到注册表
-    QSettings registry("HKEY_CURRENT_USER\\Software\\Classes", QSettings::NativeFormat);
+    QSettings registry("HKEY_CLASSES_ROOT", QSettings::NativeFormat);
     
-    // 设置协议根键
-    QString protocolKey = PROTOCOL_SCHEME;
-    registry.setValue(protocolKey + "/.", QString("URL:%1 Protocol").arg(JitsiConstants::APP_NAME));
-    registry.setValue(protocolKey + "/URL Protocol", "");
-    registry.setValue(protocolKey + "/DefaultIcon/.", QString("\"%1\",0").arg(executablePath));
+    // Register protocol scheme
+    QString protocolKey = QString("%1").arg(PROTOCOL_SCHEME);
+    registry.setValue(QString("%1/Default").arg(protocolKey), QString("URL:%1 Protocol").arg(PROTOCOL_SCHEME));
+    registry.setValue(QString("%1/URL Protocol").arg(protocolKey), "");
     
-    // 设置命令
-    QString command = QString("\"%1\" \"%2\"").arg(executablePath).arg("%1");
-    registry.setValue(protocolKey + "/shell/open/command/.", command);
+    // Register command
+    QString commandKey = QString("%1/shell/open/command").arg(protocolKey);
+    QString command = QString("\"%1\" \"%2\"").arg(executablePath, "%1");
+    registry.setValue(QString("%1/Default").arg(commandKey), command);
     
     registry.sync();
     
-    qDebug() << "Windows protocol registered with command:" << command;
-    
+    qDebug() << "Registered protocol" << PROTOCOL_SCHEME << "with command:" << command;
     return true;
 }
 
 void ProtocolHandler::unregisterWindowsProtocol()
 {
-    QSettings registry("HKEY_CURRENT_USER\\Software\\Classes", QSettings::NativeFormat);
+    QSettings registry("HKEY_CLASSES_ROOT", QSettings::NativeFormat);
     registry.remove(PROTOCOL_SCHEME);
     registry.sync();
     
-    qDebug() << "Windows protocol unregistered";
+    qDebug() << "Unregistered protocol" << PROTOCOL_SCHEME;
 }
 
 QString ProtocolHandler::getExecutablePath() const
 {
-    QString path = QApplication::applicationFilePath();
-    return QDir::toNativeSeparators(path);
+    return QApplication::applicationFilePath();
 }
 #endif

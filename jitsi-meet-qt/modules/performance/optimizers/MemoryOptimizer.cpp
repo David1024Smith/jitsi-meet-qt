@@ -3,6 +3,7 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QStandardPaths>
+#include <QMetaEnum>
 
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -331,10 +332,9 @@ bool MemoryOptimizer::initializeOptimizer()
 OptimizationResult MemoryOptimizer::performOptimization(OptimizationStrategy strategy)
 {
     OptimizationResult result;
-    result.optimizerName = getOptimizerName();
     result.timestamp = QDateTime::currentDateTime();
     
-    qDebug() << "MemoryOptimizer: Performing optimization with strategy" << strategy;
+    qDebug() << "MemoryOptimizer: Performing optimization with strategy" << static_cast<int>(strategy);
     
     try {
         switch (m_memoryStrategy) {
@@ -349,15 +349,15 @@ OptimizationResult MemoryOptimizer::performOptimization(OptimizationStrategy str
             break;
         }
         
-        if (result.success) {
-            result.description = QString("Memory optimization completed using %1 strategy")
-                               .arg(QMetaEnum::fromType<MemoryStrategy>().valueToKey(m_memoryStrategy));
+        if (result.isSuccess()) {
+            result.message = QString("Memory optimization completed using %1 strategy")
+                               .arg(QMetaEnum::fromType<MemoryOptimizer::MemoryStrategy>().valueToKey(m_memoryStrategy));
         }
         
     } catch (const std::exception& e) {
-        result.success = false;
-        result.details.errorMessage = QString("Memory optimization failed: %1").arg(e.what());
-        addError(result.details.errorMessage);
+        result.status = OptimizationResultStatus::Failed;
+        result.message = QString("Memory optimization failed: %1").arg(e.what());
+        result.errors << result.message;
     }
     
     return result;
@@ -460,9 +460,9 @@ QString MemoryOptimizer::getOptimizerDescription() const
     return "Memory optimizer for reducing memory usage and preventing leaks";
 }
 
-IOptimizer::OptimizationType MemoryOptimizer::getOptimizerType() const
+OptimizationType MemoryOptimizer::getOptimizerType() const
 {
-    return MemoryOptimization;
+    return OptimizationType::Memory;
 }
 
 void MemoryOptimizer::performPeriodicMemoryCheck()
@@ -475,7 +475,7 @@ void MemoryOptimizer::performPeriodicMemoryCheck()
         qDebug() << "MemoryOptimizer: Periodic check detected optimization need";
         
         if (isAutoOptimizationEnabled()) {
-            optimize(Balanced);
+            optimize(OptimizationStrategy::Balanced);
         }
     }
 }
@@ -483,7 +483,7 @@ void MemoryOptimizer::performPeriodicMemoryCheck()
 OptimizationResult MemoryOptimizer::performLowMemoryOptimization()
 {
     OptimizationResult result;
-    result.success = true;
+    result.status = OptimizationResultStatus::Success;
     
     updateProgress(10, "Starting low memory optimization");
     
@@ -507,12 +507,11 @@ OptimizationResult MemoryOptimizer::performLowMemoryOptimization()
     
     qint64 totalFreed = gcFreed + cacheCleared + compressed;
     
-    result.details.actionsPerformed << QString("Garbage collection freed %1 bytes").arg(gcFreed)
-                                   << QString("Cache cleanup freed %1 bytes").arg(cacheCleared)
-                                   << QString("Memory compression freed %1 bytes").arg(compressed)
-                                   << "Optimized memory pools";
+    result.message = QString("Low memory optimization completed. Total freed: %1 bytes").arg(totalFreed);
     
-    result.improvements.memoryImprovement = totalFreed > 0 ? 25.0 : 0.0;
+    // 使用 QVariantMap 存储改善信息
+    result.improvements["memoryImprovement"] = totalFreed > 0 ? 25.0 : 0.0;
+    result.improvements["totalFreed"] = static_cast<qulonglong>(totalFreed);
     
     return result;
 }
@@ -520,7 +519,7 @@ OptimizationResult MemoryOptimizer::performLowMemoryOptimization()
 OptimizationResult MemoryOptimizer::performBalancedMemoryOptimization()
 {
     OptimizationResult result;
-    result.success = true;
+    result.status = OptimizationResultStatus::Success;
     
     updateProgress(10, "Starting balanced memory optimization");
     
@@ -540,11 +539,10 @@ OptimizationResult MemoryOptimizer::performBalancedMemoryOptimization()
     
     qint64 totalFreed = gcFreed + cacheCleared;
     
-    result.details.actionsPerformed << QString("Garbage collection freed %1 bytes").arg(gcFreed)
-                                   << QString("Cache cleanup freed %1 bytes").arg(cacheCleared)
-                                   << "Optimized memory pools";
+    result.message = QString("Balanced memory optimization completed. Total freed: %1 bytes").arg(totalFreed);
     
-    result.improvements.memoryImprovement = totalFreed > 0 ? 15.0 : 0.0;
+    result.improvements["memoryImprovement"] = totalFreed > 0 ? 15.0 : 0.0;
+    result.improvements["totalFreed"] = static_cast<qulonglong>(totalFreed);
     
     return result;
 }
@@ -552,7 +550,7 @@ OptimizationResult MemoryOptimizer::performBalancedMemoryOptimization()
 OptimizationResult MemoryOptimizer::performHighPerformanceOptimization()
 {
     OptimizationResult result;
-    result.success = true;
+    result.status = OptimizationResultStatus::Success;
     
     updateProgress(10, "Starting high performance memory optimization");
     
@@ -572,12 +570,11 @@ OptimizationResult MemoryOptimizer::performHighPerformanceOptimization()
     
     qint64 totalFreed = gcFreed + cacheCleared;
     
-    result.details.actionsPerformed << QString("Light garbage collection freed %1 bytes").arg(gcFreed)
-                                   << QString("Cache cleanup freed %1 bytes").arg(cacheCleared)
-                                   << "Optimized object lifecycle";
+    result.message = QString("High performance memory optimization completed. Total freed: %1 bytes").arg(totalFreed);
     
-    result.improvements.memoryImprovement = totalFreed > 0 ? 8.0 : 0.0;
-    result.improvements.performanceGain = 5.0; // 轻微性能提升
+    result.improvements["memoryImprovement"] = totalFreed > 0 ? 8.0 : 0.0;
+    result.improvements["performanceGain"] = 5.0; // 轻微性能提升
+    result.improvements["totalFreed"] = static_cast<qulonglong>(totalFreed);
     
     return result;
 }

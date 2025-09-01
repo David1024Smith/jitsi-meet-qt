@@ -93,23 +93,34 @@ mac {
 }
 
 # Crypto dependencies (OpenSSL)
-LIBS += -lssl -lcrypto
+# 添加OpenSSL包含路径
+win32 {
+    # Windows平台OpenSSL路径
+    OPENSSL_INCLUDE_PATH = "C:/Program Files/OpenSSL-Win64/include"
+    OPENSSL_LIB_PATH = "C:/Program Files/OpenSSL-Win64/lib/VC/x64/MD"
+    
+    INCLUDEPATH += $$OPENSSL_INCLUDE_PATH
+    LIBS += -L"$$OPENSSL_LIB_PATH" -llibssl -llibcrypto
+} else {
+    # Linux/Mac平台
+    LIBS += -lssl -lcrypto
+}
 
 message("✓ Utils Module configuration loaded")
-# 
-Additional headers for integrated configuration and error handling
+
+# Additional headers for integrated configuration and error handling
 HEADERS += \
-    $UTILS_MODULE_PATH/include/UtilsSingletonManager.h \
-    $UTILS_MODULE_PATH/include/UtilsErrorHandler.h \
-    $UTILS_MODULE_PATH/config/UtilsConfig.h
+    $$UTILS_MODULE_PATH/include/UtilsSingletonManager.h \
+    $$UTILS_MODULE_PATH/include/UtilsErrorHandler.h \
+    $$UTILS_MODULE_PATH/config/UtilsConfig.h
 
 # Additional sources for integrated configuration and error handling
 SOURCES += \
-    $UTILS_MODULE_PATH/src/UtilsSingletonManager.cpp \
-    $UTILS_MODULE_PATH/src/UtilsErrorHandler.cpp \
-    $UTILS_MODULE_PATH/config/UtilsConfig.cpp
+    $$UTILS_MODULE_PATH/src/UtilsSingletonManager.cpp \
+    $$UTILS_MODULE_PATH/src/UtilsErrorHandler.cpp \
+    $$UTILS_MODULE_PATH/config/UtilsConfig.cpp
 
 # Include configuration directory
-INCLUDEPATH += $UTILS_MODULE_PATH/config
+INCLUDEPATH += $$UTILS_MODULE_PATH/config
 
 message("✓ Utils Module integrated configuration and error handling loaded")

@@ -1,17 +1,18 @@
-#include "MainApplication.h"
+#include "../include/MainApplication.h"
 #include "ProtocolHandler.h"
-#include "WindowManager.h"
+#include "../include/WindowManager.h"
 #include "TranslationManager.h"
 #include "ConfigurationManager.h"
 #include "ConferenceManager.h"
 #include "MediaManager.h"
-#include "ChatManager.h"
+// #include "ChatManager.h" // 暂时禁用聊天功能
 #include "ScreenShareManager.h"
 #include "AuthenticationManager.h"
 #include "ErrorRecoveryManager.h"
-#include "ThemeManager.h"
+// #include "ThemeManager.h" // 暂时禁用主题功能
 #include "PerformanceManager.h"
 #include "Logger.h"
+#include "LogMacros.h"
 #include "ErrorLogger.h"
 #include "ErrorEventBus.h"
 #include <QCommandLineParser>
@@ -27,18 +28,18 @@ MainApplication* MainApplication::s_instance = nullptr;
 
 MainApplication::MainApplication(int argc, char *argv[])
     : QApplication(argc, argv)
-    , m_serverName(QString::fromUtf8(SERVER_NAME.data(), static_cast<int>(SERVER_NAME.size())))
     , m_protocolHandler(nullptr)
     , m_windowManager(nullptr)
     , m_translationManager(nullptr)
     , m_configurationManager(nullptr)
     , m_conferenceManager(nullptr)
     , m_mediaManager(nullptr)
-    , m_chatManager(nullptr)
+    // , m_chatManager(nullptr) // 暂时禁用聊天功能
+    , m_serverName(QString::fromUtf8(SERVER_NAME.data(), static_cast<int>(SERVER_NAME.size())))
     , m_screenShareManager(nullptr)
     , m_authenticationManager(nullptr)
     , m_errorRecoveryManager(nullptr)
-    , m_themeManager(nullptr)
+    // , m_themeManager(nullptr) // 暂时禁用主题功能
     , m_performanceManager(nullptr)
 {
     // Set singleton instance
@@ -90,10 +91,10 @@ MainApplication::~MainApplication() {
         m_performanceManager = nullptr;
     }
     
-    if (m_themeManager) {
-        delete m_themeManager;
-        m_themeManager = nullptr;
-    }
+    // if (m_themeManager) {
+    //     delete m_themeManager;
+    //     m_themeManager = nullptr;
+    // } // 暂时禁用主题功能
     
     if (m_errorRecoveryManager) {
         delete m_errorRecoveryManager;
@@ -110,10 +111,10 @@ MainApplication::~MainApplication() {
         m_screenShareManager = nullptr;
     }
     
-    if (m_chatManager) {
-        delete m_chatManager;
-        m_chatManager = nullptr;
-    }
+    // if (m_chatManager) {
+    //     delete m_chatManager;
+    //     m_chatManager = nullptr;
+    // } // 暂时禁用聊天功能
     
     if (m_mediaManager) {
         delete m_mediaManager;
@@ -150,7 +151,7 @@ MainApplication::~MainApplication() {
     LOG_INFO("Shutting down Jitsi Meet Qt application");
     ErrorLogger::instance()->shutdown();
     ErrorEventBus::instance()->shutdown();
-    Logger::instance()->shutdown();
+    Logger::instance()->cleanup();
     
     s_instance = nullptr;
     qDebug() << "MainApplication destroyed";
@@ -374,8 +375,8 @@ void MainApplication::initializeTranslationManager() {
         // Log available languages
         auto availableLanguages = m_translationManager->availableLanguages();
         qDebug() << "Available languages:" << availableLanguages.size();
-        for (const auto& langInfo : availableLanguages) {
-            qDebug() << "  -" << langInfo.code << "(" << langInfo.nativeName << ")";
+        for (const auto& langCode : availableLanguages) {
+            qDebug() << "  -" << langCode << "(" << m_translationManager->getLanguageName(langCode) << ")";
         }
     } else {
         qWarning() << "Failed to initialize TranslationManager";
@@ -419,9 +420,9 @@ void MainApplication::initializeManagers() {
     // 2. Initialize translation manager
     initializeTranslationManager();
     
-    // 3. Initialize theme manager
-    m_themeManager = new ThemeManager(this);
-    qDebug() << "ThemeManager initialized";
+    // 3. Initialize theme manager (暂时禁用)
+    // m_themeManager = new ThemeManager(this);
+    // qDebug() << "ThemeManager initialized";
     
     // 4. Initialize performance manager
     m_performanceManager = new PerformanceManager(this);
@@ -443,12 +444,12 @@ void MainApplication::initializeManagers() {
     m_conferenceManager = new ConferenceManager(this);
     qDebug() << "ConferenceManager initialized";
     
-    // 9. Initialize chat manager
-    m_chatManager = new ChatManager(this);
-    if (m_conferenceManager && m_conferenceManager->xmppClient()) {
-        m_chatManager->setXMPPClient(m_conferenceManager->xmppClient());
-    }
-    qDebug() << "ChatManager initialized";
+    // 9. Initialize chat manager (暂时禁用)
+    // m_chatManager = new ChatManager(this);
+    // if (m_conferenceManager && m_conferenceManager->xmppClient()) {
+    //     m_chatManager->setXMPPClient(m_conferenceManager->xmppClient());
+    // }
+    // qDebug() << "ChatManager initialized";
     
     // 10. Initialize screen share manager
     m_screenShareManager = new ScreenShareManager(this);
@@ -484,7 +485,7 @@ void MainApplication::setupComponentConnections() {
     
     // Connect second instance detection to window manager
     connect(this, &MainApplication::secondInstanceDetected,
-            [this](const QString& arguments) {
+            [this](const QString& /*arguments*/) {
                 qDebug() << "Second instance detected, bringing window to front";
                 if (m_windowManager) {
                     // Show welcome window and bring to front
@@ -510,18 +511,18 @@ void MainApplication::setupComponentConnections() {
                 });
     }
     
-    // Connect chat manager to conference manager
-    if (m_chatManager && m_conferenceManager) {
-        connect(m_conferenceManager, &ConferenceManager::conferenceJoined,
-                m_chatManager, [this](const ConferenceManager::ConferenceInfo& info) {
-                    qDebug() << "Conference joined, chat manager ready";
-                });
-    }
+    // Connect chat manager to conference manager (暂时禁用)
+    // if (m_chatManager && m_conferenceManager) {
+    //     connect(m_conferenceManager, &ConferenceManager::conferenceJoined,
+    //             m_chatManager, [this](const ConferenceManager::ConferenceInfo& /*info*/) {
+    //                 qDebug() << "Conference joined, chat manager ready";
+    //             });
+    // }
     
     // Connect screen share manager to conference manager
     if (m_screenShareManager && m_conferenceManager) {
         connect(m_conferenceManager, &ConferenceManager::conferenceJoined,
-                m_screenShareManager, [this](const ConferenceManager::ConferenceInfo& info) {
+                m_screenShareManager, [this](const ConferenceManager::ConferenceInfo& /*info*/) {
                     qDebug() << "Conference joined, screen share manager ready";
                 });
     }
@@ -550,10 +551,10 @@ void MainApplication::setupComponentConnections() {
         connect(m_configurationManager, &ConfigurationManager::darkModeChanged,
                 [this](bool darkMode) {
                     qDebug() << "Dark mode changed to:" << darkMode;
-                    if (m_themeManager) {
-                        auto theme = darkMode ? ThemeManager::Theme::Dark : ThemeManager::Theme::Light;
-                        m_themeManager->setTheme(theme);
-                    }
+                    // if (m_themeManager) {
+                    //     auto theme = darkMode ? ThemeManager::Theme::Dark : ThemeManager::Theme::Light;
+                    //     m_themeManager->setTheme(theme);
+                    // } // 暂时禁用主题功能
                 });
     }
     
@@ -571,13 +572,13 @@ void MainApplication::initializeUserInterface() {
     // Set window manager in main application for protocol handling
     setWindowManager(m_windowManager);
     
-    // Apply theme settings
-    if (m_themeManager && m_configurationManager) {
-        bool darkMode = m_configurationManager->isDarkMode();
-        auto theme = darkMode ? ThemeManager::Theme::Dark : ThemeManager::Theme::Light;
-        m_themeManager->setTheme(theme);
-        qDebug() << "Applied theme settings, dark mode:" << darkMode;
-    }
+    // Apply theme settings (暂时禁用)
+    // if (m_themeManager && m_configurationManager) {
+    //     bool darkMode = m_configurationManager->isDarkMode();
+    //     auto theme = darkMode ? ThemeManager::Theme::Dark : ThemeManager::Theme::Light;
+    //     m_themeManager->setTheme(theme);
+    //     qDebug() << "Applied theme settings, dark mode:" << darkMode;
+    // }
     
     // Show welcome window as the initial interface
     QTimer::singleShot(100, [this]() {

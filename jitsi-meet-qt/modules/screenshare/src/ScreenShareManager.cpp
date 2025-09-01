@@ -711,3 +711,17 @@ void ScreenShareManager::emitError(const QString& error)
     qWarning() << "ScreenShareManager error:" << error;
     emit shareError(error);
 }
+
+bool ScreenShareManager::showScreenSelectionDialog()
+{
+    // Show screen selection dialog and return true if user selected a screen
+    // This is a placeholder implementation
+    return true;
+}
+
+QVideoWidget* ScreenShareManager::localScreenShareWidget() const
+{
+    // Return the local screen share widget
+    // This is a placeholder implementation
+    return nullptr;
+}

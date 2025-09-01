@@ -6,6 +6,8 @@
 #include <QJsonObject>
 #include <QDateTime>
 #include <QDebug>
+#include <QMutex>
+#include <QMutexLocker>
 
 #ifdef Q_OS_WIN
 #include <QWinEventNotifier>
@@ -513,8 +515,9 @@ void RegistryStorage::clear()
         
         emit dataChanged(QString(), QVariant());
     }
-}// Regis
-try-specific operations
+}
+
+// Registry-specific operations
 bool RegistryStorage::createKey(const QString& keyPath)
 {
 #ifdef Q_OS_WIN

@@ -1,0 +1,132 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Jitsi Meet Qt Preferences Schema",
+    "type": "object",
+    "properties": {
+        "application": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"},
+                "version": {"type": "string"},
+                "language": {"type": "string", "enum": ["en", "zh_CN", "ja", "ko", "de", "fr", "es", "ru", "it", "pt"]},
+                "theme": {"type": "string", "enum": ["light", "dark", "auto"]},
+                "autoStart": {"type": "boolean"},
+                "minimizeToTray": {"type": "boolean"},
+                "closeToTray": {"type": "boolean"},
+                "checkUpdates": {"type": "boolean"}
+            },
+            "required": ["name", "version", "language", "theme"]
+        },
+        "conference": {
+            "type": "object",
+            "properties": {
+                "defaultServer": {"type": "string", "format": "uri"},
+                "displayName": {"type": "string"},
+                "email": {"type": "string", "format": "email"},
+                "autoJoinAudio": {"type": "boolean"},
+                "autoJoinVideo": {"type": "boolean"},
+                "startWithAudioMuted": {"type": "boolean"},
+                "startWithVideoMuted": {"type": "boolean"},
+                "enableChat": {"type": "boolean"},
+                "enableScreenShare": {"type": "boolean"},
+                "enableRecording": {"type": "boolean"}
+            },
+            "required": ["defaultServer"]
+        },
+        "audio": {
+            "type": "object",
+            "properties": {
+                "inputDevice": {"type": "string"},
+                "outputDevice": {"type": "string"},
+                "microphoneGain": {"type": "number", "minimum": 0, "maximum": 2},
+                "speakerVolume": {"type": "number", "minimum": 0, "maximum": 2},
+                "enableEchoCancellation": {"type": "boolean"},
+                "enableNoiseSuppression": {"type": "boolean"},
+                "enableAutoGainControl": {"type": "boolean"},
+                "sampleRate": {"type": "integer", "enum": [8000, 16000, 22050, 44100, 48000]},
+                "channels": {"type": "integer", "enum": [1, 2]}
+            }
+        },
+        "video": {
+            "type": "object",
+            "properties": {
+                "inputDevice": {"type": "string"},
+                "resolution": {
+                    "type": "object",
+                    "properties": {
+                        "width": {"type": "integer", "minimum": 160},
+                        "height": {"type": "integer", "minimum": 120}
+                    },
+                    "required": ["width", "height"]
+                },
+                "frameRate": {"type": "integer", "minimum": 5, "maximum": 60},
+                "quality": {"type": "string", "enum": ["low", "medium", "high", "ultra"]},
+                "enableHardwareAcceleration": {"type": "boolean"},
+                "mirrorLocalVideo": {"type": "boolean"}
+            }
+        },
+        "network": {
+            "type": "object",
+            "properties": {
+                "useStun": {"type": "boolean"},
+                "stunServers": {
+                    "type": "array",
+                    "items": {"type": "string", "format": "uri"}
+                },
+                "useTurn": {"type": "boolean"},
+                "turnServers": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "url": {"type": "string", "format": "uri"},
+                            "username": {"type": "string"},
+                            "credential": {"type": "string"}
+                        },
+                        "required": ["url"]
+                    }
+                },
+                "enableP2P": {"type": "boolean"},
+                "maxBitrate": {"type": "integer", "minimum": 64000},
+                "minBitrate": {"type": "integer", "minimum": 32000}
+            }
+        },
+        "ui": {
+            "type": "object",
+            "properties": {
+                "showToolbar": {"type": "boolean"},
+                "showParticipantsList": {"type": "boolean"},
+                "showChatPanel": {"type": "boolean"},
+                "enableFullscreen": {"type": "boolean"},
+                "windowGeometry": {
+                    "type": "object",
+                    "properties": {
+                        "x": {"type": "integer"},
+                        "y": {"type": "integer"},
+                        "width": {"type": "integer", "minimum": 400},
+                        "height": {"type": "integer", "minimum": 300}
+                    }
+                }
+            }
+        },
+        "privacy": {
+            "type": "object",
+            "properties": {
+                "enableAnalytics": {"type": "boolean"},
+                "enableCrashReports": {"type": "boolean"},
+                "enableUsageStats": {"type": "boolean"}
+            }
+        },
+        "advanced": {
+            "type": "object",
+            "properties": {
+                "enableDebugMode": {"type": "boolean"},
+                "logLevel": {"type": "string", "enum": ["debug", "info", "warn", "error"]},
+                "enableMetrics": {"type": "boolean"},
+                "customCss": {"type": "string"},
+                "customJs": {"type": "string"}
+            }
+        }
+    },
+    "required": ["application", "conference"]
+}

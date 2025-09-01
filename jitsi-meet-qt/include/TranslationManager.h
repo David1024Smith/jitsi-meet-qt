@@ -4,204 +4,190 @@
 #include <QObject>
 #include <QTranslator>
 #include <QLocale>
+#include <QMap>
 #include <QString>
 #include <QStringList>
-#include <QApplication>
-#include <QDir>
-#include <memory>
-#include <optional>
 
 /**
- * @brief TranslationManager handles internationalization and localization
+ * @brief 翻译管理器
  * 
- * This class manages language resources, system language detection,
- * and runtime language switching for the Jitsi Meet Qt application.
- * 
- * Features:
- * - Automatic system language detection
- * - Runtime language switching
- * - Translation file management
- * - Fallback to English for unsupported languages
+ * 负责管理应用程序的语言翻译，支持动态切换语言和加载翻译文件。
  */
 class TranslationManager : public QObject
 {
     Q_OBJECT
+    Q_PROPERTY(QString currentLanguage READ currentLanguage WRITE setCurrentLanguage NOTIFY currentLanguageChanged)
+    Q_PROPERTY(QStringList availableLanguages READ availableLanguages NOTIFY availableLanguagesChanged)
 
 public:
-    /**
-     * @brief Supported languages in the application
-     */
-    enum class Language {
-        Auto,           // Auto-detect system language
-        English,        // en
-        Chinese,        // zh_CN
-        Spanish,        // es
-        French,         // fr
-        German,         // de
-        Japanese,       // ja
-        Korean,         // ko
-        Russian,        // ru
-        Portuguese,     // pt
-        Italian         // it
-    };
-
-    /**
-     * @brief Language information structure
-     */
-    struct LanguageInfo {
-        Language language;
-        QString code;           // Language code (e.g., "en", "zh_CN")
-        QString nativeName;     // Native language name (e.g., "English", "中文")
-        QString englishName;    // English language name
-        bool available;         // Whether translation file is available
-    };
-
     explicit TranslationManager(QObject *parent = nullptr);
     ~TranslationManager();
 
     /**
-     * @brief Get singleton instance
+     * @brief 获取单例实例
      */
     static TranslationManager* instance();
 
     /**
-     * @brief Initialize translation system
-     * @return true if initialization successful
+     * @brief 初始化翻译管理器
+     * @return 是否成功初始化
      */
     bool initialize();
 
     /**
-     * @brief Set application language
-     * @param language Target language
-     * @return true if language was set successfully
+     * @brief 关闭翻译管理器
      */
-    bool setLanguage(Language language);
+    void shutdown();
 
     /**
-     * @brief Set application language by code
-     * @param languageCode Language code (e.g., "en", "zh_CN")
-     * @return true if language was set successfully
+     * @brief 设置当前语言
+     * @param language 语言代码（如"en_US"、"zh_CN"等）
+     * @return 是否成功设置
      */
-    bool setLanguage(const QString& languageCode);
+    bool setCurrentLanguage(const QString& language);
 
     /**
-     * @brief Get current language
+     * @brief 设置语言
+     * @param language 语言代码
+     * @return 是否成功设置
      */
-    Language currentLanguage() const;
+    bool setLanguage(const QString& language);
 
     /**
-     * @brief Get current language code
+     * @brief 获取当前语言
+     * @return 当前语言代码
+     */
+    QString currentLanguage() const;
+
+    /**
+     * @brief 获取当前语言代码
+     * @return 当前语言代码
      */
     QString currentLanguageCode() const;
 
     /**
-     * @brief Get system language
+     * @brief 获取当前语言名称
+     * @return 当前语言名称
      */
-    Language systemLanguage() const;
+    QString currentLanguageName() const;
 
     /**
-     * @brief Get list of available languages
+     * @brief 获取可用语言列表
+     * @return 语言代码列表
      */
-    QList<LanguageInfo> availableLanguages() const;
+    QStringList availableLanguages() const;
 
     /**
-     * @brief Get language info by language enum
+     * @brief 获取语言名称
+     * @param language 语言代码
+     * @return 语言名称
      */
-    std::optional<LanguageInfo> getLanguageInfo(Language language) const;
+    QString getLanguageName(const QString& language) const;
 
     /**
-     * @brief Get language info by language code
+     * @brief 获取语言代码
+     * @param languageName 语言名称
+     * @return 语言代码
      */
-    std::optional<LanguageInfo> getLanguageInfo(const QString& languageCode) const;
+    QString getLanguageCode(const QString& languageName) const;
 
     /**
-     * @brief Check if language is supported
+     * @brief 加载翻译文件
+     * @param filePath 文件路径
+     * @param language 语言代码
+     * @return 是否成功加载
      */
-    bool isLanguageSupported(Language language) const;
-    bool isLanguageSupported(const QString& languageCode) const;
+    bool loadTranslationFile(const QString& filePath, const QString& language);
 
     /**
-     * @brief Get translation for key (convenience function)
+     * @brief 加载所有翻译文件
+     * @return 是否成功加载
      */
-    QString translate(const QString& context, const QString& key, const QString& disambiguation = QString()) const;
+    bool loadAllTranslations();
 
     /**
-     * @brief Reload translations (useful for development)
+     * @brief 获取系统语言
+     * @return 系统语言代码
      */
-    void reloadTranslations();
+    QString getSystemLanguage() const;
+
+    /**
+     * @brief 获取系统语言枚举
+     * @return 系统语言枚举值
+     */
+    QLocale::Language systemLanguage() const;
+
+    /**
+     * @brief 翻译文本
+     * @param text 原文本
+     * @param context 上下文
+     * @return 翻译后的文本
+     */
+    QString translate(const QString& text, const QString& context = QString()) const;
+
+    /**
+     * @brief 设置翻译文件目录
+     * @param path 目录路径
+     */
+    void setTranslationsPath(const QString& path);
+
+    /**
+     * @brief 获取翻译文件目录
+     * @return 目录路径
+     */
+    QString translationsPath() const;
+
+    /**
+     * @brief 重新加载当前翻译
+     * @return 是否成功重新加载
+     */
+    bool reloadCurrentTranslation();
+
+    /**
+     * @brief 检查语言是否可用
+     * @param language 语言代码
+     * @return 是否可用
+     */
+    bool isLanguageAvailable(const QString& language) const;
 
 signals:
     /**
-     * @brief Emitted when language changes
+     * @brief 当前语言变更信号
+     * @param language 语言代码
      */
-    void languageChanged(Language newLanguage, const QString& languageCode);
+    void currentLanguageChanged(const QString& language);
 
     /**
-     * @brief Emitted when translation loading fails
+     * @brief 可用语言列表变更信号
+     * @param languages 语言代码列表
      */
-    void translationLoadFailed(const QString& languageCode, const QString& error);
+    void availableLanguagesChanged(const QStringList& languages);
+
+    /**
+     * @brief 翻译加载信号
+     * @param language 语言代码
+     * @param success 是否成功
+     */
+    void translationLoaded(const QString& language, bool success);
 
 private slots:
-    void onApplicationLanguageChanged();
+    void onLocaleChanged(const QLocale& locale);
 
 private:
-    /**
-     * @brief Detect system language
-     */
-    Language detectSystemLanguage() const;
-
-    /**
-     * @brief Convert Language enum to language code
-     */
-    QString languageToCode(Language language) const;
-
-    /**
-     * @brief Convert language code to Language enum
-     */
-    Language codeToLanguage(const QString& code) const;
-
-    /**
-     * @brief Load translation file
-     */
-    bool loadTranslation(const QString& languageCode);
-
-    /**
-     * @brief Unload current translation
-     */
-    void unloadTranslation();
-
-    /**
-     * @brief Get translation file path
-     */
-    QString getTranslationFilePath(const QString& languageCode) const;
-
-    /**
-     * @brief Check if translation file exists
-     */
-    bool translationFileExists(const QString& languageCode) const;
-
-    /**
-     * @brief Initialize language info list
-     */
-    void initializeLanguageInfo();
-
-    /**
-     * @brief Update available languages based on existing translation files
-     */
-    void updateAvailableLanguages();
+    void detectAvailableTranslations();
+    bool installTranslator(const QString& language);
+    void removeCurrentTranslator();
+    QString getTranslationFilePath(const QString& language) const;
+    void loadLanguageNames();
+    void setupDefaultLanguage();
 
     static TranslationManager* s_instance;
-
-    Language m_currentLanguage;
-    QString m_currentLanguageCode;
-    std::unique_ptr<QTranslator> m_translator;
-    std::unique_ptr<QTranslator> m_qtTranslator;  // For Qt's built-in strings
-    QList<LanguageInfo> m_languageInfo;
+    QTranslator m_translator;
+    QString m_currentLanguage;
+    QStringList m_availableLanguages;
+    QMap<QString, QString> m_languageNames;
     QString m_translationsPath;
     bool m_initialized;
 };
-
-// Convenience macro for translation
-#define TR(context, key) TranslationManager::instance()->translate(context, key)
 
 #endif // TRANSLATIONMANAGER_H

@@ -342,8 +342,9 @@ void SettingsLayout::setCurrentPanel(QWidget* panel)
     if (index >= 0) {
         setCurrentPanelIndex(index);
     }
-}// 设置页
-面管理实现
+}
+
+// 设置页面管理实现
 bool SettingsLayout::addSettingsPage(const QString& category, const QString& title, QWidget* page)
 {
     if (!page || category.isEmpty() || title.isEmpty()) {
@@ -672,8 +673,9 @@ bool SettingsLayout::isResponsive() const
 void SettingsLayout::setResponsive(bool responsive)
 {
     m_responsive = responsive;
-}/
-/ BaseLayout虚函数实现
+}
+
+// BaseLayout虚函数实现
 void SettingsLayout::onThemeChanged(std::shared_ptr<BaseTheme> theme)
 {
     BaseLayout::onThemeChanged(theme);
@@ -890,7 +892,10 @@ void SettingsLayout::arrangeRegions()
     }
 
     // 清除现有布局
-    m_mainSplitter->clear();
+    while (m_mainSplitter->count() > 0) {
+        QWidget* widget = m_mainSplitter->widget(0);
+        widget->setParent(nullptr);
+    }
 
     // 根据布局样式排列区域
     switch (m_layoutStyle) {

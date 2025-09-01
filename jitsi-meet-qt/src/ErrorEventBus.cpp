@@ -1,5 +1,5 @@
-#include "ErrorEventBus.h"
-#include "ModuleError.h"
+#include "../include/ErrorEventBus.h"
+#include "../include/ModuleError.h"
 #include <QDebug>
 #include <QMutexLocker>
 #include <QCoreApplication>

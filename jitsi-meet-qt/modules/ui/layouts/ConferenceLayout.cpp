@@ -564,8 +564,7 @@ QWidget* ConferenceLayout::screenShareWidget() const
 void ConferenceLayout::setScreenShareWidget(QWidget* widget)
 {
     setRegionWidget(ScreenShareRegion, widget);
-}//
- 布局配置实现
+}// 布局配置实现
 QVariantMap ConferenceLayout::getLayoutConfiguration() const
 {
     QVariantMap config = BaseLayout::getLayoutConfiguration();
@@ -827,8 +826,9 @@ void ConferenceLayout::onRegionWidgetDestroyed()
             break;
         }
     }
-}// 私
-有方法实现
+}
+
+// 私有方法实现
 void ConferenceLayout::setupLayout()
 {
     // 创建主分割器
@@ -861,8 +861,15 @@ void ConferenceLayout::arrangeRegions()
     }
 
     // 清除现有布局
-    m_mainSplitter->clear();
-    m_videoSplitter->clear();
+    while (m_mainSplitter->count() > 0) {
+        QWidget* widget = m_mainSplitter->widget(0);
+        widget->setParent(nullptr);
+    }
+    
+    while (m_videoSplitter->count() > 0) {
+        QWidget* widget = m_videoSplitter->widget(0);
+        widget->setParent(nullptr);
+    }
 
     // 根据视图模式排列区域
     switch (m_viewMode) {

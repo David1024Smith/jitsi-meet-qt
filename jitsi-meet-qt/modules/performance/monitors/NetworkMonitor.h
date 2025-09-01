@@ -295,7 +295,7 @@ private slots:
      * @brief 处理网络状态变化
      * @param accessible 网络是否可访问
      */
-    void handleNetworkAccessibilityChanged(QNetworkAccessManager::NetworkAccessibility accessible);
+    void handleNetworkAccessibilityChanged(int accessible);
 
     /**
      * @brief 处理延迟测试完成

@@ -36,7 +36,7 @@ public:
         Control,            ///< 控制消息
         Data,               ///< 数据消息
         Heartbeat,          ///< 心跳消息
-        Error,              ///< 错误消息
+        ErrorMessage,       ///< 错误消息
         Custom              ///< 自定义消息
     };
     Q_ENUM(MessageType)

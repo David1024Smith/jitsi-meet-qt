@@ -1,4 +1,4 @@
-#include "ErrorDialog.h"
+#include "../include/ErrorDialog.h"
 #include <QApplication>
 #include <QStyle>
 #include <QGuiApplication>

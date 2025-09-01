@@ -18,9 +18,8 @@ class Participant;
  * IChatManager定义了聊天管理器的标准接口，
  * 提供聊天功能的抽象定义。
  */
-class IChatManager : public QObject
+class IChatManager
 {
-    Q_OBJECT
 
 public:
     /**
@@ -33,7 +32,6 @@ public:
         Reconnecting,       ///< 重连中
         Error               ///< 连接错误
     };
-    Q_ENUM(ConnectionStatus)
 
     /**
      * @brief 消息类型枚举
@@ -45,7 +43,6 @@ public:
         SystemMessage,      ///< 系统消息
         NotificationMessage ///< 通知消息
     };
-    Q_ENUM(MessageType)
 
     /**
      * @brief 虚析构函数
@@ -183,7 +180,6 @@ public:
      */
     virtual QVariantMap getStatistics() const = 0;
 
-public slots:
     /**
      * @brief 重新连接
      */
@@ -207,88 +203,29 @@ public slots:
      */
     virtual void markRoomAsRead(const QString& roomId = QString()) = 0;
 
-signals:
-    /**
-     * @brief 连接状态改变信号
-     * @param connected 是否已连接
-     */
-    void connectionChanged(bool connected);
-
-    /**
-     * @brief 连接状态改变信号
-     * @param status 连接状态
-     */
-    void connectionStatusChanged(ConnectionStatus status);
-
-    /**
-     * @brief 当前房间改变信号
-     * @param roomId 新的房间ID
-     */
-    void currentRoomChanged(const QString& roomId);
-
-    /**
-     * @brief 加入房间信号
-     * @param roomId 房间ID
-     */
-    void roomJoined(const QString& roomId);
-
-    /**
-     * @brief 离开房间信号
-     * @param roomId 房间ID
-     */
-    void roomLeft(const QString& roomId);
-
-    /**
-     * @brief 收到消息信号
-     * @param message 消息对象
-     */
-    void messageReceived(ChatMessage* message);
-
-    /**
-     * @brief 消息发送成功信号
-     * @param messageId 消息ID
-     */
-    void messageSent(const QString& messageId);
-
-    /**
-     * @brief 消息发送失败信号
-     * @param messageId 消息ID
-     * @param error 错误信息
-     */
-    void messageSendFailed(const QString& messageId, const QString& error);
-
-    /**
-     * @brief 参与者加入信号
-     * @param participant 参与者对象
-     * @param roomId 房间ID
-     */
-    void participantJoined(Participant* participant, const QString& roomId);
-
-    /**
-     * @brief 参与者离开信号
-     * @param participantId 参与者ID
-     * @param roomId 房间ID
-     */
-    void participantLeft(const QString& participantId, const QString& roomId);
-
-    /**
-     * @brief 参与者数量改变信号
-     * @param count 新的参与者数量
-     * @param roomId 房间ID
-     */
-    void participantCountChanged(int count, const QString& roomId = QString());
-
-    /**
-     * @brief 消息历史启用状态改变信号
-     * @param enabled 是否启用
-     */
-    void messageHistoryEnabledChanged(bool enabled);
-
-    /**
-     * @brief 错误发生信号
-     * @param error 错误信息
-     */
-    void errorOccurred(const QString& error);
+// 信号接口（由实现类提供）
+    // 连接状态改变
+    // void connectionChanged(bool connected);
+    // void connectionStatusChanged(ConnectionStatus status);
+    
+    // 房间相关
+    // void currentRoomChanged(const QString& roomId);
+    // void roomJoined(const QString& roomId);
+    // void roomLeft(const QString& roomId);
+    
+    // 消息相关
+    // void messageReceived(ChatMessage* message);
+    // void messageSent(const QString& messageId);
+    // void messageSendFailed(const QString& messageId, const QString& error);
+    
+    // 参与者相关
+    // void participantJoined(Participant* participant, const QString& roomId);
+    // void participantLeft(const QString& participantId, const QString& roomId);
+    // void participantCountChanged(int count, const QString& roomId);
+    
+    // 其他
+    // void messageHistoryEnabledChanged(bool enabled);
+    // void errorOccurred(const QString& error);
 };
 
 Q_DECLARE_INTERFACE(IChatManager, "org.jitsi.chat.IChatManager/1.0")

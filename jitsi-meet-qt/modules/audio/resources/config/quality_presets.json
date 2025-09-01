@@ -1,0 +1,60 @@
+{
+    "quality_presets": {
+        "low": {
+            "name": "Low Quality",
+            "description": "Optimized for low bandwidth connections",
+            "sample_rate": 16000,
+            "channels": 1,
+            "bitrate": 32000,
+            "buffer_size": 2048,
+            "codec": "opus",
+            "noise_suppression": true,
+            "echo_cancellation": true,
+            "auto_gain_control": true
+        },
+        "medium": {
+            "name": "Medium Quality",
+            "description": "Balanced quality and bandwidth usage",
+            "sample_rate": 44100,
+            "channels": 2,
+            "bitrate": 64000,
+            "buffer_size": 1024,
+            "codec": "opus",
+            "noise_suppression": true,
+            "echo_cancellation": true,
+            "auto_gain_control": true
+        },
+        "high": {
+            "name": "High Quality",
+            "description": "Best audio quality for high bandwidth connections",
+            "sample_rate": 48000,
+            "channels": 2,
+            "bitrate": 128000,
+            "buffer_size": 512,
+            "codec": "opus",
+            "noise_suppression": true,
+            "echo_cancellation": true,
+            "auto_gain_control": false
+        },
+        "ultra": {
+            "name": "Ultra Quality",
+            "description": "Maximum quality for professional use",
+            "sample_rate": 96000,
+            "channels": 2,
+            "bitrate": 256000,
+            "buffer_size": 256,
+            "codec": "flac",
+            "noise_suppression": false,
+            "echo_cancellation": true,
+            "auto_gain_control": false
+        }
+    },
+    "default_preset": "medium",
+    "adaptive_quality": {
+        "enabled": true,
+        "bandwidth_threshold_low": 100000,
+        "bandwidth_threshold_high": 1000000,
+        "cpu_threshold": 80,
+        "auto_adjust": true
+    }
+}

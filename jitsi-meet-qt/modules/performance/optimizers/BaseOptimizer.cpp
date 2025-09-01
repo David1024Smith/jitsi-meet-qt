@@ -5,7 +5,7 @@
 BaseOptimizer::BaseOptimizer(const QString& optimizerName, QObject *parent)
     : QObject(parent)
     , m_optimizerName(optimizerName)
-    , m_status(Idle)
+    , m_status(OptimizerStatus::Idle)
     , m_enabled(true)
     , m_autoOptimizationEnabled(false)
     , m_optimizationInterval(DEFAULT_OPTIMIZATION_INTERVAL)
@@ -49,11 +49,11 @@ bool BaseOptimizer::initialize()
 {
     qDebug() << "BaseOptimizer: Initializing optimizer" << m_optimizerName;
     
-    setStatus(Starting);
+    setStatus(OptimizerStatus::Analyzing);
     
     if (!initializeOptimizer()) {
         addError("Failed to initialize optimizer-specific functionality");
-        setStatus(Failed);
+        setStatus(OptimizerStatus::Failed);
         return false;
     }
     
@@ -65,11 +65,11 @@ bool BaseOptimizer::initialize()
     // 验证配置
     if (!validateConfiguration()) {
         addError("Invalid optimizer configuration");
-        setStatus(Failed);
+        setStatus(OptimizerStatus::Failed);
         return false;
     }
     
-    setStatus(Idle);
+    setStatus(OptimizerStatus::Idle);
     
     qDebug() << "BaseOptimizer: Initialized successfully";
     return true;
@@ -81,25 +81,23 @@ OptimizationResult BaseOptimizer::optimize(OptimizationStrategy strategy)
     
     if (!m_enabled) {
         OptimizationResult result;
-        result.success = false;
-        result.optimizerName = m_optimizerName;
-        result.description = "Optimizer is disabled";
+        result.status = OptimizationResultStatus::Failed;
+        result.message = "Optimizer is disabled";
         result.timestamp = QDateTime::currentDateTime();
-        result.details.errorMessage = "Optimizer is disabled";
+        result.errors << "Optimizer is disabled";
         return result;
     }
     
-    if (m_status == Optimizing) {
+    if (m_status == OptimizerStatus::Optimizing) {
         OptimizationResult result;
-        result.success = false;
-        result.optimizerName = m_optimizerName;
-        result.description = "Optimization already in progress";
+        result.status = OptimizationResultStatus::Failed;
+        result.message = "Optimization already in progress";
         result.timestamp = QDateTime::currentDateTime();
-        result.details.errorMessage = "Optimization already in progress";
+        result.errors << "Optimization already in progress";
         return result;
     }
     
-    setStatus(Analyzing);
+    setStatus(OptimizerStatus::Analyzing);
     m_cancellationRequested = false;
     
     emit optimizationStarted(strategy);
@@ -109,7 +107,7 @@ OptimizationResult BaseOptimizer::optimize(OptimizationStrategy strategy)
     // 获取优化前指标
     QVariantMap beforeMetrics = getBeforeMetrics();
     
-    setStatus(Optimizing);
+    setStatus(OptimizerStatus::Optimizing);
     updateProgress(10, "Starting optimization");
     
     // 执行具体优化操作
@@ -120,9 +118,9 @@ OptimizationResult BaseOptimizer::optimize(OptimizationStrategy strategy)
     
     // 计算改善效果
     result.improvements = calculateImprovements(beforeMetrics, afterMetrics);
-    result.details.beforeMetrics = beforeMetrics;
-    result.details.afterMetrics = afterMetrics;
-    result.details.duration = startTime.msecsTo(QDateTime::currentDateTime());
+    result.beforeMetrics = beforeMetrics;
+    result.afterMetrics = afterMetrics;
+    result.executionTime = startTime.msecsTo(QDateTime::currentDateTime());
     
     // 更新统计信息
     updateStatistics(result);
@@ -130,19 +128,21 @@ OptimizationResult BaseOptimizer::optimize(OptimizationStrategy strategy)
     // 记录结果
     recordOptimizationResult(result);
     
-    if (result.success) {
-        setStatus(Completed);
+    if (result.isSuccess()) {
+        setStatus(OptimizerStatus::Completed);
         updateProgress(100, "Optimization completed successfully");
     } else {
-        setStatus(Failed);
-        addError(result.details.errorMessage);
+        setStatus(OptimizerStatus::Failed);
+        if (!result.errors.isEmpty()) {
+            addError(result.errors.first());
+        }
     }
     
     emit optimizationCompleted(result);
     
     // 重置状态
     QTimer::singleShot(5000, this, [this]() {
-        setStatus(Idle);
+        setStatus(OptimizerStatus::Idle);
     });
     
     return result;
@@ -185,12 +185,12 @@ QString BaseOptimizer::getVersion() const
     return getOptimizerVersion();
 }
 
-IOptimizer::OptimizationType BaseOptimizer::getOptimizationType() const
+OptimizationType BaseOptimizer::getOptimizationType() const
 {
     return getOptimizerType();
 }
 
-IOptimizer::OptimizerStatus BaseOptimizer::getStatus() const
+OptimizerStatus BaseOptimizer::getStatus() const
 {
     QMutexLocker locker(&m_mutex);
     return m_status;
@@ -286,7 +286,7 @@ void BaseOptimizer::reset()
     m_errors.clear();
     
     // 重置状态
-    setStatus(Idle);
+    setStatus(OptimizerStatus::Idle);
     
     qDebug() << "BaseOptimizer: Reset" << m_optimizerName;
 }
@@ -331,7 +331,7 @@ void BaseOptimizer::cancelOptimization()
 {
     QMutexLocker locker(&m_mutex);
     
-    if (m_status == Optimizing || m_status == Analyzing) {
+    if (m_status == OptimizerStatus::Optimizing || m_status == OptimizerStatus::Analyzing) {
         m_cancellationRequested = true;
         qDebug() << "BaseOptimizer: Cancellation requested for" << m_optimizerName;
         emit optimizationCancelled();
@@ -341,7 +341,7 @@ void BaseOptimizer::cancelOptimization()
 bool BaseOptimizer::canCancel() const
 {
     QMutexLocker locker(&m_mutex);
-    return (m_status == Optimizing || m_status == Analyzing);
+    return (m_status == OptimizerStatus::Optimizing || m_status == OptimizerStatus::Analyzing);
 }
 
 void BaseOptimizer::setStatus(OptimizerStatus status)
@@ -474,9 +474,9 @@ QVariantMap BaseOptimizer::getAfterMetrics() const
     return metrics;
 }
 
-OptimizationResult::Improvements BaseOptimizer::calculateImprovements(const QVariantMap& beforeMetrics, const QVariantMap& afterMetrics) const
+QVariantMap BaseOptimizer::calculateImprovements(const QVariantMap& beforeMetrics, const QVariantMap& afterMetrics) const
 {
-    OptimizationResult::Improvements improvements;
+    QVariantMap improvements;
     
     // 基本改善计算
     // 子类可以重写此方法来提供更具体的计算
@@ -500,7 +500,7 @@ QVariantMap BaseOptimizer::getDefaultParameters() const
 {
     // 返回默认参数
     QVariantMap defaults;
-    defaults["strategy"] = static_cast<int>(Balanced);
+    defaults["strategy"] = static_cast<int>(OptimizationStrategy::Balanced);
     defaults["timeout"] = 30000; // 30秒超时
     defaults["retryCount"] = 3;
     
@@ -513,13 +513,13 @@ void BaseOptimizer::performAutoOptimization()
         return;
     }
     
-    if (m_status != Idle) {
+    if (m_status != OptimizerStatus::Idle) {
         return; // 已经在执行优化
     }
     
     if (shouldOptimize()) {
         qDebug() << "BaseOptimizer: Performing auto optimization for" << m_optimizerName;
-        optimize(Balanced);
+        optimize(OptimizationStrategy::Balanced);
     }
 }
 
@@ -547,13 +547,13 @@ void BaseOptimizer::updateStatistics(const OptimizationResult& result)
 {
     m_optimizationCount++;
     
-    if (result.success) {
+    if (result.isSuccess()) {
         m_successfulOptimizations++;
     } else {
         m_failedOptimizations++;
     }
     
-    m_totalOptimizationTime += result.details.duration;
+    m_totalOptimizationTime += result.executionTime;
     
     // 更新时间戳
     if (!m_firstOptimizationTime.isValid()) {
@@ -562,10 +562,10 @@ void BaseOptimizer::updateStatistics(const OptimizationResult& result)
     m_lastOptimizationTime = result.timestamp;
     
     // 累计改善效果
-    if (result.success) {
-        m_totalImprovements["cpuImprovement"] = m_totalImprovements.value("cpuImprovement", 0.0).toDouble() + result.improvements.cpuImprovement;
-        m_totalImprovements["memoryImprovement"] = m_totalImprovements.value("memoryImprovement", 0.0).toDouble() + result.improvements.memoryImprovement;
-        m_totalImprovements["performanceGain"] = m_totalImprovements.value("performanceGain", 0.0).toDouble() + result.improvements.performanceGain;
-        m_totalImprovements["responseTimeGain"] = m_totalImprovements.value("responseTimeGain", 0.0).toDouble() + result.improvements.responseTimeGain;
+    if (result.isSuccess()) {
+        m_totalImprovements["cpuImprovement"] = m_totalImprovements.value("cpuImprovement", 0.0).toDouble() + result.improvements.value("cpuImprovement", 0.0).toDouble();
+        m_totalImprovements["memoryImprovement"] = m_totalImprovements.value("memoryImprovement", 0.0).toDouble() + result.improvements.value("memoryImprovement", 0.0).toDouble();
+        m_totalImprovements["performanceGain"] = m_totalImprovements.value("performanceGain", 0.0).toDouble() + result.improvements.value("performanceGain", 0.0).toDouble();
+        m_totalImprovements["responseTimeGain"] = m_totalImprovements.value("responseTimeGain", 0.0).toDouble() + result.improvements.value("responseTimeGain", 0.0).toDouble();
     }
 }

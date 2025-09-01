@@ -1,0 +1,63 @@
+{
+    "meeting_templates": {
+        "quick_meeting": {
+            "name": "Quick Meeting",
+            "description": "Start a meeting immediately with default settings",
+            "settings": {
+                "audio_enabled": true,
+                "video_enabled": true,
+                "screen_share_enabled": true,
+                "chat_enabled": true,
+                "recording_enabled": false,
+                "password_protected": false,
+                "waiting_room": false,
+                "max_participants": 50
+            }
+        },
+        "scheduled_meeting": {
+            "name": "Scheduled Meeting",
+            "description": "Create a meeting for a specific date and time",
+            "settings": {
+                "audio_enabled": true,
+                "video_enabled": true,
+                "screen_share_enabled": true,
+                "chat_enabled": true,
+                "recording_enabled": true,
+                "password_protected": true,
+                "waiting_room": true,
+                "max_participants": 100
+            }
+        },
+        "webinar": {
+            "name": "Webinar",
+            "description": "Large-scale presentation with limited interaction",
+            "settings": {
+                "audio_enabled": false,
+                "video_enabled": false,
+                "screen_share_enabled": false,
+                "chat_enabled": true,
+                "recording_enabled": true,
+                "password_protected": true,
+                "waiting_room": true,
+                "max_participants": 500,
+                "presenter_mode": true
+            }
+        },
+        "private_meeting": {
+            "name": "Private Meeting",
+            "description": "Secure meeting with enhanced privacy settings",
+            "settings": {
+                "audio_enabled": true,
+                "video_enabled": true,
+                "screen_share_enabled": true,
+                "chat_enabled": true,
+                "recording_enabled": false,
+                "password_protected": true,
+                "waiting_room": true,
+                "max_participants": 10,
+                "end_to_end_encryption": true
+            }
+        }
+    },
+    "default_template": "quick_meeting"
+}

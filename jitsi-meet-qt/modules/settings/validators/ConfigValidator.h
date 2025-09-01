@@ -1,9 +1,10 @@
 #ifndef CONFIGVALIDATOR_H
 #define CONFIGVALIDATOR_H
 
-#include "interfaces/IConfigValidator.h"
+#include "../interfaces/IConfigValidator.h"
 #include <QRegularExpression>
-#include <QJsonSchema>
+#include <QJsonObject>
+#include <QJsonDocument>
 #include <QMutex>
 #include <memory>
 
@@ -29,9 +30,9 @@ public:
         bool enabled;                   ///< 是否启用
         
         ValidationRuleInfo() 
-            : rule(Required), severity(Error), enabled(true) {}
+            : rule(Required), severity(ErrorLevel), enabled(true) {}
         ValidationRuleInfo(ValidationRule r, const QVariantList& params, 
-                          ValidationSeverity sev = Error, const QString& desc = QString())
+                          ValidationSeverity sev = ErrorLevel, const QString& desc = QString())
             : rule(r), parameters(params), severity(sev), description(desc), enabled(true) {}
     };
 
@@ -61,10 +62,10 @@ public:
     
     void addRule(const QString& key, ValidationRule rule, 
                 const QVariantList& parameters = QVariantList(), 
-                ValidationSeverity severity = Error) override;
+                ValidationSeverity severity = ErrorLevel) override;
     
     void addCustomValidator(const QString& key, CustomValidatorFunction validator, 
-                           ValidationSeverity severity = Error) override;
+                           ValidationSeverity severity = ErrorLevel) override;
     
     void removeRule(const QString& key, ValidationRule rule = ValidationRule::Custom) override;
     
@@ -211,7 +212,7 @@ public:
      * @param validator 全局验证函数
      * @param severity 严重程度
      */
-    void addGlobalValidator(CustomValidatorFunction validator, ValidationSeverity severity = Error);
+    void addGlobalValidator(CustomValidatorFunction validator, ValidationSeverity severity = ErrorLevel);
 
     /**
      * @brief 移除所有全局验证器
@@ -228,6 +229,18 @@ public:
      * @brief 重置验证统计
      */
     void resetStatistics();
+
+    /**
+     * @brief 获取最后的验证错误
+     * @return 错误列表
+     */
+    QList<ValidationError> getLastErrors() const override;
+
+    /**
+     * @brief 获取验证警告
+     * @return 警告列表
+     */
+    QStringList getWarnings() const override;
 
     // 预定义规则集
     /**
@@ -283,6 +296,12 @@ public slots:
      */
     void optimizeRules();
 
+signals:
+    void validationFinished(const ValidationResult& result);
+    void rulesReloaded();
+    void rulesOptimized();
+    void asyncValidationCompleted();
+
 private slots:
     void onAsyncValidationFinished();
 
@@ -311,12 +330,16 @@ private:
     // JSON Schema 相关
     bool validateJsonSchema(const QJsonObject& schema) const;
     QList<ValidationResult> processSchemaValidation(const QJsonObject& json, const QJsonObject& schema) const;
+    ValidationResult validateJsonValue(const QString& key, const QJsonValue& value, const QJsonObject& schema) const;
     
     // 类型转换
     QString ruleToString(ValidationRule rule) const;
     ValidationRule stringToRule(const QString& str) const;
     QString severityToString(ValidationSeverity severity) const;
     ValidationSeverity stringToSeverity(const QString& str) const;
+    
+    // 验证辅助方法
+    ValidationResult validateWithRule(const QString& key, const QVariant& value, const ValidationRuleInfo& ruleInfo) const;
 
     class Private;
     std::unique_ptr<Private> d;

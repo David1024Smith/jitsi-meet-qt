@@ -3,6 +3,7 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QDebug>
+#include <QTemporaryDir>
 
 // 静态成员初始化
 QList<TempFile*> TempFile::s_tempFiles;
@@ -289,13 +290,30 @@ bool TempFile::open(QIODevice::OpenMode mode)
         m_tempFile->close();
     }
     
-    return m_tempFile->open(mode);
+    // QTemporaryFile::open是protected的，但我们可以使用QTemporaryFile的特殊功能
+    // 首先调用无参数的open()方法（这是public的），然后关闭并使用QFile打开
+    if (!m_tempFile->open()) {
+        return false;
+    }
+    
+    QString fileName = m_tempFile->fileName();
+    m_tempFile->close();
+    
+    // 使用QFile打开临时文件
+    m_file.setFileName(fileName);
+    return m_file.open(mode);
 }
 
 void TempFile::close()
 {
     QMutexLocker locker(&m_mutex);
     
+    // 关闭QFile
+    if (m_file.isOpen()) {
+        m_file.close();
+    }
+    
+    // 关闭QTemporaryFile
     if (m_tempFile && m_tempFile->isOpen()) {
         m_tempFile->close();
     }
@@ -304,24 +322,27 @@ void TempFile::close()
 bool TempFile::isOpen() const
 {
     QMutexLocker locker(&m_mutex);
-    return m_tempFile && m_tempFile->isOpen();
+    // 检查QFile是否打开
+    return m_file.isOpen();
 }
 
 qint64 TempFile::write(const QByteArray& data)
 {
     QMutexLocker locker(&m_mutex);
     
-    if (!m_tempFile || !m_tempFile->isOpen()) {
-        return -1;
+    if (!m_file.isOpen()) {
+        if (!open()) {
+            return -1;
+        }
     }
     
     // 检查大小限制
-    if (m_maxSize > 0 && (m_tempFile->size() + data.size()) > m_maxSize) {
-        emit sizeLimitExceeded(m_tempFile->fileName(), m_tempFile->size() + data.size(), m_maxSize);
+    if (m_maxSize > 0 && (m_file.size() + data.size()) > m_maxSize) {
+        emit sizeLimitExceeded(m_file.fileName(), m_file.size() + data.size(), m_maxSize);
         return -1;
     }
     
-    return m_tempFile->write(data);
+    return m_file.write(data);
 }
 
 qint64 TempFile::write(const QString& text)
@@ -333,11 +354,13 @@ QByteArray TempFile::readAll()
 {
     QMutexLocker locker(&m_mutex);
     
-    if (!m_tempFile || !m_tempFile->isOpen()) {
-        return QByteArray();
+    if (!m_file.isOpen()) {
+        if (!open(QIODevice::ReadOnly)) {
+            return QByteArray();
+        }
     }
     
-    return m_tempFile->readAll();
+    return m_file.readAll();
 }
 
 QByteArray TempFile::read(qint64 maxSize)

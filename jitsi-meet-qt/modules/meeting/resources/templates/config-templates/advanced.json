@@ -1,0 +1,49 @@
+{
+    "meeting_config": {
+        "name": "Advanced Configuration",
+        "description": "Feature-rich setup for professional meetings",
+        "settings": {
+            "audio": {
+                "enabled": true,
+                "quality": "high",
+                "noise_suppression": true,
+                "echo_cancellation": true,
+                "auto_gain_control": true,
+                "stereo": true
+            },
+            "video": {
+                "enabled": true,
+                "resolution": "1080p",
+                "frame_rate": 60,
+                "bandwidth_limit": 2000,
+                "background_blur": true,
+                "virtual_backgrounds": true
+            },
+            "features": {
+                "screen_sharing": true,
+                "chat": true,
+                "recording": true,
+                "whiteboard": true,
+                "file_sharing": true,
+                "breakout_rooms": true,
+                "polls": true,
+                "reactions": true
+            },
+            "security": {
+                "password_required": true,
+                "waiting_room": true,
+                "end_to_end_encryption": true,
+                "participant_approval": true
+            },
+            "limits": {
+                "max_participants": 100,
+                "meeting_duration": 240
+            },
+            "quality": {
+                "adaptive_bitrate": true,
+                "bandwidth_optimization": true,
+                "low_bandwidth_mode": false
+            }
+        }
+    }
+}

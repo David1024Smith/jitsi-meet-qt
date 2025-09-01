@@ -87,7 +87,7 @@ public:
      * @param priority 消息优先级
      * @return 处理结果
      */
-    ProcessingResult processIncomingMessage(const QVariantMap& data, MessagePriority priority = Normal) override;
+    IMessageHandler::ProcessingResult processIncomingMessage(const QVariantMap& data, IMessageHandler::MessagePriority priority = IMessageHandler::Normal) override;
 
     /**
      * @brief 处理传出消息
@@ -95,7 +95,7 @@ public:
      * @param priority 消息优先级
      * @return 处理结果
      */
-    ProcessingResult processOutgoingMessage(ChatMessage* message, MessagePriority priority = Normal) override;
+    IMessageHandler::ProcessingResult processOutgoingMessage(ChatMessage* message, IMessageHandler::MessagePriority priority = IMessageHandler::Normal) override;
 
     /**
      * @brief 验证消息格式
@@ -134,7 +134,7 @@ public:
      * @brief 获取处理状态
      * @return 处理状态
      */
-    ProcessingStatus processingStatus() const override;
+    IMessageHandler::ProcessingStatus processingStatus() const override;
 
     /**
      * @brief 获取队列大小
@@ -337,13 +337,21 @@ private:
      * @brief 设置处理状态
      * @param status 新状态
      */
-    void setProcessingStatus(ProcessingStatus status);
+    void setProcessingStatus(IMessageHandler::ProcessingStatus status);
 
     /**
      * @brief 更新统计信息
      * @param result 处理结果
      */
-    void updateStatistics(ProcessingResult result);
+    void updateStatistics(IMessageHandler::ProcessingResult result);
+    
+    /**
+     * @brief 内部处理消息
+     * @param data 消息数据
+     * @param priority 优先级
+     * @return 处理结果
+     */
+    IMessageHandler::ProcessingResult internalProcessMessage(const QVariantMap& data, IMessageHandler::MessagePriority priority);
 
 private:
     class Private;

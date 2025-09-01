@@ -86,7 +86,7 @@ bool DefaultTheme::apply()
     try {
         // 应用样式表到应用程序
         if (QApplication::instance()) {
-            QApplication::instance()->setStyleSheet(getStyleSheet());
+            qobject_cast<QApplication*>(QApplication::instance())->setStyleSheet(getStyleSheet());
         }
 
         emit themeApplied();

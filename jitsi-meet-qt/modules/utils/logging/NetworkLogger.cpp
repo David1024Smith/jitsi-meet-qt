@@ -8,6 +8,8 @@
 #include <QSslConfiguration>
 #include <QAuthenticator>
 #include <QDebug>
+#include <QEventLoop>
+#include <QTimer>
 
 NetworkLogger::NetworkLogger(const NetworkConfig& config, QObject* parent)
     : ILogger(parent)
@@ -360,7 +362,7 @@ void NetworkLogger::sendBatch()
     m_retryCount[reply] = 0;
     
     // 连接错误信号
-    connect(reply, QOverload<QNetworkReply::NetworkError>::of(&QNetworkReply::error),
+    connect(reply, &QNetworkReply::errorOccurred,
             this, &NetworkLogger::onNetworkError);
 }
 
@@ -385,7 +387,7 @@ void NetworkLogger::sendLogEntry(const LogEntry& entry)
     m_pendingRequests[reply] = data;
     m_retryCount[reply] = 0;
     
-    connect(reply, QOverload<QNetworkReply::NetworkError>::of(&QNetworkReply::error),
+    connect(reply, &QNetworkReply::errorOccurred,
             this, &NetworkLogger::onNetworkError);
 }
 
@@ -553,8 +555,9 @@ void NetworkLogger::retryRequest(const QByteArray& data, int retryCount)
         m_pendingRequests[reply] = data;
         m_retryCount[reply] = retryCount;
         
-        connect(reply, QOverload<QNetworkReply::NetworkError>::of(&QNetworkReply::error),
-                this, &NetworkLogger::onNetworkError);
+        // 修复QOverload使用问题，使用旧式连接语法
+        connect(reply, SIGNAL(error(QNetworkReply::NetworkError)),
+                this, SLOT(onNetworkError(QNetworkReply::NetworkError)));
     });
 }
 

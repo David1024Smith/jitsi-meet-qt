@@ -47,11 +47,27 @@ bool QtAudioDevice::initialize()
     
     // 检查格式是否支持
     if (!m_deviceInfo.isFormatSupported(m_format)) {
-        QAudioFormat nearestFormat = m_deviceInfo.nearestFormat(m_format);
-        qDebug() << "Original format not supported, using nearest format";
+        // Qt 6 不再提供 nearestFormat 方法，我们需要手动调整格式
+        qDebug() << "Original format not supported, adjusting format";
         qDebug() << "Original:" << m_format;
-        qDebug() << "Nearest:" << nearestFormat;
-        m_format = nearestFormat;
+        
+        // 尝试调整采样率
+        QList<int> commonRates = {8000, 16000, 22050, 44100, 48000, 96000};
+        for (int rate : commonRates) {
+            if (rate >= m_deviceInfo.minimumSampleRate() && rate <= m_deviceInfo.maximumSampleRate()) {
+                m_format.setSampleRate(rate);
+                break;
+            }
+        }
+        
+        // 尝试调整声道数
+        if (m_format.channelCount() < m_deviceInfo.minimumChannelCount()) {
+            m_format.setChannelCount(m_deviceInfo.minimumChannelCount());
+        } else if (m_format.channelCount() > m_deviceInfo.maximumChannelCount()) {
+            m_format.setChannelCount(m_deviceInfo.maximumChannelCount());
+        }
+        
+        qDebug() << "Adjusted:" << m_format;
         
         // 更新参数以匹配实际格式
         m_sampleRate = m_format.sampleRate();
@@ -75,12 +91,12 @@ bool QtAudioDevice::start()
     
     try {
         if (m_deviceType == Input) {
-            // 创建音频输入
-            m_audioInput = new QAudioInput(m_deviceInfo, m_format, this);
+            // 创建音频输入 (Qt 6 API)
+            m_audioInput = new QAudioSource(m_deviceInfo, m_format, this);
             m_audioInput->setVolume(m_muted ? 0.0 : m_volume);
             
             // 连接状态变化信号
-            connect(m_audioInput, QOverload<QAudio::State>::of(&QAudioInput::stateChanged),
+            connect(m_audioInput, &QAudioSource::stateChanged,
                     this, &QtAudioDevice::onInputStateChanged);
             
             // 启动音频输入
@@ -91,12 +107,12 @@ bool QtAudioDevice::start()
             }
             
         } else {
-            // 创建音频输出
-            m_audioOutput = new QAudioOutput(m_deviceInfo, m_format, this);
+            // 创建音频输出 (Qt 6 API)
+            m_audioOutput = new QAudioSink(m_deviceInfo, m_format, this);
             m_audioOutput->setVolume(m_muted ? 0.0 : m_volume);
             
             // 连接状态变化信号
-            connect(m_audioOutput, QOverload<QAudio::State>::of(&QAudioOutput::stateChanged),
+            connect(m_audioOutput, &QAudioSink::stateChanged,
                     this, &QtAudioDevice::onOutputStateChanged);
             
             // 启动音频输出
@@ -159,7 +175,7 @@ QString QtAudioDevice::deviceId() const
 
 QString QtAudioDevice::deviceName() const
 {
-    return m_deviceInfo.isNull() ? m_deviceId : m_deviceInfo.deviceName();
+    return m_deviceInfo.isNull() ? m_deviceId : m_deviceInfo.description();
 }
 
 IAudioDevice::DeviceType QtAudioDevice::deviceType() const
@@ -326,10 +342,7 @@ bool QtAudioDevice::supportsFormat(int sampleRate, int channels) const
     QAudioFormat testFormat;
     testFormat.setSampleRate(sampleRate);
     testFormat.setChannelCount(channels);
-    testFormat.setSampleSize(16);
-    testFormat.setCodec("audio/pcm");
-    testFormat.setByteOrder(QAudioFormat::LittleEndian);
-    testFormat.setSampleType(QAudioFormat::SignedInt);
+    testFormat.setSampleFormat(QAudioFormat::Int16);
     
     return m_deviceInfo.isFormatSupported(testFormat);
 }
@@ -348,7 +361,7 @@ void QtAudioDevice::onInputStateChanged(QAudio::State state)
     case QAudio::StoppedState:
         // 设备已停止
         if (m_audioInput && m_audioInput->error() != QAudio::NoError) {
-            emit errorOccurred(QString("Audio input error: %1").arg(m_audioInput->error()));
+            emit errorOccurred(QString("Audio input error: %1").arg(static_cast<int>(m_audioInput->error())));
             setStatus(Error);
         }
         break;
@@ -372,7 +385,7 @@ void QtAudioDevice::onOutputStateChanged(QAudio::State state)
     case QAudio::StoppedState:
         // 设备已停止
         if (m_audioOutput && m_audioOutput->error() != QAudio::NoError) {
-            emit errorOccurred(QString("Audio output error: %1").arg(m_audioOutput->error()));
+            emit errorOccurred(QString("Audio output error: %1").arg(static_cast<int>(m_audioOutput->error())));
             setStatus(Error);
         }
         break;
@@ -395,24 +408,29 @@ void QtAudioDevice::updateAudioFormat()
 {
     m_format.setSampleRate(m_sampleRate);
     m_format.setChannelCount(m_channels);
-    m_format.setSampleSize(16);
-    m_format.setCodec("audio/pcm");
-    m_format.setByteOrder(QAudioFormat::LittleEndian);
-    m_format.setSampleType(QAudioFormat::SignedInt);
+    m_format.setSampleFormat(QAudioFormat::Int16);
+    
+    // Qt 6 不再使用这些方法
+    // m_format.setCodec("audio/pcm");
+    // m_format.setByteOrder(QAudioFormat::LittleEndian);
+    // m_format.setSampleType(QAudioFormat::SignedInt);
 }
 
 bool QtAudioDevice::findDeviceInfo()
 {
-    QList<QAudioDeviceInfo> devices;
+    // 获取媒体设备管理器
+    QMediaDevices *mediaDevices = new QMediaDevices(this);
+    
+    QList<QAudioDevice> devices;
     
     if (m_deviceType == Input) {
-        devices = QAudioDeviceInfo::availableDevices(QAudio::AudioInput);
+        devices = mediaDevices->audioInputs();
     } else {
-        devices = QAudioDeviceInfo::availableDevices(QAudio::AudioOutput);
+        devices = mediaDevices->audioOutputs();
     }
     
-    for (const QAudioDeviceInfo &info : devices) {
-        if (info.deviceName() == m_deviceId) {
+    for (const QAudioDevice &info : devices) {
+        if (info.id() == m_deviceId) {
             m_deviceInfo = info;
             qDebug() << "Found device info for:" << m_deviceId;
             return true;

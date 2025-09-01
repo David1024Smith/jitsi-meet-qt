@@ -7,6 +7,7 @@
 #include <QStringList>
 #include <QMutex>
 #include <QFileSystemWatcher>
+#include <QTimer>
 
 /**
  * @brief 配置文件处理器
@@ -117,7 +118,7 @@ public:
      * @brief 移除配置项
      * @param key 配置键
      */
-    void remove(const QString& key);
+    void removeKey(const QString& key);
 
     /**
      * @brief 获取所有配置键

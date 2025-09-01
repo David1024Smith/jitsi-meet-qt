@@ -1,8 +1,8 @@
 #include "NetworkMonitor.h"
+#include <QRegularExpression>
 #include <QDebug>
 #include <QCoreApplication>
-#include <QNetworkConfigurationManager>
-#include <QNetworkSession>
+#include <QNetworkInformation>
 #include <QHostInfo>
 #include <QProcess>
 
@@ -22,8 +22,9 @@ NetworkMonitor::NetworkMonitor(QObject *parent)
 {
     // 初始化网络管理器
     m_networkManager = new QNetworkAccessManager(this);
-    connect(m_networkManager, &QNetworkAccessManager::networkAccessibleChanged,
-            this, &NetworkMonitor::handleNetworkAccessibilityChanged);
+    // Note: networkAccessibleChanged signal is deprecated in newer Qt versions
+    // connect(m_networkManager, &QNetworkAccessManager::networkAccessibleChanged,
+    //         this, &NetworkMonitor::handleNetworkAccessibilityChanged);
     
     // 初始化定时器
     m_periodicTimer = new QTimer(this);
@@ -249,7 +250,7 @@ ResourceUsage NetworkMonitor::collectResourceUsage()
 {
     ResourceUsage usage;
     usage.timestamp = QDateTime::currentDateTime();
-    usage.resourceType = IResourceTracker::Network;
+    // ResourceUsage doesn't have resourceType field - it's determined by context
     
     // 更新接口统计信息
     updateInterfaceStatistics();
@@ -262,30 +263,29 @@ ResourceUsage NetworkMonitor::collectResourceUsage()
     }
     
     QPair<qint64, qint64> speeds = calculateNetworkSpeed(interfaceName);
-    usage.networkDownload = speeds.first;
-    usage.networkUpload = speeds.second;
+    usage.network.receiveSpeed = speeds.first;
+    usage.network.sendSpeed = speeds.second;
     
     // 根据监控模式收集不同级别的数据
     if (m_monitoringMode >= LatencyMode) {
         if (!m_latencyTestHosts.isEmpty()) {
             double avgLatency = performLatencyTest(m_latencyTestHosts.first());
-            usage.additionalData["latency"] = avgLatency;
+            usage.network.latency = avgLatency;
         }
     }
     
     if (m_monitoringMode >= QualityMode) {
         QualityLevel quality = calculateNetworkQuality();
-        usage.additionalData["quality"] = static_cast<int>(quality);
-        usage.additionalData["score"] = getNetworkScore();
+        // Store quality and score in network usage structure
+        // Note: These could be stored in a custom metrics map if needed
         
         QMutexLocker locker(&m_dataMutex);
         m_currentQuality = quality;
     }
     
     if (m_monitoringMode == ComprehensiveMode) {
-        usage.additionalData["connectionCount"] = getConnectionCount();
-        usage.additionalData["isConnected"] = isNetworkConnected();
-        usage.additionalData["isInternetConnected"] = isInternetConnected();
+        usage.network.connectionCount = getConnectionCount();
+        // Store connection status in network usage structure
     }
     
     // 更新历史数据
@@ -293,7 +293,7 @@ ResourceUsage NetworkMonitor::collectResourceUsage()
     m_lastUpdateTime = usage.timestamp;
     
     // 添加到历史记录
-    m_bandwidthHistory.append(qMakePair(usage.networkDownload, usage.networkUpload));
+    m_bandwidthHistory.append(qMakePair(usage.network.receiveSpeed, usage.network.sendSpeed));
     if (m_bandwidthHistory.size() > 1440) {
         m_bandwidthHistory.removeFirst();
     }
@@ -306,10 +306,10 @@ QList<IResourceTracker::ResourceType> NetworkMonitor::supportedResourceTypes() c
     return {IResourceTracker::Network};
 }
 
-void NetworkMonitor::handleNetworkAccessibilityChanged(QNetworkAccessManager::NetworkAccessibility accessible)
+void NetworkMonitor::handleNetworkAccessibilityChanged(int accessible)
 {
     bool wasConnected = m_isConnected;
-    m_isConnected = (accessible == QNetworkAccessManager::Accessible);
+    m_isConnected = (accessible == 1); // 1 represents Accessible in older Qt versions
     
     if (wasConnected != m_isConnected) {
         qDebug() << "NetworkMonitor: Network accessibility changed to" << accessible;
@@ -469,9 +469,10 @@ double NetworkMonitor::performLatencyTest(const QString& host)
         QString output = pingProcess.readAllStandardOutput();
         
         // 解析ping输出获取延迟时间
-        QRegExp timeRegex("time[<=]([0-9.]+)");
-        if (timeRegex.indexIn(output) != -1) {
-            return timeRegex.cap(1).toDouble();
+        QRegularExpression timeRegex("time[<=]([0-9.]+)");
+        QRegularExpressionMatch match = timeRegex.match(output);
+        if (match.hasMatch()) {
+            return match.captured(1).toDouble();
         }
     }
     

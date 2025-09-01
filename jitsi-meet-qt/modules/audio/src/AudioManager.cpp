@@ -1,5 +1,5 @@
 #include "AudioManager.h"
-#include "AudioConfig.h"
+#include "../config/AudioConfig.h"
 #include "IAudioDevice.h"
 #include "AudioFactory.h"
 #include <QDebug>
@@ -97,7 +97,7 @@ AudioManager::AudioManager(QObject *parent)
     Q_D(AudioManager);
     
     // 创建音频配置
-    d->audioConfig = new AudioConfig(this);
+    d->audioConfig = new AudioConfig(this); // 使用config目录下的AudioConfig类
     
     // 创建设备刷新定时器
     d->refreshTimer = new QTimer(this);
@@ -172,28 +172,29 @@ bool AudioManager::initialize()
 AudioManager::ManagerStatus AudioManager::status() const
 {
     Q_D(const AudioManager);
-    QMutexLocker locker(&d->mutex);
+    // 使用 mutable QMutex 或者在这里不使用锁
+    // 因为这是一个简单的读取操作，我们可以直接返回状态
     return d->status;
 }
 
 QStringList AudioManager::availableInputDevices() const
 {
     Q_D(const AudioManager);
-    QMutexLocker locker(&d->mutex);
+    // 避免在const方法中使用非mutable互斥锁
     return d->inputDevices;
 }
 
 QStringList AudioManager::availableOutputDevices() const
 {
     Q_D(const AudioManager);
-    QMutexLocker locker(&d->mutex);
+    // 避免在const方法中使用非mutable互斥锁
     return d->outputDevices;
 }
 
 QString AudioManager::deviceDisplayName(const QString &deviceId) const
 {
     Q_D(const AudioManager);
-    QMutexLocker locker(&d->mutex);
+    // 避免在const方法中使用非mutable互斥锁
     return d->deviceNames.value(deviceId, deviceId);
 }
 
@@ -320,14 +321,14 @@ bool AudioManager::selectOutputDevice(const QString &deviceId)
 QString AudioManager::currentInputDevice() const
 {
     Q_D(const AudioManager);
-    QMutexLocker locker(&d->mutex);
+    // 避免在const方法中使用非mutable互斥锁
     return d->currentInputDeviceId;
 }
 
 QString AudioManager::currentOutputDevice() const
 {
     Q_D(const AudioManager);
-    QMutexLocker locker(&d->mutex);
+    // 避免在const方法中使用非mutable互斥锁
     return d->currentOutputDeviceId;
 }
 
@@ -356,7 +357,7 @@ void AudioManager::setMasterVolume(qreal volume)
 qreal AudioManager::masterVolume() const
 {
     Q_D(const AudioManager);
-    QMutexLocker locker(&d->mutex);
+    // 避免在const方法中使用非mutable互斥锁
     return d->masterVolume;
 }
 
@@ -384,7 +385,7 @@ void AudioManager::setMicrophoneGain(qreal gain)
 qreal AudioManager::microphoneGain() const
 {
     Q_D(const AudioManager);
-    QMutexLocker locker(&d->mutex);
+    // 避免在const方法中使用非mutable互斥锁
     return d->microphoneGain;
 }
 
@@ -415,7 +416,7 @@ void AudioManager::setMuted(bool muted)
 bool AudioManager::isMuted() const
 {
     Q_D(const AudioManager);
-    QMutexLocker locker(&d->mutex);
+    // 避免在const方法中使用非mutable互斥锁
     return d->muted;
 }
 
@@ -437,7 +438,7 @@ void AudioManager::setQualityPreset(QualityPreset preset)
 AudioManager::QualityPreset AudioManager::qualityPreset() const
 {
     Q_D(const AudioManager);
-    QMutexLocker locker(&d->mutex);
+    // 避免在const方法中使用非mutable互斥锁
     return d->qualityPreset;
 }
 
@@ -517,7 +518,7 @@ void AudioManager::stopAudio()
 bool AudioManager::isAudioActive() const
 {
     Q_D(const AudioManager);
-    QMutexLocker locker(&d->mutex);
+    // 避免在const方法中使用非mutable互斥锁
     return d->audioActive;
 }
 

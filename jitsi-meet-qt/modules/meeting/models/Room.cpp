@@ -497,7 +497,14 @@ QVariantMap Room::toVariantMap() const
     map["description"] = d->description;
     map["subject"] = d->subject;
     map["participants"] = d->participants;
-    map["participantRoles"] = QVariantMap(d->participantRoles);
+    
+    // 手动将 QMap<QString, QString> 转换为 QVariantMap
+    QVariantMap roleMap;
+    for (auto it = d->participantRoles.constBegin(); it != d->participantRoles.constEnd(); ++it) {
+        roleMap[it.key()] = it.value();
+    }
+    map["participantRoles"] = roleMap;
+    
     map["configuration"] = d->configuration;
     map["permissions"] = d->permissions;
     map["statistics"] = d->statistics;

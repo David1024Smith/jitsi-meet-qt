@@ -36,10 +36,10 @@ public:
 
     // IOptimizer接口实现
     bool initialize() override;
-    OptimizationResult optimize(OptimizationStrategy strategy = Balanced) override;
+    OptimizationResult optimize(OptimizationStrategy strategy = OptimizationStrategy::Balanced) override;
     bool shouldOptimize() const override;
     QStringList getOptimizationSuggestions() const override;
-    QVariantMap estimateImprovements(OptimizationStrategy strategy = Balanced) const override;
+    QVariantMap estimateImprovements(OptimizationStrategy strategy = OptimizationStrategy::Balanced) const override;
     QString getOptimizerName() const override;
     QString getVersion() const override;
     OptimizationType getOptimizationType() const override;
@@ -243,7 +243,7 @@ protected:
      * @param afterMetrics 优化后指标
      * @return 改善效果
      */
-    OptimizationResult::Improvements calculateImprovements(const QVariantMap& beforeMetrics, const QVariantMap& afterMetrics) const;
+    QVariantMap calculateImprovements(const QVariantMap& beforeMetrics, const QVariantMap& afterMetrics) const;
 
     /**
      * @brief 验证优化参数

@@ -73,6 +73,14 @@ public:
     WindowState windowState() const;
     QRect windowGeometry() const;
     bool isWindowValid() const;
+    
+    // 窗口对象接口
+    QWindow* targetWindow() const;
+    void setTargetWindow(QWindow* window);
+    WId targetWindowId() const;
+    void setTargetWindowId(WId windowId);
+    bool includeWindowFrame() const;
+    void setIncludeWindowFrame(bool include);
 
     // 窗口管理接口
     QStringList availableWindows() const;
@@ -87,6 +95,10 @@ public:
     bool isCaptureClientAreaEnabled() const;
     void setAutoResize(bool enabled);
     bool isAutoResizeEnabled() const;
+    
+    // 窗口信息接口
+    void refreshWindowInfo();
+    QStringList getAvailableWindows() const;
 
 public slots:
     /**
@@ -132,6 +144,7 @@ signals:
 private slots:
     void onCaptureTimer();
     void onWindowMonitorTimer();
+    void onWindowGeometryChanged();
 
 private:
     void initializeCapture();
@@ -144,6 +157,7 @@ private:
     void monitorWindowState();
     void updateWindowGeometry();
     void emitError(const QString& error);
+    QPixmap applyCaptureQuality(const QPixmap& frame);
 
 #ifdef Q_OS_WIN
     QPixmap captureWindowWin32();

@@ -38,6 +38,7 @@ public:
     };
     Q_ENUM(SettingsScope)
 
+    explicit ISettingsManager(QObject* parent = nullptr) : QObject(parent) {}
     virtual ~ISettingsManager() = default;
 
     /**

@@ -9,20 +9,20 @@
 class BaseTheme;
 
 /**
- * @brief 基础组件类
+ * @brief 基础组件接口类
  * 
- * BaseWidget是所有UI组件的基类，提供统一的主题支持、
- * 配置管理和基础功能。
+ * BaseWidget是所有UI组件的基础接口，提供统一的主题支持、
+ * 配置管理和基础功能。不继承QWidget以避免多重继承问题。
  */
-class BaseWidget : public QWidget
+class BaseWidget
 {
-    Q_OBJECT
-    Q_PROPERTY(QString themeName READ themeName WRITE setThemeName NOTIFY themeNameChanged)
-    Q_PROPERTY(bool themeEnabled READ isThemeEnabled WRITE setThemeEnabled NOTIFY themeEnabledChanged)
+public:
+    // 移除 Q_OBJECT 宏，因为不再继承 QObject
+    // Q_PROPERTY 也需要移除，因为它们依赖于 QObject
 
 public:
-    explicit BaseWidget(QWidget *parent = nullptr);
-    ~BaseWidget() override;
+    BaseWidget();
+    virtual ~BaseWidget();
 
     // 主题支持
     QString themeName() const;
@@ -52,13 +52,14 @@ public:
     virtual QString componentVersion() const;
     virtual QString componentDescription() const;
 
-signals:
-    void themeNameChanged(const QString& themeName);
-    void themeEnabledChanged(bool enabled);
-    void themeApplied();
-    void configurationChanged();
-    void styleSheetChanged();
-    void validationFailed(const QStringList& errors);
+    // 信号需要在具体的 QObject 子类中定义
+    // signals:
+    // void themeNameChanged(const QString& themeName);
+    // void themeEnabledChanged(bool enabled);
+    // void themeApplied();
+    // void configurationChanged();
+    // void styleSheetChanged();
+    // void validationFailed(const QStringList& errors);
 
 protected:
     // 主题相关虚函数
@@ -73,13 +74,14 @@ protected:
     virtual QVariantMap getDefaultConfiguration() const;
     virtual bool validateConfiguration(const QVariantMap& config) const;
 
-    // 事件处理
-    void paintEvent(QPaintEvent *event) override;
-    void resizeEvent(QResizeEvent *event) override;
-    void changeEvent(QEvent *event) override;
+    // 事件处理 - 这些需要在具体的 QWidget 子类中实现
+    // virtual void paintEvent(QPaintEvent *event);
+    // virtual void resizeEvent(QResizeEvent *event);
+    // virtual void changeEvent(QEvent *event);
 
-private slots:
-    void onGlobalThemeChanged();
+    // 槽函数需要在具体的 QObject 子类中定义
+    // private slots:
+    // void onGlobalThemeChanged();
 
 private:
     void setupWidget();

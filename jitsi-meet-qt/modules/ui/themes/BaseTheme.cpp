@@ -2,12 +2,14 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 
-BaseTheme::BaseTheme(QObject *parent)
-    : QObject(parent)
-{
-}
+// 构造函数已在头文件中定义为内联函数
+// BaseTheme::BaseTheme(QObject *parent)
+//     : QObject(parent)
+// {
+// }
 
-BaseTheme::~BaseTheme() = default;
+// 析构函数已在头文件中定义为内联函数
+// BaseTheme::~BaseTheme() = default;
 
 QString BaseTheme::version() const
 {
@@ -87,10 +89,7 @@ void BaseTheme::fromVariantMap(const QVariantMap& map)
     }
 }
 
-void BaseTheme::applyConfiguration(const QVariantMap& config)
-{
-    fromVariantMap(config);
-}
+// 删除重复定义的函数，因为在前面已经定义过了
 
 void BaseTheme::setName(const QString& name)
 {

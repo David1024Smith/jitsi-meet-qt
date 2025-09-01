@@ -478,7 +478,8 @@ private:
 #endif
 
     void initializeAlternativeStorage();
-    void updateStatistics(const QString& operation);
+    void loadData();
+    void updateStatistics(const QString& operation) const;
 
     class Private;
     std::unique_ptr<Private> d;

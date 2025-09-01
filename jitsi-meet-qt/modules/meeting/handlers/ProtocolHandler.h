@@ -237,6 +237,12 @@ private:
      * @brief 初始化支持的协议
      */
     void initializeSupportedProtocols();
+    
+    /**
+     * @brief 获取可执行文件路径
+     * @return 可执行文件路径
+     */
+    QString getExecutablePath() const;
 
     /**
      * @brief 在Windows注册表中注册协议

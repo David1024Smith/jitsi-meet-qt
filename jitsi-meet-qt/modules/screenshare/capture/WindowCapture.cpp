@@ -6,10 +6,19 @@
 #include <QMutexLocker>
 #include <QDebug>
 #include <QBuffer>
+#include <QFileInfo>
+#include <QRegularExpression>
+#include <QScreen>
+#include <QPainter>
+#include <QElapsedTimer>
 
 #ifdef Q_OS_WIN
 #include <windows.h>
 #include <dwmapi.h>
+#include <psapi.h>
+// 在Qt6中，QtWin被移除，改用Qt的Windows特定功能
+#include <QtCore/QOperatingSystemVersion>
+#include <QtGui/QWindow>
 #endif
 
 class WindowCapture::Private
@@ -25,6 +34,7 @@ public:
         , captureDelay(0)
         , compressionQuality(75)
         , includeWindowFrame(true)
+        , followWindow(false)
         , targetWindow(nullptr)
         , captureTimer(nullptr)
         , windowId(0)
@@ -40,6 +50,7 @@ public:
     int captureDelay;
     int compressionQuality;
     bool includeWindowFrame;
+    bool followWindow;
     
     QWindow* targetWindow;
     QTimer* captureTimer;
@@ -503,7 +514,17 @@ QPixmap WindowCapture::captureWindowInternal()
                 }
                 
                 // 转换为QPixmap
-                screenshot = QPixmap::fromWinHBITMAP(hbmScreen);
+                // 使用 Qt 6 兼容的方式从 HBITMAP 创建 QPixmap
+                // Qt6 中不再有 QtWin::imageFromHBITMAP，使用替代方法
+                BITMAP bmpScreen;
+                GetObject(hbmScreen, sizeof(BITMAP), &bmpScreen);
+                
+                QImage image(bmpScreen.bmWidth, bmpScreen.bmHeight, QImage::Format_ARGB32_Premultiplied);
+                
+                // 获取位图数据
+                GetBitmapBits(hbmScreen, bmpScreen.bmHeight * bmpScreen.bmWidth * 4, image.bits());
+                
+                screenshot = QPixmap::fromImage(image);
                 
                 DeleteObject(hbmScreen);
                 DeleteDC(hdcMemDC);
@@ -696,7 +717,7 @@ bool WindowCapture::selectWindowByProcess(const QString& processName)
         HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, processId);
         if (hProcess) {
             WCHAR processPath[MAX_PATH];
-            if (GetModuleFileNameExW(hProcess, nullptr, processPath, MAX_PATH)) {
+                        if (::GetModuleFileNameExW(hProcess, nullptr, processPath, MAX_PATH)) {
                 QString fullPath = QString::fromWCharArray(processPath);
                 QString fileName = QFileInfo(fullPath).baseName();
                 
@@ -768,9 +789,10 @@ void WindowCapture::autoFindWindow()
     if (!windows.isEmpty()) {
         // 选择第一个可见窗口
         QString firstWindow = windows.first();
-        QRegExp rx("ID: (\\d+)");
-        if (rx.indexIn(firstWindow) != -1) {
-            qulonglong handle = rx.cap(1).toULongLong();
+        QRegularExpression rx("ID: (\\d+)");
+        QRegularExpressionMatch match = rx.match(firstWindow);
+        if (match.hasMatch()) {
+            qulonglong handle = match.captured(1).toULongLong();
             setTargetWindowHandle(handle);
         }
     }

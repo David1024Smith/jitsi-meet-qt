@@ -273,8 +273,9 @@ bool WebRTCProtocol::sendHeartbeat()
     }
     
     return result;
-}bool WebR
-TCProtocol::supportsFeature(const QString& feature) const
+}
+
+bool WebRTCProtocol::supportsFeature(const QString& feature) const
 {
     QStringList features = supportedFeatures();
     return features.contains(feature);

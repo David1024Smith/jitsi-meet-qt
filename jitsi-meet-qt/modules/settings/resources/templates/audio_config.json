@@ -1,0 +1,40 @@
+{
+    "audio": {
+        "input": {
+            "defaultDevice": "default",
+            "sampleRate": 48000,
+            "channels": 2,
+            "bufferSize": 1024,
+            "gain": 1.0,
+            "noiseReduction": true,
+            "echoCancellation": true,
+            "autoGainControl": true
+        },
+        "output": {
+            "defaultDevice": "default",
+            "sampleRate": 48000,
+            "channels": 2,
+            "bufferSize": 1024,
+            "volume": 1.0
+        },
+        "processing": {
+            "enableProcessing": true,
+            "enableWebRTCAudio": true,
+            "enableAudioFilters": true,
+            "enableVolumeNormalization": true
+        },
+        "codec": {
+            "preferredCodec": "opus",
+            "bitrate": 64000,
+            "complexity": 10,
+            "enableDTX": true,
+            "enableFEC": true
+        },
+        "advanced": {
+            "enableAudioDebug": false,
+            "logLevel": "info",
+            "enableMetrics": true,
+            "metricsInterval": 5000
+        }
+    }
+}

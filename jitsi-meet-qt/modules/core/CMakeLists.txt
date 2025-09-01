@@ -10,27 +10,23 @@ find_package(Qt6 REQUIRED COMPONENTS Core Widgets Network)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Define the core module library
+# Define the core module library - only existing files
 set(CORE_MODULE_SOURCES
     # Main implementation files
     src/ModuleManager.cpp
     src/GlobalModuleConfig.cpp
     src/ModuleHealthMonitor.cpp
     src/ModuleVersionManager.cpp
+    src/ModuleCommunicationBus.cpp
+    src/ModulePerformanceIntegrator.cpp
+    src/ModuleResourceManager.cpp
+    src/ModuleStartupOptimizer.cpp
     
     # Management components
     management/RuntimeController.cpp
     
     # Configuration files
     config/ModuleConfig.cpp
-    
-    # Monitoring components
-    monitoring/HealthChecker.cpp
-    monitoring/StatusMonitor.cpp
-    
-    # Versioning components
-    versioning/VersionController.cpp
-    versioning/UpgradeManager.cpp
 )
 
 set(CORE_MODULE_HEADERS
@@ -39,6 +35,10 @@ set(CORE_MODULE_HEADERS
     include/GlobalModuleConfig.h
     include/ModuleHealthMonitor.h
     include/ModuleVersionManager.h
+    include/ModuleCommunicationBus.h
+    include/ModulePerformanceIntegrator.h
+    include/ModuleResourceManager.h
+    include/ModuleStartupOptimizer.h
     
     # Interface definitions
     interfaces/IModuleManager.h
@@ -51,14 +51,6 @@ set(CORE_MODULE_HEADERS
     
     # Configuration headers
     config/ModuleConfig.h
-    
-    # Monitoring headers
-    monitoring/HealthChecker.h
-    monitoring/StatusMonitor.h
-    
-    # Versioning headers
-    versioning/VersionController.h
-    versioning/UpgradeManager.h
 )
 
 # Create the core module library

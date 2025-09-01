@@ -1,15 +1,17 @@
 #include "ThemeManager.h"
 #include "ThemeFactory.h"
-#include "themes/BaseTheme.h"
+#include "../themes/BaseTheme.h"
 #include <QApplication>
 #include <QFile>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QDebug>
+#include <QStyle>
+#include <QWidget>
 
 ThemeManager::ThemeManager(QObject *parent)
     : QObject(parent)
-    , m_status(NotLoaded)
+    , m_status(IThemeManager::NotInitialized) // 使用IThemeManager中定义的正确枚举值
     , m_currentThemeName("default")
 {
 }
@@ -21,11 +23,11 @@ ThemeManager::~ThemeManager()
 
 bool ThemeManager::initialize()
 {
-    if (m_status == Loaded || m_status == Applied) {
+    if (m_status == IThemeManager::Ready) { // 使用IThemeManager中定义的正确枚举值
         return true;
     }
 
-    m_status = Loading;
+    m_status = IThemeManager::Initializing; // 这个枚举值在IThemeManager中存在
 
     try {
         // 设置主题工厂
@@ -34,12 +36,12 @@ bool ThemeManager::initialize()
         // 加载默认主题
         loadDefaultThemes();
 
-        m_status = Loaded;
+        m_status = IThemeManager::Ready; // 使用IThemeManager中定义的正确枚举值
         qDebug() << "ThemeManager initialized successfully";
         return true;
 
     } catch (const std::exception& e) {
-        m_status = Error;
+        m_status = IThemeManager::Error;
         emit errorOccurred(QString("Failed to initialize ThemeManager: %1").arg(e.what()));
         return false;
     }
@@ -47,7 +49,7 @@ bool ThemeManager::initialize()
 
 void ThemeManager::shutdown()
 {
-    if (m_status == NotLoaded) {
+    if (m_status == IThemeManager::NotInitialized) { // 使用IThemeManager中定义的正确枚举值
         return;
     }
 
@@ -61,7 +63,7 @@ void ThemeManager::shutdown()
         m_themeFactory.reset();
     }
 
-    m_status = NotLoaded;
+    m_status = IThemeManager::NotInitialized; // 使用IThemeManager中定义的正确枚举值
     qDebug() << "ThemeManager shutdown completed";
 }
 
@@ -189,7 +191,7 @@ bool ThemeManager::applyTheme(std::shared_ptr<BaseTheme> theme)
     if (applyThemeToApplication(theme)) {
         m_currentTheme = theme;
         m_currentThemeName = theme->name();
-        m_status = Applied;
+        m_status = IThemeManager::Ready; // 使用IThemeManager中定义的正确枚举值
         
         emit themeApplied(m_currentThemeName);
         if (oldTheme != m_currentThemeName) {
@@ -293,7 +295,7 @@ QVariant ThemeManager::getThemeProperty(const QString& themeName, const QString&
     if (m_loadedThemes.contains(themeName)) {
         auto theme = m_loadedThemes[themeName];
         if (theme) {
-            return theme->property(property);
+            return theme->property(property.toUtf8().constData());
         }
     }
     return QVariant();
@@ -397,7 +399,10 @@ bool ThemeManager::applyThemeToApplication(std::shared_ptr<BaseTheme> theme)
         // 应用主题样式表
         QString styleSheet = theme->styleSheet();
         if (QApplication::instance()) {
-            QApplication::instance()->setStyleSheet(styleSheet);
+            // 在Qt6中，QApplication::setStyleSheet已被移除，我们需要应用到所有顶级窗口
+            for (QWidget* widget : QApplication::topLevelWidgets()) {
+                widget->setStyleSheet(styleSheet);
+            }
         }
 
         // 应用主题属性

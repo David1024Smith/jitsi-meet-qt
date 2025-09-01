@@ -47,8 +47,31 @@ find_package(Qt6 6.8.3 REQUIRED COMPONENTS
     WebSockets
     Multimedia
     MultimediaWidgets
+    Sql
     LinguistTools
+    Xml
 )
+
+# Find OpenSSL - make it optional for now
+find_package(OpenSSL)
+
+# If OpenSSL is not found, set custom path or disable
+if(NOT OPENSSL_FOUND)
+    message(WARNING "OpenSSL not found, trying alternative paths...")
+    set(OPENSSL_ROOT_DIR "C:/Program Files/OpenSSL-Win64")
+    set(OPENSSL_INCLUDE_DIR "${OPENSSL_ROOT_DIR}/include")
+    set(OPENSSL_LIBRARIES "${OPENSSL_ROOT_DIR}/lib/libssl.lib;${OPENSSL_ROOT_DIR}/lib/libcrypto.lib")
+    
+    # Check if the alternative path exists
+    if(EXISTS "${OPENSSL_INCLUDE_DIR}/openssl/ssl.h")
+        set(OPENSSL_FOUND TRUE)
+        message(STATUS "Found OpenSSL at: ${OPENSSL_ROOT_DIR}")
+    else()
+        message(WARNING "OpenSSL not found, building without SSL support")
+        set(OPENSSL_FOUND FALSE)
+        set(OPENSSL_LIBRARIES "")
+    endif()
+endif()
 
 # Enable Qt MOC, UIC, and RCC
 set(CMAKE_AUTOMOC ON)
@@ -59,6 +82,7 @@ set(CMAKE_AUTORCC ON)
 include_directories(
     ${CMAKE_SOURCE_DIR}/include
     ${CMAKE_CURRENT_BINARY_DIR}/include
+    ${OPENSSL_INCLUDE_DIR}
 )
 
 # Resource files
@@ -66,17 +90,27 @@ set(RESOURCES
     resources/resources.qrc
 )
 
-# Source files
+# Add module subdirectories - only working modules for now
+add_subdirectory(modules/settings)
+# Temporarily disable other modules until we create missing source files
+# add_subdirectory(modules/chat)
+# add_subdirectory(modules/network)
+# add_subdirectory(modules/performance)
+# add_subdirectory(modules/screenshare)
+# add_subdirectory(modules/utils)
+# add_subdirectory(modules/ui)
+# add_subdirectory(modules/audio)
+# add_subdirectory(modules/camera)
+
+# Source files - only include existing files
 set(SOURCES
     src/main.cpp
     src/MainApplication.cpp
     src/WebRTCEngine.cpp
     src/MediaManager.cpp
-    src/ScreenShareManager.cpp
     src/AuthenticationManager.cpp
     src/XMPPClient.cpp
     src/ConferenceManager.cpp
-    src/ChatManager.cpp
     src/ConfigurationManager.cpp
     src/WindowManager.cpp
     src/WelcomeWindow.cpp
@@ -86,32 +120,25 @@ set(SOURCES
     src/TranslationManager.cpp
     src/NavigationBar.cpp
     src/RecentListWidget.cpp
-    src/WindowStateManager.cpp
     src/JitsiError.cpp
     src/ErrorRecoveryManager.cpp
     src/ErrorDialog.cpp
     src/ErrorUtils.cpp
-    src/ThemeManager.cpp
     src/StyleHelper.cpp
     src/StyleUtils.cpp
-    src/PerformanceManager.cpp
-    src/PerformanceConfig.cpp
-    src/StartupOptimizer.cpp
     src/MemoryProfiler.cpp
     src/MemoryLeakDetector.cpp
     src/OptimizedRecentManager.cpp
 )
 
-# Header files
+# Header files - only existing files
 set(HEADERS
     include/MainApplication.h
     include/WebRTCEngine.h
     include/MediaManager.h
-    include/ScreenShareManager.h
     include/AuthenticationManager.h
     include/XMPPClient.h
     include/ConferenceManager.h
-    include/ChatManager.h
     include/ConfigurationManager.h
     include/WindowManager.h
     include/WelcomeWindow.h
@@ -121,17 +148,12 @@ set(HEADERS
     include/TranslationManager.h
     include/NavigationBar.h
     include/RecentListWidget.h
-    include/WindowStateManager.h
     include/JitsiError.h
     include/ErrorRecoveryManager.h
     include/ErrorDialog.h
     include/ErrorUtils.h
-    include/ThemeManager.h
     include/StyleHelper.h
     include/StyleUtils.h
-    include/PerformanceManager.h
-    include/PerformanceConfig.h
-    include/StartupOptimizer.h
     include/MemoryProfiler.h
     include/MemoryLeakDetector.h
     include/OptimizedRecentManager.h
@@ -162,7 +184,7 @@ qt6_standard_project_setup()
 # Create executable
 add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS} ${RESOURCES})
 
-# Link Qt libraries
+# Link Qt libraries and modules
 target_link_libraries(${PROJECT_NAME}
     Qt6::Core
     Qt6::Widgets
@@ -170,7 +192,26 @@ target_link_libraries(${PROJECT_NAME}
     Qt6::WebSockets
     Qt6::Multimedia
     Qt6::MultimediaWidgets
+    Qt6::Sql
+    Qt6::Xml
+    # Module libraries - only enabled modules
+    SettingsModule
+    # Temporarily disabled modules
+    # ChatModule
+    # NetworkModule
+    # PerformanceModule
+    # ScreenShareModule
+    # UtilsModule
+    # UIModule
+    # AudioModule
+    # CameraModule
 )
+
+# Add OpenSSL if found - temporarily disabled due to library path issues
+# if(OPENSSL_FOUND)
+#     target_link_libraries(${PROJECT_NAME} ${OPENSSL_LIBRARIES})
+#     target_compile_definitions(${PROJECT_NAME} PRIVATE HAVE_OPENSSL)
+# endif()
 
 # Windows specific settings
 if(WIN32)

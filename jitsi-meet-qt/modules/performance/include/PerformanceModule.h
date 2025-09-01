@@ -183,7 +183,7 @@ signals:
     /**
      * @brief 模块关闭信号
      */
-    void shutdown();
+    void moduleShutdown();
 
 private slots:
     /**
@@ -226,7 +226,7 @@ private:
     MetricsCollector* m_metricsCollector;          ///< 指标收集器
     PerformanceConfig* m_config;                   ///< 模块配置
     QTimer* m_statusTimer;                         ///< 状态更新定时器
-    QMutex m_mutex;                                ///< 线程安全互斥锁
+    mutable QMutex m_mutex;                        ///< 线程安全互斥锁
     
     static PerformanceModule* s_instance;          ///< 单例实例
     static QMutex s_instanceMutex;                 ///< 单例互斥锁

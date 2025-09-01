@@ -347,7 +347,7 @@ private:
      * @param jwt JWT令牌
      * @return 解析结果
      */
-    QVariantMap parseJWT(const QString& jwt);
+    QVariantMap parseJWT(const QString& jwt) const;
 
     /**
      * @brief 验证JWT签名

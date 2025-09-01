@@ -308,9 +308,9 @@ void ChatWidget::connectToChat(const QString& serverUrl)
 {
     if (d->chatManager) {
         if (!serverUrl.isEmpty()) {
-            d->chatManager->connectToServer(serverUrl);
+            d->chatManager->connectToService(serverUrl);
         } else {
-            d->chatManager->connect();
+            d->chatManager->connectToService("");
         }
     }
 }
@@ -544,7 +544,7 @@ void ChatWidget::connectSignals()
     // Toolbar action signals
     if (d->connectAction) {
         connect(d->connectAction, &QAction::triggered,
-                this, &ChatWidget::connectToChat);
+                this, [this]() { connectToChat(); });
     }
     if (d->disconnectAction) {
         connect(d->disconnectAction, &QAction::triggered,
@@ -556,7 +556,7 @@ void ChatWidget::connectSignals()
     }
     if (d->participantListAction) {
         connect(d->participantListAction, &QAction::toggled,
-                this, &ChatWidget::setParticipantListVisible);
+                this, [this](bool checked) { setParticipantListVisible(checked); });
     }
 }
 

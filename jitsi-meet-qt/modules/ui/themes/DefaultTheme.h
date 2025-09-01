@@ -107,6 +107,10 @@ private:
     QString generateToolBarStyleSheet() const;
     QString generateStatusBarStyleSheet() const;
     QString generateDialogStyleSheet() const;
+    
+    // 主题基本信息
+    QString m_name;
+    QString m_displayName;
 
     // 颜色定义
     QColor m_primaryColor;

@@ -1,13 +1,6 @@
 <!DOCTYPE RCC>
 <RCC version="1.0">
     <qresource prefix="/settings">
-        <!-- Icons -->
-        <file>icons/settings.png</file>
-        <file>icons/preferences.png</file>
-        <file>icons/config.png</file>
-        <file>icons/validation.png</file>
-        <file>icons/storage.png</file>
-        
         <!-- Styles -->
         <file>styles/default.qss</file>
         <file>styles/dark.qss</file>

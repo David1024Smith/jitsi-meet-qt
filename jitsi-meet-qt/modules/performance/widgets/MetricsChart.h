@@ -21,7 +21,7 @@
 #include <QMutex>
 #include "PerformanceManager.h"
 
-QT_CHARTS_USE_NAMESPACE
+// QT_CHARTS_USE_NAMESPACE - Charts module not available, using alternative implementation
 
 /**
  * @brief 性能指标图表组件

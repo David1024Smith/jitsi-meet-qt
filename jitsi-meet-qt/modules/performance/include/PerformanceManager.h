@@ -7,6 +7,7 @@
 #include <QDateTime>
 #include <QVariantMap>
 #include <QSharedPointer>
+#include <QSize>
 #include "IPerformanceMonitor.h"
 #include "IResourceTracker.h"
 
@@ -159,6 +160,29 @@ public:
     BaseMonitor* getMonitor(const QString& monitorName) const;
 
     /**
+     * @brief 获取监控器名称
+     * @return 监控器名称
+     */
+    QString getMonitorName() const override;
+
+    /**
+     * @brief 获取版本信息
+     * @return 版本字符串
+     */
+    QString getVersion() const override;
+
+    /**
+     * @brief 获取状态信息
+     * @return 状态映射
+     */
+    QVariantMap getStatus() const override;
+
+    /**
+     * @brief 重置监控器
+     */
+    void reset() override;
+
+    /**
      * @brief 获取所有监控器
      * @return 监控器列表
      */
@@ -202,6 +226,23 @@ public:
      * @return 间隔时间(毫秒)
      */
     int monitoringInterval() const;
+
+    /**
+     * @brief 检查监控是否活跃
+     * @return 是否活跃
+     */
+    bool isMonitoringActive() const;
+
+    /**
+     * @brief 开始监控
+     * @return 启动是否成功
+     */
+    bool startMonitoring();
+
+    /**
+     * @brief 停止监控
+     */
+    void stopMonitoring();
 
     /**
      * @brief 启用自动优化

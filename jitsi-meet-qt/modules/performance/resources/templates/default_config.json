@@ -1,0 +1,64 @@
+{
+    "performance": {
+        "monitoring": {
+            "enabled": true,
+            "interval": 5000,
+            "metrics": {
+                "cpu": true,
+                "memory": true,
+                "network": true,
+                "gpu": false
+            },
+            "thresholds": {
+                "cpu": {
+                    "warning": 70,
+                    "critical": 90
+                },
+                "memory": {
+                    "warning": 80,
+                    "critical": 95
+                },
+                "network": {
+                    "warning": 80,
+                    "critical": 95
+                }
+            }
+        },
+        "optimization": {
+            "enabled": true,
+            "autoOptimize": false,
+            "strategies": {
+                "startup": {
+                    "enabled": true,
+                    "preloadModules": true,
+                    "cacheResources": true,
+                    "optimizeMemory": true
+                },
+                "memory": {
+                    "enabled": true,
+                    "garbageCollection": true,
+                    "memoryPool": true,
+                    "cacheLimit": 100
+                },
+                "rendering": {
+                    "enabled": true,
+                    "hardwareAcceleration": true,
+                    "vsync": true,
+                    "frameRateLimit": 60
+                }
+            }
+        },
+        "profiling": {
+            "enabled": false,
+            "outputPath": "./performance_logs",
+            "detailedLogging": false,
+            "includeStackTrace": false
+        },
+        "alerts": {
+            "enabled": true,
+            "showNotifications": true,
+            "logToFile": true,
+            "emailNotifications": false
+        }
+    }
+}

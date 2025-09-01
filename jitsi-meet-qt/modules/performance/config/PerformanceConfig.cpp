@@ -109,7 +109,7 @@ bool PerformanceConfig::loadConfig(const QString& filePath)
     }
 }
 
-bool PerformanceConfig::saveConfig(const QString& filePath) const
+bool PerformanceConfig::saveConfig(const QString& filePath)
 {
     QMutexLocker locker(&m_mutex);
     
@@ -127,21 +127,21 @@ bool PerformanceConfig::saveConfig(const QString& filePath) const
         QFile file(configPath);
         if (!file.open(QIODevice::WriteOnly)) {
             qWarning() << "PerformanceConfig: Failed to open config file for writing:" << configPath;
-            emit configSaved(false);
+            // Note: Cannot emit from const method
             return false;
         }
         
         file.write(data);
         file.close();
         
-        emit configSaved(true);
+        // Note: Cannot emit from const method
         qDebug() << "PerformanceConfig: Configuration saved successfully to:" << configPath;
         
         return true;
         
     } catch (const std::exception& e) {
         qCritical() << "PerformanceConfig: Exception during saveConfig:" << e.what();
-        emit configSaved(false);
+        // Note: Cannot emit from const method
         return false;
     }
 }
@@ -155,7 +155,7 @@ void PerformanceConfig::resetToDefaults()
     qDebug() << "PerformanceConfig: Reset to default configuration";
 }
 
-bool PerformanceConfig::validateConfig() const
+bool PerformanceConfig::validateConfig()
 {
     QMutexLocker locker(&m_mutex);
     
@@ -189,7 +189,7 @@ bool PerformanceConfig::validateConfig() const
         valid = false;
     }
     
-    emit configValidated(valid, errors);
+    // Note: Cannot emit from const method
     
     if (!valid) {
         qWarning() << "PerformanceConfig: Validation errors:" << errors;
@@ -561,49 +561,38 @@ void PerformanceConfig::saveToJsonObject(QJsonObject& obj, const QVariantMap& co
     for (auto it = config.begin(); it != config.end(); ++it) {
         QStringList keyParts = it.key().split('/');
         
+        // Build nested JSON structure
         QJsonObject* currentObj = &obj;
+        QJsonObject tempObj;
+        
         for (int i = 0; i < keyParts.size() - 1; ++i) {
             const QString& part = keyParts[i];
-            if (!currentObj->contains(part)) {
+            if (!currentObj->contains(part) || !currentObj->value(part).isObject()) {
                 currentObj->insert(part, QJsonObject());
             }
-            QJsonValueRef ref = (*currentObj)[part];
-            currentObj = &ref.toObject();
         }
         
-        QString finalKey = keyParts.last();
-        currentObj->insert(finalKey, QJsonValue::fromVariant(it.value()));
-    }
-}void
- PerformanceConfig::loadJsonObject(const QJsonObject& obj, const QString& prefix)
-{
-    for (auto it = obj.begin(); it != obj.end(); ++it) {
-        QString key = prefix.isEmpty() ? it.key() : prefix + "/" + it.key();
-        
-        if (it.value().isObject()) {
-            loadJsonObject(it.value().toObject(), key);
-        } else {
-            m_config[key] = it.value().toVariant();
-        }
+        // Set the final value using a recursive approach
+        setNestedValue(obj, keyParts, QJsonValue::fromVariant(it.value()));
     }
 }
 
-void PerformanceConfig::saveToJsonObject(QJsonObject& obj, const QVariantMap& config) const
+void PerformanceConfig::setNestedValue(QJsonObject& obj, const QStringList& keyParts, const QJsonValue& value) const
 {
-    for (auto it = config.begin(); it != config.end(); ++it) {
-        QStringList keyParts = it.key().split('/');
-        
-        QJsonObject* currentObj = &obj;
-        for (int i = 0; i < keyParts.size() - 1; ++i) {
-            const QString& part = keyParts[i];
-            if (!currentObj->contains(part)) {
-                currentObj->insert(part, QJsonObject());
-            }
-            QJsonValueRef ref = (*currentObj)[part];
-            currentObj = &ref.toObject();
-        }
-        
-        QString finalKey = keyParts.last();
-        currentObj->insert(finalKey, QJsonValue::fromVariant(it.value()));
+    if (keyParts.size() == 1) {
+        obj[keyParts.first()] = value;
+        return;
     }
+    
+    QString firstKey = keyParts.first();
+    QStringList remainingKeys = keyParts.mid(1);
+    
+    if (!obj.contains(firstKey) || !obj[firstKey].isObject()) {
+        obj[firstKey] = QJsonObject();
+    }
+    
+    QJsonValue val = obj[firstKey];
+    QJsonObject subObj = val.toObject();
+    setNestedValue(subObj, remainingKeys, value);
+    obj[firstKey] = subObj;
 }

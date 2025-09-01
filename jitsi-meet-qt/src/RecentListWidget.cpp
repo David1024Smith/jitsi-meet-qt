@@ -1,263 +1,417 @@
 #include "RecentListWidget.h"
 #include <QVBoxLayout>
+#include <QHBoxLayout>
 #include <QListWidget>
+#include <QLineEdit>
+#include <QPushButton>
 #include <QLabel>
-#include <QListWidgetItem>
-#include <QDateTime>
-#include <QFont>
-#include <QStyle>
-#include <algorithm>
+#include <QMenu>
+#include <QAction>
+#include <QComboBox>
+#include <QCheckBox>
+#include <QApplication>
+#include <QClipboard>
+#include <QMessageBox>
+#include <QDebug>
 
 RecentListWidget::RecentListWidget(QWidget *parent)
     : QWidget(parent)
-    , m_layout(nullptr)
+    , m_mainLayout(nullptr)
     , m_listWidget(nullptr)
+    , m_searchBox(nullptr)
+    , m_clearSearchButton(nullptr)
     , m_emptyLabel(nullptr)
-    , m_maxItems(DEFAULT_MAX_ITEMS)
+    , m_contextMenu(nullptr)
+    , m_sortMode(SortByDate)
+    , m_showFavoritesOnly(false)
+    , m_showSearchBox(true)
+    , m_maxDisplayItems(50)
 {
     setupUI();
+    setupConnections();
+    createContextMenu();
 }
 
 RecentListWidget::~RecentListWidget()
 {
-    // Qt handles cleanup automatically
 }
 
 void RecentListWidget::setupUI()
 {
-    m_layout = new QVBoxLayout(this);
-    m_layout->setContentsMargins(0, 0, 0, 0);
-    m_layout->setSpacing(0);
-    
-    // Create list widget
+    m_mainLayout = new QVBoxLayout(this);
+    m_mainLayout->setContentsMargins(0, 0, 0, 0);
+    m_mainLayout->setSpacing(5);
+
+    // Search box
+    m_searchBox = new QLineEdit(this);
+    m_searchBox->setPlaceholderText(tr("Search recent meetings..."));
+    m_clearSearchButton = new QPushButton(tr("Clear"), this);
+    m_clearSearchButton->setMaximumWidth(60);
+
+    QHBoxLayout* searchLayout = new QHBoxLayout();
+    searchLayout->addWidget(m_searchBox);
+    searchLayout->addWidget(m_clearSearchButton);
+    m_mainLayout->addLayout(searchLayout);
+
+    // List widget
     m_listWidget = new QListWidget(this);
+    m_listWidget->setContextMenuPolicy(Qt::CustomContextMenu);
     m_listWidget->setAlternatingRowColors(true);
     m_listWidget->setSelectionMode(QAbstractItemView::SingleSelection);
-    m_listWidget->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
-    
-    // Create empty state label
-    m_emptyLabel = new QLabel(tr("no_recent_meetings"), this);
+    m_mainLayout->addWidget(m_listWidget);
+
+    // Empty state label
+    m_emptyLabel = new QLabel(tr("No recent meetings"), this);
     m_emptyLabel->setAlignment(Qt::AlignCenter);
-    m_emptyLabel->setStyleSheet("color: #666; font-style: italic; padding: 20px;");
-    
-    // Add widgets to layout
-    m_layout->addWidget(m_listWidget);
-    m_layout->addWidget(m_emptyLabel);
-    
-    // Connect signals
-    connect(m_listWidget, &QListWidget::itemClicked, 
-            this, &RecentListWidget::onItemClicked);
-    connect(m_listWidget, &QListWidget::itemDoubleClicked, 
-            this, &RecentListWidget::onItemDoubleClicked);
-    
-    // Initially show empty state
-    updateDisplay();
+    m_emptyLabel->setStyleSheet("color: gray; font-size: 14px; padding: 20px;");
+    m_emptyLabel->hide();
+    m_mainLayout->addWidget(m_emptyLabel);
+
+    updateList();
 }
 
-void RecentListWidget::addRecentItem(const RecentItem& item)
+void RecentListWidget::setupConnections()
 {
-    if (!item.isValid()) {
-        return;
-    }
+    connect(m_listWidget, &QListWidget::itemClicked, this, &RecentListWidget::onItemClicked);
+    connect(m_listWidget, &QListWidget::itemDoubleClicked, this, &RecentListWidget::onItemDoubleClicked);
+    connect(m_listWidget, &QListWidget::customContextMenuRequested, this, &RecentListWidget::onContextMenuRequested);
     
-    // Check if item already exists and update it
-    auto it = std::find(m_recentItems.begin(), m_recentItems.end(), item);
-    if (it != m_recentItems.end()) {
-        // Update existing item
-        it->updateAccess();
-    } else {
-        // Add new item
-        m_recentItems.append(item);
-    }
-    
-    // Sort items by timestamp (newest first)
-    sortItems();
-    
-    // Limit to max items
-    while (m_recentItems.size() > m_maxItems) {
-        m_recentItems.removeLast();
-    }
-    
-    updateDisplay();
-    emit listChanged();
-}
+    connect(m_searchBox, &QLineEdit::textChanged, this, &RecentListWidget::onSearchTextChanged);
+    connect(m_clearSearchButton, &QPushButton::clicked, this, &RecentListWidget::onClearSearchClicked);
 
-void RecentListWidget::removeRecentItem(const QString& url)
-{
-    auto it = std::remove_if(m_recentItems.begin(), m_recentItems.end(),
-                            [&url](const RecentItem& item) {
-                                return item.url == url;
-                            });
-    
-    if (it != m_recentItems.end()) {
-        m_recentItems.erase(it, m_recentItems.end());
-        updateDisplay();
-        emit listChanged();
+    // Connect to OptimizedRecentManager signals
+    if (OptimizedRecentManager::instance()) {
+        connect(OptimizedRecentManager::instance(), &OptimizedRecentManager::recentMeetingsChanged,
+                this, &RecentListWidget::onRecentMeetingsChanged);
+        connect(OptimizedRecentManager::instance(), &OptimizedRecentManager::recentMeetingAdded,
+                this, &RecentListWidget::onRecentMeetingAdded);
+        connect(OptimizedRecentManager::instance(), &OptimizedRecentManager::recentMeetingUpdated,
+                this, &RecentListWidget::onRecentMeetingUpdated);
+        connect(OptimizedRecentManager::instance(), &OptimizedRecentManager::recentMeetingRemoved,
+                this, &RecentListWidget::onRecentMeetingRemoved);
     }
 }
 
-void RecentListWidget::clearRecentItems()
+void RecentListWidget::createContextMenu()
 {
-    m_recentItems.clear();
-    updateDisplay();
-    emit listChanged();
+    m_contextMenu = new QMenu(this);
+    
+    QAction* favoriteAction = m_contextMenu->addAction(tr("Toggle Favorite"));
+    connect(favoriteAction, &QAction::triggered, this, &RecentListWidget::onFavoriteActionTriggered);
+    
+    QAction* copyLinkAction = m_contextMenu->addAction(tr("Copy Link"));
+    connect(copyLinkAction, &QAction::triggered, this, &RecentListWidget::onCopyLinkActionTriggered);
+    
+    m_contextMenu->addSeparator();
+    
+    QAction* deleteAction = m_contextMenu->addAction(tr("Delete"));
+    connect(deleteAction, &QAction::triggered, this, &RecentListWidget::onDeleteActionTriggered);
 }
 
-void RecentListWidget::setRecentItems(const QList<RecentItem>& items)
+void RecentListWidget::refreshList()
 {
-    m_recentItems = items;
-    sortItems();
-    
-    // Limit to max items
-    while (m_recentItems.size() > m_maxItems) {
-        m_recentItems.removeLast();
+    updateList();
+}
+
+void RecentListWidget::setSortMode(SortMode mode)
+{
+    if (m_sortMode != mode) {
+        m_sortMode = mode;
+        sortItems();
     }
-    
-    updateDisplay();
-    emit listChanged();
 }
 
-QList<RecentItem> RecentListWidget::getRecentItems() const
+RecentListWidget::SortMode RecentListWidget::sortMode() const
 {
-    return m_recentItems;
+    return m_sortMode;
 }
 
-void RecentListWidget::setMaxItems(int maxItems)
+void RecentListWidget::setShowFavoritesOnly(bool show)
 {
-    if (maxItems <= 0) {
-        return;
+    if (m_showFavoritesOnly != show) {
+        m_showFavoritesOnly = show;
+        filterItems();
     }
-    
-    m_maxItems = maxItems;
-    
-    // Remove excess items if necessary
-    while (m_recentItems.size() > m_maxItems) {
-        m_recentItems.removeLast();
+}
+
+bool RecentListWidget::showFavoritesOnly() const
+{
+    return m_showFavoritesOnly;
+}
+
+void RecentListWidget::setShowSearchBox(bool show)
+{
+    m_showSearchBox = show;
+    m_searchBox->setVisible(show);
+    m_clearSearchButton->setVisible(show);
+}
+
+bool RecentListWidget::showSearchBox() const
+{
+    return m_showSearchBox;
+}
+
+void RecentListWidget::setMaxDisplayItems(int count)
+{
+    m_maxDisplayItems = qMax(1, count);
+    updateList();
+}
+
+int RecentListWidget::maxDisplayItems() const
+{
+    return m_maxDisplayItems;
+}
+
+QString RecentListWidget::selectedMeetingId() const
+{
+    return m_selectedMeetingId;
+}
+
+bool RecentListWidget::selectMeeting(const QString& meetingId)
+{
+    QListWidgetItem* item = findItemByMeetingId(meetingId);
+    if (item) {
+        m_listWidget->setCurrentItem(item);
+        m_selectedMeetingId = meetingId;
+        return true;
     }
-    
-    updateDisplay();
+    return false;
 }
 
-int RecentListWidget::maxItems() const
+void RecentListWidget::clearSelection()
 {
-    return m_maxItems;
-}
-
-bool RecentListWidget::isEmpty() const
-{
-    return m_recentItems.isEmpty();
+    m_listWidget->clearSelection();
+    m_selectedMeetingId.clear();
 }
 
 void RecentListWidget::onItemClicked(QListWidgetItem* item)
 {
-    if (!item) {
-        return;
-    }
-    
-    QString url = item->data(Qt::UserRole).toString();
-    if (!url.isEmpty()) {
-        emit itemClicked(url);
+    if (item) {
+        QString meetingId = getMeetingIdFromItem(item);
+        if (!meetingId.isEmpty()) {
+            m_selectedMeetingId = meetingId;
+            emit meetingSelected(meetingId);
+        }
     }
 }
 
 void RecentListWidget::onItemDoubleClicked(QListWidgetItem* item)
 {
-    if (!item) {
-        return;
-    }
-    
-    QString url = item->data(Qt::UserRole).toString();
-    if (!url.isEmpty()) {
-        emit itemDoubleClicked(url);
-    }
-}
-
-void RecentListWidget::updateDisplay()
-{
-    m_listWidget->clear();
-    
-    if (m_recentItems.isEmpty()) {
-        showEmptyState();
-    } else {
-        hideEmptyState();
-        
-        // Add items to list widget
-        for (const RecentItem& item : m_recentItems) {
-            QListWidgetItem* listItem = createListItem(item);
-            m_listWidget->addItem(listItem);
+    if (item) {
+        QString meetingId = getMeetingIdFromItem(item);
+        if (!meetingId.isEmpty()) {
+            emit meetingDoubleClicked(meetingId);
         }
     }
 }
 
-void RecentListWidget::showEmptyState()
+void RecentListWidget::onSearchTextChanged(const QString& text)
 {
-    m_listWidget->hide();
-    m_emptyLabel->show();
+    m_searchText = text;
+    filterItems();
 }
 
-void RecentListWidget::hideEmptyState()
+void RecentListWidget::onClearSearchClicked()
 {
+    m_searchBox->clear();
+}
+
+void RecentListWidget::onSortModeChanged(int index)
+{
+    setSortMode(static_cast<SortMode>(index));
+}
+
+void RecentListWidget::onShowFavoritesToggled(bool checked)
+{
+    setShowFavoritesOnly(checked);
+}
+
+void RecentListWidget::onRecentMeetingsChanged()
+{
+    updateList();
+}
+
+void RecentListWidget::onRecentMeetingAdded(const QString& meetingId)
+{
+    Q_UNUSED(meetingId)
+    updateList();
+}
+
+void RecentListWidget::onRecentMeetingUpdated(const QString& meetingId)
+{
+    Q_UNUSED(meetingId)
+    updateList();
+}
+
+void RecentListWidget::onRecentMeetingRemoved(const QString& meetingId)
+{
+    Q_UNUSED(meetingId)
+    updateList();
+}
+
+void RecentListWidget::onContextMenuRequested(const QPoint& pos)
+{
+    QListWidgetItem* item = m_listWidget->itemAt(pos);
+    if (item && m_contextMenu) {
+        m_contextMenu->exec(m_listWidget->mapToGlobal(pos));
+    }
+}
+
+void RecentListWidget::onDeleteActionTriggered()
+{
+    QListWidgetItem* currentItem = m_listWidget->currentItem();
+    if (currentItem) {
+        QString meetingId = getMeetingIdFromItem(currentItem);
+        if (!meetingId.isEmpty()) {
+            int ret = QMessageBox::question(this, tr("Delete Meeting"), 
+                                          tr("Are you sure you want to delete this meeting from recent list?"),
+                                          QMessageBox::Yes | QMessageBox::No);
+            if (ret == QMessageBox::Yes) {
+                emit meetingDeleted(meetingId);
+            }
+        }
+    }
+}
+
+void RecentListWidget::onFavoriteActionTriggered()
+{
+    QListWidgetItem* currentItem = m_listWidget->currentItem();
+    if (currentItem) {
+        QString meetingId = getMeetingIdFromItem(currentItem);
+        if (!meetingId.isEmpty() && OptimizedRecentManager::instance()) {
+            auto meeting = OptimizedRecentManager::instance()->getMeetingDetails(meetingId);
+            bool newFavoriteState = !meeting.favorite;
+            emit meetingFavoriteChanged(meetingId, newFavoriteState);
+        }
+    }
+}
+
+void RecentListWidget::onCopyLinkActionTriggered()
+{
+    QListWidgetItem* currentItem = m_listWidget->currentItem();
+    if (currentItem) {
+        QString meetingId = getMeetingIdFromItem(currentItem);
+        if (!meetingId.isEmpty() && OptimizedRecentManager::instance()) {
+            auto meeting = OptimizedRecentManager::instance()->getMeetingDetails(meetingId);
+            if (!meeting.url.isEmpty()) {
+                QApplication::clipboard()->setText(meeting.url);
+            }
+        }
+    }
+}
+
+void RecentListWidget::updateList()
+{
+    m_listWidget->clear();
+    
+    if (!OptimizedRecentManager::instance()) {
+        m_emptyLabel->show();
+        m_listWidget->hide();
+        return;
+    }
+
+    QList<OptimizedRecentManager::RecentItem> meetings;
+    if (m_showFavoritesOnly) {
+        meetings = OptimizedRecentManager::instance()->getFavoriteMeetings();
+    } else {
+        meetings = OptimizedRecentManager::instance()->getRecentMeetings(m_maxDisplayItems);
+    }
+
+    if (meetings.isEmpty()) {
+        m_emptyLabel->show();
+        m_listWidget->hide();
+        return;
+    }
+
     m_emptyLabel->hide();
     m_listWidget->show();
+
+    for (const auto& meeting : meetings) {
+        QListWidgetItem* item = createItemForMeeting(meeting);
+        if (item) {
+            m_listWidget->addItem(item);
+        }
+    }
+
+    filterItems();
+    sortItems();
 }
 
-QListWidgetItem* RecentListWidget::createListItem(const RecentItem& item)
+void RecentListWidget::filterItems()
 {
-    QListWidgetItem* listItem = new QListWidgetItem();
-    
-    // Set the display text
-    QString displayText = formatItemText(item);
-    listItem->setText(displayText);
-    
-    // Store the URL in user data for easy retrieval
-    listItem->setData(Qt::UserRole, item.url);
-    
-    // Set tooltip with full URL
-    listItem->setToolTip(item.url);
-    
-    // Set icon (you can customize this later)
-    listItem->setIcon(style()->standardIcon(QStyle::SP_ComputerIcon));
-    
-    return listItem;
-}
-
-QString RecentListWidget::formatItemText(const RecentItem& item) const
-{
-    QString displayName = item.getDisplayText();
-    QString timeStr = formatTimestamp(item.timestamp);
-    
-    return QString("%1\n%2").arg(displayName, timeStr);
-}
-
-QString RecentListWidget::formatTimestamp(const QDateTime& timestamp) const
-{
-    QDateTime now = QDateTime::currentDateTime();
-    qint64 secondsAgo = timestamp.secsTo(now);
-    
-    if (secondsAgo < 60) {
-        return tr("Just now");
-    } else if (secondsAgo < 3600) {
-        int minutes = secondsAgo / 60;
-        return tr("%1 minutes ago").arg(minutes);
-    } else if (secondsAgo < 86400) {
-        int hours = secondsAgo / 3600;
-        return tr("%1 hours ago").arg(hours);
-    } else if (secondsAgo < 604800) {
-        int days = secondsAgo / 86400;
-        return tr("%1 days ago").arg(days);
-    } else {
-        return timestamp.toString("MMM dd, yyyy");
+    for (int i = 0; i < m_listWidget->count(); ++i) {
+        QListWidgetItem* item = m_listWidget->item(i);
+        if (item) {
+            bool visible = true;
+            
+            if (!m_searchText.isEmpty()) {
+                QString itemText = item->text();
+                visible = itemText.contains(m_searchText, Qt::CaseInsensitive);
+            }
+            
+            item->setHidden(!visible);
+        }
     }
 }
 
 void RecentListWidget::sortItems()
 {
-    std::sort(m_recentItems.begin(), m_recentItems.end());
+    // Qt's QListWidget doesn't have built-in sorting for custom data
+    // We would need to implement custom sorting logic here
+    // For now, we rely on the OptimizedRecentManager to provide sorted data
 }
 
-void RecentListWidget::retranslateUi()
+QListWidgetItem* RecentListWidget::createItemForMeeting(const OptimizedRecentManager::RecentItem& meeting)
 {
-    if (m_emptyLabel) {
-        m_emptyLabel->setText(tr("no_recent_meetings"));
+    QListWidgetItem* item = new QListWidgetItem();
+    updateItemForMeeting(item, meeting);
+    return item;
+}
+
+void RecentListWidget::updateItemForMeeting(QListWidgetItem* item, const OptimizedRecentManager::RecentItem& meeting)
+{
+    if (!item) return;
+    
+    QString displayText = meeting.displayName.isEmpty() ? meeting.meetingId : meeting.displayName;
+    QString timeText = meeting.lastJoined.toString("yyyy-MM-dd hh:mm");
+    
+    item->setText(QString("%1\n%2").arg(displayText, timeText));
+    item->setData(Qt::UserRole, meeting.meetingId);
+    
+    applyItemStyle(item, meeting);
+}
+
+QString RecentListWidget::getMeetingIdFromItem(QListWidgetItem* item) const
+{
+    if (item) {
+        return item->data(Qt::UserRole).toString();
+    }
+    return QString();
+}
+
+QListWidgetItem* RecentListWidget::findItemByMeetingId(const QString& meetingId) const
+{
+    for (int i = 0; i < m_listWidget->count(); ++i) {
+        QListWidgetItem* item = m_listWidget->item(i);
+        if (item && getMeetingIdFromItem(item) == meetingId) {
+            return item;
+        }
+    }
+    return nullptr;
+}
+
+void RecentListWidget::applyItemStyle(QListWidgetItem* item, const OptimizedRecentManager::RecentItem& meeting)
+{
+    if (!item) return;
+    
+    QFont font = item->font();
+    if (meeting.favorite) {
+        font.setBold(true);
+        item->setFont(font);
+        item->setIcon(QIcon(":/icons/star.png")); // Assuming we have a star icon
+    } else {
+        font.setBold(false);
+        item->setFont(font);
+        item->setIcon(QIcon());
     }
 }

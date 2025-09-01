@@ -44,9 +44,13 @@ NetworkManager::NetworkManager(QObject *parent)
     
     // 连接信号
     connect(d->impl, &INetworkManager::connectionStateChanged,
-            this, &NetworkManager::connectionStateChanged);
+            this, [this](INetworkManager::ConnectionState state) {
+                emit connectionStateChanged(static_cast<NetworkManager::ConnectionState>(state));
+            });
     connect(d->impl, &INetworkManager::networkQualityChanged,
-            this, &NetworkManager::networkQualityChanged);
+            this, [this](INetworkManager::NetworkQuality quality) {
+                emit networkQualityChanged(static_cast<NetworkManager::NetworkQuality>(quality));
+            });
     connect(d->impl, &INetworkManager::dataReceived,
             this, &NetworkManager::dataReceived);
     connect(d->impl, &INetworkManager::dataSent,

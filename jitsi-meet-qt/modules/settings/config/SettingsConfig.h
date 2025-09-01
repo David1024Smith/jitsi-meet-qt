@@ -264,13 +264,13 @@ public:
      * @param filePath 配置文件路径（可选）
      * @return 保存是否成功
      */
-    bool saveConfiguration(const QString& filePath = QString()) const;
+    bool saveConfiguration(const QString& filePath = QString());
 
     /**
      * @brief 验证配置
      * @return 验证结果和错误列表
      */
-    QPair<bool, QStringList> validateConfiguration() const;
+    QPair<bool, QStringList> validateConfiguration();
 
     /**
      * @brief 重置为默认配置

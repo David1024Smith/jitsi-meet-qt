@@ -1,117 +1,250 @@
 #ifndef STYLEHELPER_H
 #define STYLEHELPER_H
 
+#include <QObject>
 #include <QString>
 #include <QColor>
-#include <QWidget>
-#include <QIcon>
-
-class QPushButton;
-class QLabel;
-class QLineEdit;
+#include <QFont>
+#include <QMap>
+#include <QVariantMap>
 
 /**
- * @brief The StyleHelper class provides utility functions for consistent styling
+ * @brief 样式助手类
  * 
- * This class offers helper methods to:
- * - Apply consistent styling to common widgets
- * - Generate themed colors and gradients
- * - Create styled icons and buttons
- * - Handle hover and focus effects
+ * 该类提供样式相关的辅助功能，包括颜色、字体、图标和样式表的管理。
  */
-class StyleHelper
+class StyleHelper : public QObject
 {
+    Q_OBJECT
+
 public:
-    // Color schemes
-    struct ColorScheme {
-        QColor primary;
-        QColor primaryDark;
-        QColor secondary;
-        QColor background;
-        QColor surface;
-        QColor text;
-        QColor textSecondary;
-        QColor accent;
-        QColor error;
-        QColor success;
-        QColor warning;
-    };
-    
-    // Button styles
-    enum class ButtonStyle {
+    enum ColorRole {
         Primary,
         Secondary,
         Success,
+        Danger,
         Warning,
-        Error,
-        Flat,
-        Outlined
+        Info,
+        Light,
+        Dark,
+        Background,
+        Surface,
+        Text,
+        TextSecondary,
+        Border,
+        Disabled,
+        Highlight,
+        Link
     };
-    
-    // Input styles
-    enum class InputStyle {
-        Default,
-        Rounded,
-        Outlined,
-        Filled
-    };
+    Q_ENUM(ColorRole)
 
-    // Static utility methods
-    static ColorScheme getLightColorScheme();
-    static ColorScheme getDarkColorScheme();
-    static ColorScheme getModernColorScheme();
-    
-    // Widget styling
-    static void styleButton(QPushButton* button, ButtonStyle style = ButtonStyle::Primary);
-    static void styleLineEdit(QLineEdit* lineEdit, InputStyle style = InputStyle::Default);
-    static void styleLabel(QLabel* label, const QString& role = "default");
-    
-    // Icon utilities
-    static QIcon createThemedIcon(const QString& iconName, const QColor& color = QColor());
-    static QIcon createButtonIcon(const QString& iconName, ButtonStyle style);
-    
-    // Color utilities
-    static QString colorToString(const QColor& color);
-    static QColor adjustColorBrightness(const QColor& color, int factor);
-    static QColor blendColors(const QColor& color1, const QColor& color2, double ratio);
-    
-    // Gradient utilities
-    static QString createLinearGradient(const QColor& startColor, const QColor& endColor, 
-                                      const QString& direction = "to bottom");
-    static QString createRadialGradient(const QColor& centerColor, const QColor& edgeColor);
-    
-    // Animation utilities
-    static QString createTransition(const QString& property = "all", 
-                                  const QString& duration = "0.2s",
-                                  const QString& easing = "ease");
-    
-    // Shadow utilities
-    static QString createBoxShadow(int offsetX, int offsetY, int blur, 
-                                 const QColor& color, int spread = 0);
-    
-    // Border utilities
-    static QString createBorder(int width, const QString& style, const QColor& color);
-    static QString createBorderRadius(int radius);
-    static QString createBorderRadius(int topLeft, int topRight, int bottomRight, int bottomLeft);
-    
-    // Layout utilities
-    static void addHoverEffect(QWidget* widget, const QString& hoverStyle);
-    static void addFocusEffect(QWidget* widget, const QString& focusStyle);
-    static void addPressedEffect(QWidget* widget, const QString& pressedStyle);
-    
-    // Responsive utilities
-    static int getScaledSize(int baseSize);
-    static QString getScaledFont(int baseSize, const QString& weight = "normal");
-    
+    enum FontRole {
+        Default,
+        Title,
+        Subtitle,
+        Heading1,
+        Heading2,
+        Heading3,
+        Small,
+        Monospace,
+        Button
+    };
+    Q_ENUM(FontRole)
+
+    enum StyleTheme {
+        LightTheme,
+        DarkTheme,
+        SystemTheme,
+        CustomTheme
+    };
+    Q_ENUM(StyleTheme)
+
+    explicit StyleHelper(QObject *parent = nullptr);
+    ~StyleHelper();
+
+    /**
+     * @brief 获取单例实例
+     */
+    static StyleHelper* instance();
+
+    /**
+     * @brief 初始化样式助手
+     * @return 是否成功初始化
+     */
+    bool initialize();
+
+    /**
+     * @brief 关闭样式助手
+     */
+    void shutdown();
+
+    /**
+     * @brief 设置主题
+     * @param theme 主题
+     */
+    void setTheme(StyleTheme theme);
+
+    /**
+     * @brief 获取当前主题
+     * @return 当前主题
+     */
+    StyleTheme currentTheme() const;
+
+    /**
+     * @brief 获取颜色
+     * @param role 颜色角色
+     * @return 颜色
+     */
+    QColor getColor(ColorRole role) const;
+
+    /**
+     * @brief 设置颜色
+     * @param role 颜色角色
+     * @param color 颜色
+     */
+    void setColor(ColorRole role, const QColor& color);
+
+    /**
+     * @brief 获取字体
+     * @param role 字体角色
+     * @return 字体
+     */
+    QFont getFont(FontRole role) const;
+
+    /**
+     * @brief 设置字体
+     * @param role 字体角色
+     * @param font 字体
+     */
+    void setFont(FontRole role, const QFont& font);
+
+    /**
+     * @brief 获取图标路径
+     * @param iconName 图标名称
+     * @return 图标路径
+     */
+    QString getIconPath(const QString& iconName) const;
+
+    /**
+     * @brief 获取样式表
+     * @param widgetType 组件类型
+     * @return 样式表
+     */
+    QString getStyleSheet(const QString& widgetType) const;
+
+    /**
+     * @brief 获取完整样式表
+     * @return 完整样式表
+     */
+    QString getFullStyleSheet() const;
+
+    /**
+     * @brief 加载样式表文件
+     * @param filePath 文件路径
+     * @return 是否成功加载
+     */
+    bool loadStyleSheetFile(const QString& filePath);
+
+    /**
+     * @brief 保存样式表文件
+     * @param filePath 文件路径
+     * @return 是否成功保存
+     */
+    bool saveStyleSheetFile(const QString& filePath);
+
+    /**
+     * @brief 重置为默认样式
+     */
+    void resetToDefaultStyle();
+
+    /**
+     * @brief 应用样式到应用程序
+     */
+    void applyStyleToApplication();
+
+    /**
+     * @brief 获取颜色名称
+     * @param role 颜色角色
+     * @return 颜色名称
+     */
+    static QString colorRoleName(ColorRole role);
+
+    /**
+     * @brief 获取字体角色名称
+     * @param role 字体角色
+     * @return 字体角色名称
+     */
+    static QString fontRoleName(FontRole role);
+
+    /**
+     * @brief 获取主题名称
+     * @param theme 主题
+     * @return 主题名称
+     */
+    static QString themeName(StyleTheme theme);
+
+    /**
+     * @brief 检测系统主题
+     * @return 系统主题
+     */
+    static StyleTheme detectSystemTheme();
+
+    /**
+     * @brief 获取样式配置
+     * @return 样式配置
+     */
+    QVariantMap getStyleConfig() const;
+
+    /**
+     * @brief 设置样式配置
+     * @param config 样式配置
+     */
+    void setStyleConfig(const QVariantMap& config);
+
+signals:
+    /**
+     * @brief 主题变更信号
+     * @param theme 主题
+     */
+    void themeChanged(StyleTheme theme);
+
+    /**
+     * @brief 颜色变更信号
+     * @param role 颜色角色
+     * @param color 颜色
+     */
+    void colorChanged(ColorRole role, const QColor& color);
+
+    /**
+     * @brief 字体变更信号
+     * @param role 字体角色
+     * @param font 字体
+     */
+    void fontChanged(FontRole role, const QFont& font);
+
+    /**
+     * @brief 样式表变更信号
+     */
+    void styleSheetChanged();
+
 private:
-    StyleHelper() = default; // Static class
-    
-    static ColorScheme s_lightScheme;
-    static ColorScheme s_darkScheme;
-    static ColorScheme s_modernScheme;
-    static bool s_schemesInitialized;
-    
-    static void initializeColorSchemes();
+    void loadDefaultColors();
+    void loadDefaultFonts();
+    void loadDefaultStyleSheets();
+    void updateStyleSheets();
+    void generateFullStyleSheet();
+    QString colorToStyleSheet(const QColor& color) const;
+    QString fontToStyleSheet(const QFont& font) const;
+    void connectSignals();
+
+    static StyleHelper* s_instance;
+    StyleTheme m_currentTheme;
+    QMap<ColorRole, QColor> m_colors;
+    QMap<FontRole, QFont> m_fonts;
+    QMap<QString, QString> m_styleSheets;
+    QMap<QString, QString> m_iconPaths;
+    QString m_fullStyleSheet;
+    bool m_initialized;
 };
 
 #endif // STYLEHELPER_H

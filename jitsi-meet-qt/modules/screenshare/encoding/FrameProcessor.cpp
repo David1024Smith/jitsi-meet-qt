@@ -3,6 +3,9 @@
 #include <QDebug>
 #include <QMutexLocker>
 #include <QElapsedTimer>
+#include <QVariant>
+#include <QVariantMap>
+#include <QThread>
 
 class FrameProcessor::Private
 {
@@ -163,11 +166,11 @@ QSize FrameProcessor::targetSize() const
     return d->targetSize;
 }
 
-void FrameProcessor::setScalingMode(Qt::TransformationMode mode)
+void FrameProcessor::setScalingMode(ScalingMode mode)
 {
     QMutexLocker locker(&d->mutex);
-    if (d->scalingMode != mode) {
-        d->scalingMode = mode;
+    if (d->scalingMode != static_cast<Qt::TransformationMode>(mode)) {
+        d->scalingMode = static_cast<Qt::TransformationMode>(mode);
         emit scalingModeChanged(mode);
     }
 }
@@ -455,18 +458,6 @@ void FrameProcessor::setOutputSize(const QSize& size)
     setTargetSize(size);
     emit outputSizeChanged(size);
 }
-
-FrameProcessor::ScalingMode FrameProcessor::scalingMode() const
-{
-    return KeepAspectRatio; // 简化实现
-}
-
-void FrameProcessor::setScalingMode(ScalingMode mode)
-{
-    Q_UNUSED(mode)
-    // 简化实现
-}
-
 bool FrameProcessor::maintainAspectRatio() const
 {
     return true; // 简化实现

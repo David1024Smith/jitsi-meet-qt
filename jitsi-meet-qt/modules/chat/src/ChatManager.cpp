@@ -173,7 +173,7 @@ bool ChatManager::initialize(const QVariantMap& config)
         // 连接消息处理器信号
         connect(d->messageHandler, &MessageHandler::messageProcessed,
                 this, [this](ChatMessage* message, MessageHandler::ProcessingResult result) {
-                    if (result == MessageHandler::Success) {
+                    if (result == IMessageHandler::Success) {
                         emit messageReceived(message);
                     }
                 });
@@ -252,9 +252,9 @@ bool ChatManager::isConnected() const
     return d->connectionStatus == Connected;
 }
 
-ChatManager::ConnectionStatus ChatManager::connectionStatus() const
+IChatManager::ConnectionStatus ChatManager::connectionStatus() const
 {
-    return d->connectionStatus;
+    return static_cast<IChatManager::ConnectionStatus>(d->connectionStatus);
 }
 
 bool ChatManager::joinRoom(const QString& roomId, const QString& password)
@@ -331,7 +331,7 @@ QStringList ChatManager::joinedRooms() const
     return d->joinedRoomIds;
 }
 
-bool ChatManager::sendMessage(const QString& message, MessageType type, const QString& roomId)
+bool ChatManager::sendMessage(const QString& message, IChatManager::MessageType type, const QString& roomId)
 {
     if (!isConnected()) {
         qWarning() << "Not connected to service";
@@ -360,9 +360,9 @@ bool ChatManager::sendMessage(const QString& message, MessageType type, const QS
     qDebug() << "Sending message to room" << targetRoomId << ":" << message;
     
     // 通过消息处理器处理
-    MessageHandler::ProcessingResult result = d->messageHandler->processOutgoingMessage(chatMessage);
+    IMessageHandler::ProcessingResult result = d->messageHandler->processOutgoingMessage(chatMessage);
     
-    if (result == MessageHandler::Success) {
+    if (result == IMessageHandler::Success) {
         chatMessage->setStatus(ChatMessage::Sent);
         d->messagesSent++;
         emit messageSent(messageId);
@@ -574,4 +574,24 @@ bool ChatManager::filterMessage(ChatMessage* message) const
         return d->messageFilter(message);
     }
     return true;
+}
+
+void ChatManager::setXMPPClient(QObject* client)
+{
+    // Store XMPP client reference for chat functionality
+    Q_UNUSED(client)
+}
+
+void ChatManager::setCurrentRoom(const QString& roomId)
+{
+    if (d->currentRoomId != roomId) {
+        d->currentRoomId = roomId;
+        emit currentRoomChanged(roomId);
+    }
+}
+
+void ChatManager::markAllAsRead()
+{
+    // Mark all messages in current room as read
+    markRoomAsRead(d->currentRoomId);
 }

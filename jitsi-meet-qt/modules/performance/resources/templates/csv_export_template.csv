@@ -1,0 +1,2 @@
+Timestamp,CPU Usage (%),Memory Usage (MB),Network In (KB/s),Network Out (KB/s),GPU Usage (%),Disk Usage (%),Temperature (°C),Event Type,Description
+{timestamp},{cpu_usage},{memory_usage},{network_in},{network_out},{gpu_usage},{disk_usage},{temperature},{event_type},{description}

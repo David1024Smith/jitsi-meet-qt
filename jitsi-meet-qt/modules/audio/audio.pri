@@ -102,8 +102,9 @@ RESOURCES += $$PWD/resources/audio.qrc
 win32 {
     LIBS += -lwinmm -lole32 -loleaut32
     DEFINES += AUDIO_MODULE_WINDOWS
-    HEADERS += $$PWD/src/platform/AudioDevice_Windows.h
-    SOURCES += $$PWD/src/platform/AudioDevice_Windows.cpp
+    # 使用通用的Qt音频设备实现，不再使用平台特定实现
+    # HEADERS += $$PWD/src/platform/AudioDevice_Windows.h
+    # SOURCES += $$PWD/src/platform/AudioDevice_Windows.cpp
 }
 
 # Linux 特定配置
@@ -146,13 +147,12 @@ message("  - Platform Support: Cross-platform")
 # 导出模块信息
 export(AUDIO_MODULE_NAME)
 export(AUDIO_MODULE_VERSION)
-# 平台特定
-音频设备实现
+# 平台特定音频设备实现
 HEADERS += \
-    $PWD/src/platform/QtAudioDevice.h
+    $$PWD/src/platform/QtAudioDevice.h
 
 SOURCES += \
-    $PWD/src/platform/QtAudioDevice.cpp
+    $$PWD/src/platform/QtAudioDevice.cpp
 
 # Qt音频模块依赖
 QT += multimedia

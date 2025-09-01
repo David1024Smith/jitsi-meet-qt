@@ -103,6 +103,10 @@ private:
     QString generateDarkToolBarStyleSheet() const;
     QString generateDarkStatusBarStyleSheet() const;
     QString generateDarkDialogStyleSheet() const;
+    
+    // 主题基本信息
+    QString m_name;
+    QString m_displayName;
 
     // 暗色主题颜色定义
     QColor m_primaryColor;

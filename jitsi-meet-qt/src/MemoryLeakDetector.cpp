@@ -1,4 +1,4 @@
-#include "MemoryLeakDetector.h"
+#include "../include/MemoryLeakDetector.h"
 #include <QDebug>
 #include <QCoreApplication>
 #include <algorithm>

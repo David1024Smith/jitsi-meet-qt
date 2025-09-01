@@ -1,0 +1,47 @@
+/* Dark Theme for Performance Module */
+QWidget {
+    background-color: #2b2b2b;
+    color: #ffffff;
+}
+
+QWidget#PerformanceWidget {
+    background-color: #3c3c3c;
+    border: 1px solid #555;
+}
+
+QLabel#MetricLabel {
+    color: #ffffff;
+}
+
+QLabel#MetricValue {
+    color: #64B5F6;
+}
+
+QLabel#MetricValue[status="warning"] {
+    color: #FFB74D;
+}
+
+QLabel#MetricValue[status="critical"] {
+    color: #E57373;
+}
+
+QProgressBar {
+    border: 2px solid #555;
+    background-color: #404040;
+}
+
+QProgressBar::chunk {
+    background-color: #66BB6A;
+}
+
+QPushButton {
+    background-color: #424242;
+    color: white;
+    border: 1px solid #666;
+    border-radius: 4px;
+    padding: 6px 12px;
+}
+
+QPushButton:hover {
+    background-color: #616161;
+}

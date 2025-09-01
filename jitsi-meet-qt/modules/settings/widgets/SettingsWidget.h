@@ -504,6 +504,7 @@ protected:
     void showEvent(QShowEvent* event) override;
     void closeEvent(QCloseEvent* event) override;
     void changeEvent(QEvent* event) override;
+    void keyPressEvent(QKeyEvent* event) override;
 
 private slots:
     void onSettingValueChanged();
@@ -515,11 +516,13 @@ private slots:
 
 private:
     void setupUI();
+    void connectSignals();
+    void filterSettings(const QString& text);
     void setupTabView();
     void setupTreeView();
     void setupListView();
     void setupWizardView();
-    void createSettingWidget(const SettingDescriptor& descriptor, QWidget* parent);
+    QWidget* createSettingWidget(const SettingDescriptor& descriptor, QWidget* parent);
     QWidget* createStringWidget(const SettingDescriptor& descriptor);
     QWidget* createIntegerWidget(const SettingDescriptor& descriptor);
     QWidget* createDoubleWidget(const SettingDescriptor& descriptor);

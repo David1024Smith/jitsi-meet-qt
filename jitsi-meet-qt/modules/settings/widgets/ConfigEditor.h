@@ -247,7 +247,7 @@ public:
      * @param filePath 文件路径
      * @return 保存是否成功
      */
-    bool saveToFile(const QString& filePath) const;
+    bool saveToFile(const QString& filePath);
 
     /**
      * @brief 获取当前文件路径

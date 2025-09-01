@@ -1,11 +1,13 @@
 #include "ScreenCapture.h"
 #include <QApplication>
+#include <QGuiApplication>
 #include <QScreen>
 #include <QPixmap>
 #include <QTimer>
 #include <QMutexLocker>
 #include <QDebug>
 #include <QBuffer>
+#include <QRandomGenerator>
 
 class ScreenCapture::Private
 {
@@ -49,10 +51,13 @@ ScreenCapture::ScreenCapture(QObject *parent)
             this, &ScreenCapture::onCaptureTimer);
     
     // 监听屏幕变化
-    connect(QApplication::instance(), &QApplication::screenAdded,
-            this, &ScreenCapture::onScreenChanged);
-    connect(QApplication::instance(), &QApplication::screenRemoved,
-            this, &ScreenCapture::onScreenChanged);
+    QGuiApplication* guiApp = qobject_cast<QGuiApplication*>(QApplication::instance());
+    if (guiApp) {
+        connect(guiApp, &QGuiApplication::screenAdded,
+                this, &ScreenCapture::onScreenChanged);
+        connect(guiApp, &QGuiApplication::screenRemoved,
+                this, &ScreenCapture::onScreenChanged);
+    }
 }
 
 ScreenCapture::~ScreenCapture()
@@ -538,7 +543,7 @@ double ScreenCapture::getCurrentCPUUsage() const
 {
     // 简化实现 - 实际项目中应该使用系统API获取CPU使用率
     static double simulatedCPU = 50.0;
-    simulatedCPU += (qrand() % 21 - 10); // 随机变化 -10 到 +10
+    simulatedCPU += (QRandomGenerator::global()->bounded(21) - 10); // 随机变化 -10 到 +10
     return qBound(0.0, simulatedCPU, 100.0);
 }
 
@@ -546,7 +551,7 @@ qint64 ScreenCapture::getCurrentMemoryUsage() const
 {
     // 简化实现 - 实际项目中应该使用系统API获取内存使用率
     static qint64 simulatedMemory = 50;
-    simulatedMemory += (qrand() % 21 - 10); // 随机变化 -10 到 +10
+    simulatedMemory += (QRandomGenerator::global()->bounded(21) - 10); // 随机变化 -10 到 +10
     return qBound(0LL, simulatedMemory, 100LL);
 }
 

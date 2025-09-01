@@ -529,7 +529,7 @@ bool HistoryManager::importHistory(const QString& filePath, ExportFormat format)
     
     for (const QJsonValue& value : messagesArray) {
         QJsonObject messageObj = value.toObject();
-        ChatMessage* message = ChatMessage::fromVariantMap(messageObj.toVariantObject(), this);
+        ChatMessage* message = ChatMessage::fromVariantMap(QJsonDocument(messageObj).toVariant().toMap(), this);
         
         if (message && addMessage(message)) {
             importedCount++;
@@ -727,8 +727,8 @@ void HistoryManager::handleAutoCleanupTimer()
 void HistoryManager::handleStatisticsTimer()
 {
     updateInternalStatistics();
-}// 私有方法
-实现
+}
+// 私有方法实现
 void HistoryManager::initializeTimers()
 {
     // 启动自动清理定时器

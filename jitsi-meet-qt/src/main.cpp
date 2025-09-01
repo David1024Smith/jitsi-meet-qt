@@ -1,4 +1,4 @@
-#include "MainApplication.h"
+#include "../include/MainApplication.h"
 #include <QDebug>
 #include <QMessageBox>
 #include <QStyleFactory>

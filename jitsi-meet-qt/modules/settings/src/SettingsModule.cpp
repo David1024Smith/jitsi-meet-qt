@@ -1,8 +1,8 @@
 #include "SettingsModule.h"
 #include "SettingsManager.h"
 #include "PreferencesHandler.h"
-#include "validators/ConfigValidator.h"
-#include "config/SettingsConfig.h"
+#include "../validators/ConfigValidator.h"
+#include "../config/SettingsConfig.h"
 
 #include <QDebug>
 #include <QTimer>

@@ -18,6 +18,7 @@
 #include <QApplication>
 #include <QClipboard>
 #include <QTextStream>
+#include <QStyle>
 #include <QFile>
 #include <QFileDialog>
 #include <QMessageBox>

@@ -1,0 +1,63 @@
+/* ScreenShare Module Styles */
+QWidget#ScreenShareWidget {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+}
+
+QPushButton#ShareButton {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 20px;
+    font-weight: bold;
+    font-size: 14px;
+}
+
+QPushButton#ShareButton:hover {
+    background-color: #0056b3;
+}
+
+QPushButton#ShareButton:pressed {
+    background-color: #004085;
+}
+
+QPushButton#ShareButton:disabled {
+    background-color: #6c757d;
+    color: #adb5bd;
+}
+
+QPushButton#StopButton {
+    background-color: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 20px;
+    font-weight: bold;
+}
+
+QPushButton#StopButton:hover {
+    background-color: #c82333;
+}
+
+QLabel#PreviewLabel {
+    border: 2px dashed #dee2e6;
+    background-color: #f8f9fa;
+    color: #6c757d;
+    text-align: center;
+    padding: 20px;
+    border-radius: 8px;
+}
+
+QComboBox#SourceSelector {
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    padding: 8px 12px;
+    background-color: white;
+}
+
+QComboBox#SourceSelector:focus {
+    border-color: #007bff;
+    outline: none;
+}

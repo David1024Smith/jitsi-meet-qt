@@ -6,7 +6,8 @@
 #include <QDebug>
 #include <QMutex>
 #include <QMutexLocker>
-#include <QAudioDeviceInfo>
+#include <QMediaDevices>
+#include <QAudioDevice>
 #include <QAudioInput>
 #include <QAudioOutput>
 #include <functional>
@@ -44,7 +45,7 @@ public:
     }
 
     bool initialized;
-    QMutex mutex;
+    mutable QMutex mutex;
 
     // 设备列表
     QStringList inputDevices;
@@ -270,33 +271,41 @@ void AudioFactory::scanDevices()
     d->outputDevices.clear();
     d->deviceInfoMap.clear();
     
+    // 获取媒体设备管理器
+    QMediaDevices *mediaDevices = new QMediaDevices(this);
+    
     // 扫描输入设备
-    QList<QAudioDeviceInfo> inputDeviceInfos = QAudioDeviceInfo::availableDevices(QAudio::AudioInput);
-    for (const QAudioDeviceInfo &info : inputDeviceInfos) {
-        QString deviceId = info.deviceName();
+    QList<QAudioDevice> inputDeviceInfos = mediaDevices->audioInputs();
+    for (const QAudioDevice &info : inputDeviceInfos) {
+        QString deviceId = info.id();
         d->inputDevices.append(deviceId);
         
         QVariantMap deviceInfo;
         deviceInfo["id"] = deviceId;
-        deviceInfo["name"] = info.deviceName();
+        deviceInfo["name"] = info.description();
         deviceInfo["type"] = "input";
-        deviceInfo["isDefault"] = (info == QAudioDeviceInfo::defaultInputDevice());
+        deviceInfo["isDefault"] = info.isDefault();
         
         // 添加支持的格式信息
         QVariantList supportedSampleRates;
-        for (int rate : info.supportedSampleRates()) {
-            supportedSampleRates.append(rate);
+        QList<int> rates = {8000, 16000, 22050, 44100, 48000, 96000}; // 常见采样率
+        for (int rate : rates) {
+            if (info.minimumSampleRate() <= rate && rate <= info.maximumSampleRate()) {
+                supportedSampleRates.append(rate);
+            }
         }
         deviceInfo["supportedSampleRates"] = supportedSampleRates;
         
         QVariantList supportedChannelCounts;
-        for (int channels : info.supportedChannelCounts()) {
+        for (int channels = info.minimumChannelCount(); channels <= info.maximumChannelCount(); ++channels) {
             supportedChannelCounts.append(channels);
         }
         deviceInfo["supportedChannelCounts"] = supportedChannelCounts;
         
+        // 在Qt6中，不再直接提供supportedSampleSizes，我们使用常见的值
         QVariantList supportedSampleSizes;
-        for (int size : info.supportedSampleSizes()) {
+        QList<int> sizes = {8, 16, 24, 32};
+        for (int size : sizes) {
             supportedSampleSizes.append(size);
         }
         deviceInfo["supportedSampleSizes"] = supportedSampleSizes;
@@ -304,38 +313,43 @@ void AudioFactory::scanDevices()
         d->deviceInfoMap[deviceId] = deviceInfo;
         
         // 设置默认设备
-        if (info == QAudioDeviceInfo::defaultInputDevice()) {
+        if (info.isDefault()) {
             d->defaultInputDevice = deviceId;
         }
     }
     
     // 扫描输出设备
-    QList<QAudioDeviceInfo> outputDeviceInfos = QAudioDeviceInfo::availableDevices(QAudio::AudioOutput);
-    for (const QAudioDeviceInfo &info : outputDeviceInfos) {
-        QString deviceId = info.deviceName();
+    QList<QAudioDevice> outputDeviceInfos = mediaDevices->audioOutputs();
+    for (const QAudioDevice &info : outputDeviceInfos) {
+        QString deviceId = info.id();
         d->outputDevices.append(deviceId);
         
         QVariantMap deviceInfo;
         deviceInfo["id"] = deviceId;
-        deviceInfo["name"] = info.deviceName();
+        deviceInfo["name"] = info.description();
         deviceInfo["type"] = "output";
-        deviceInfo["isDefault"] = (info == QAudioDeviceInfo::defaultOutputDevice());
+        deviceInfo["isDefault"] = info.isDefault();
         
         // 添加支持的格式信息
         QVariantList supportedSampleRates;
-        for (int rate : info.supportedSampleRates()) {
-            supportedSampleRates.append(rate);
+        QList<int> rates = {8000, 16000, 22050, 44100, 48000, 96000}; // 常见采样率
+        for (int rate : rates) {
+            if (info.minimumSampleRate() <= rate && rate <= info.maximumSampleRate()) {
+                supportedSampleRates.append(rate);
+            }
         }
         deviceInfo["supportedSampleRates"] = supportedSampleRates;
         
         QVariantList supportedChannelCounts;
-        for (int channels : info.supportedChannelCounts()) {
+        for (int channels = info.minimumChannelCount(); channels <= info.maximumChannelCount(); ++channels) {
             supportedChannelCounts.append(channels);
         }
         deviceInfo["supportedChannelCounts"] = supportedChannelCounts;
         
+        // 在Qt6中，不再直接提供supportedSampleSizes，我们使用常见的值
         QVariantList supportedSampleSizes;
-        for (int size : info.supportedSampleSizes()) {
+        QList<int> sizes = {8, 16, 24, 32};
+        for (int size : sizes) {
             supportedSampleSizes.append(size);
         }
         deviceInfo["supportedSampleSizes"] = supportedSampleSizes;
@@ -343,7 +357,7 @@ void AudioFactory::scanDevices()
         d->deviceInfoMap[deviceId] = deviceInfo;
         
         // 设置默认设备
-        if (info == QAudioDeviceInfo::defaultOutputDevice()) {
+        if (info.isDefault()) {
             d->defaultOutputDevice = deviceId;
         }
     }

@@ -22,14 +22,14 @@ public:
     MessageHandler* q_ptr;
     
     // 状态管理
-    ProcessingStatus status = Idle;
+    IMessageHandler::ProcessingStatus status = IMessageHandler::Idle;
     bool processingEnabled = true;
     bool initialized = false;
     
     // 消息队列
     struct QueuedMessage {
         QVariantMap data;
-        MessagePriority priority;
+        IMessageHandler::MessagePriority priority;
         QDateTime timestamp;
         int retryCount = 0;
     };
@@ -63,24 +63,24 @@ public:
     int processingInterval = 100; // ms
     int retryInterval = 5000; // ms
     
-    void setProcessingStatus(ProcessingStatus newStatus) {
+    void setProcessingStatus(IMessageHandler::ProcessingStatus newStatus) {
         if (status != newStatus) {
             status = newStatus;
-            emit q_ptr->processingStatusChanged(newStatus);
+            emit q_ptr->processingStatusChanged(static_cast<MessageHandler::ProcessingStatus>(newStatus));
         }
     }
     
-    void updateStatistics(ProcessingResult result) {
+    void updateStatistics(IMessageHandler::ProcessingResult result) {
         processedCount++;
         
         switch (result) {
-        case Success:
+        case IMessageHandler::Success:
             successCount++;
             break;
-        case Failed:
+        case IMessageHandler::Failed:
             failedCount++;
             break;
-        case Filtered:
+        case IMessageHandler::Filtered:
             filteredCount++;
             break;
         default:
@@ -173,38 +173,38 @@ bool MessageHandler::initialize(const QVariantMap& config)
     }
 }
 
-MessageHandler::ProcessingResult MessageHandler::processIncomingMessage(const QVariantMap& data, MessagePriority priority)
+IMessageHandler::ProcessingResult MessageHandler::processIncomingMessage(const QVariantMap& data, IMessageHandler::MessagePriority priority)
 {
     if (!d->initialized) {
         qWarning() << "MessageHandler not initialized";
-        return Failed;
+        return static_cast<IMessageHandler::ProcessingResult>(Failed);
     }
     
     if (!d->processingEnabled) {
         qDebug() << "Processing disabled, message queued";
-        return Queued;
+        return static_cast<IMessageHandler::ProcessingResult>(Queued);
     }
     
     // 验证消息
     auto validation = validateMessageContent(data);
     if (!validation.first) {
         emit messageValidationFailed(data, validation.second);
-        d->updateStatistics(Failed);
-        return Failed;
+        d->updateStatistics(static_cast<IMessageHandler::ProcessingResult>(Failed));
+        return static_cast<IMessageHandler::ProcessingResult>(Failed);
     }
     
     // 应用过滤器
     if (!applyMessageFilter(data)) {
         emit messageFiltered(data);
-        d->updateStatistics(Filtered);
-        return Filtered;
+        d->updateStatistics(static_cast<IMessageHandler::ProcessingResult>(Filtered));
+        return static_cast<IMessageHandler::ProcessingResult>(Filtered);
     }
     
     // 检查队列是否已满
     QMutexLocker locker(&d->queueMutex);
     if (d->isQueueFull()) {
         emit queueFull();
-        return Rejected;
+        return static_cast<IMessageHandler::ProcessingResult>(Rejected);
     }
     
     // 添加到队列
@@ -234,13 +234,13 @@ MessageHandler::ProcessingResult MessageHandler::processIncomingMessage(const QV
         startProcessing();
     }
     
-    return Queued;
+    return static_cast<IMessageHandler::ProcessingResult>(Queued);
 }
 
-MessageHandler::ProcessingResult MessageHandler::processOutgoingMessage(ChatMessage* message, MessagePriority priority)
+IMessageHandler::ProcessingResult MessageHandler::processOutgoingMessage(ChatMessage* message, IMessageHandler::MessagePriority priority)
 {
     if (!message) {
-        return Failed;
+        return static_cast<IMessageHandler::ProcessingResult>(Failed);
     }
     
     // 格式化消息
@@ -260,9 +260,9 @@ MessageHandler::ProcessingResult MessageHandler::processOutgoingMessage(ChatMess
     }
     
     emit messageProcessed(message, Success);
-    d->updateStatistics(Success);
+    d->updateStatistics(static_cast<IMessageHandler::ProcessingResult>(Success));
     
-    return Success;
+    return static_cast<IMessageHandler::ProcessingResult>(Success);
 }
 
 bool MessageHandler::validateMessage(const QVariantMap& data) const
@@ -378,7 +378,7 @@ void MessageHandler::setProcessingEnabled(bool enabled)
     }
 }
 
-MessageHandler::ProcessingStatus MessageHandler::processingStatus() const
+IMessageHandler::ProcessingStatus MessageHandler::processingStatus() const
 {
     return d->status;
 }
@@ -467,7 +467,7 @@ void MessageHandler::startProcessing()
     }
     
     qDebug() << "Starting message processing...";
-    d->setProcessingStatus(Processing);
+    d->setProcessingStatus(static_cast<IMessageHandler::ProcessingStatus>(Processing));
     d->startProcessingTimer();
 }
 
@@ -479,7 +479,7 @@ void MessageHandler::stopProcessing()
     
     qDebug() << "Stopping message processing...";
     d->stopProcessingTimer();
-    d->setProcessingStatus(Idle);
+    d->setProcessingStatus(static_cast<IMessageHandler::ProcessingStatus>(Idle));
 }
 
 void MessageHandler::pauseProcessing()
@@ -490,7 +490,7 @@ void MessageHandler::pauseProcessing()
     
     qDebug() << "Pausing message processing...";
     d->stopProcessingTimer();
-    d->setProcessingStatus(Paused);
+    d->setProcessingStatus(static_cast<IMessageHandler::ProcessingStatus>(Paused));
 }
 
 void MessageHandler::resumeProcessing()
@@ -500,7 +500,7 @@ void MessageHandler::resumeProcessing()
     }
     
     qDebug() << "Resuming message processing...";
-    d->setProcessingStatus(Processing);
+    d->setProcessingStatus(static_cast<IMessageHandler::ProcessingStatus>(Processing));
     d->startProcessingTimer();
 }
 
@@ -516,7 +516,7 @@ void MessageHandler::processQueue()
         Private::QueuedMessage queuedMsg = d->messageQueue.dequeue();
         locker.unlock();
         
-        ProcessingResult result = internalProcessMessage(queuedMsg.data, queuedMsg.priority);
+        ProcessingResult result = static_cast<ProcessingResult>(internalProcessMessage(queuedMsg.data, queuedMsg.priority));
         
         if (result == Failed && queuedMsg.retryCount < d->maxRetryCount) {
             queuedMsg.retryCount++;
@@ -545,7 +545,7 @@ void MessageHandler::retryFailedMessages()
     d->failedMessages.clear();
     
     for (const auto& queuedMsg : retryMessages) {
-        ProcessingResult result = internalProcessMessage(queuedMsg.data, queuedMsg.priority);
+        ProcessingResult result = static_cast<ProcessingResult>(internalProcessMessage(queuedMsg.data, queuedMsg.priority));
         
         if (result == Failed && queuedMsg.retryCount < d->maxRetryCount) {
             Private::QueuedMessage retryMsg = queuedMsg;
@@ -588,7 +588,7 @@ void MessageHandler::processNextMessage()
     Private::QueuedMessage queuedMsg = d->messageQueue.dequeue();
     locker.unlock();
     
-    ProcessingResult result = internalProcessMessage(queuedMsg.data, queuedMsg.priority);
+    ProcessingResult result = static_cast<ProcessingResult>(internalProcessMessage(queuedMsg.data, queuedMsg.priority));
     
     if (result == Failed && queuedMsg.retryCount < d->maxRetryCount) {
         queuedMsg.retryCount++;
@@ -605,14 +605,14 @@ void MessageHandler::handleTimeoutMessages()
     qDebug() << "Handling timeout messages...";
 }
 
-MessageHandler::ProcessingResult MessageHandler::internalProcessMessage(const QVariantMap& data, MessagePriority priority)
+IMessageHandler::ProcessingResult MessageHandler::internalProcessMessage(const QVariantMap& data, IMessageHandler::MessagePriority priority)
 {
     try {
         // 解析消息
         ChatMessage* message = parseMessage(data);
         if (!message) {
-            d->updateStatistics(Failed);
-            return Failed;
+            d->updateStatistics(static_cast<IMessageHandler::ProcessingResult>(Failed));
+            return static_cast<IMessageHandler::ProcessingResult>(Failed);
         }
         
         // 应用消息处理器
@@ -626,15 +626,15 @@ MessageHandler::ProcessingResult MessageHandler::internalProcessMessage(const QV
         }
         
         emit messageProcessed(message, Success);
-        d->updateStatistics(Success);
+        d->updateStatistics(static_cast<IMessageHandler::ProcessingResult>(Success));
         
-        return Success;
+        return static_cast<IMessageHandler::ProcessingResult>(Success);
         
     } catch (const std::exception& e) {
         qCritical() << "Exception during message processing:" << e.what();
         emit processingError(QString("Processing exception: %1").arg(e.what()));
-        d->updateStatistics(Failed);
-        return Failed;
+        d->updateStatistics(static_cast<IMessageHandler::ProcessingResult>(Failed));
+        return static_cast<IMessageHandler::ProcessingResult>(Failed);
     }
 }
 
@@ -689,12 +689,12 @@ QVariantMap MessageHandler::applyMessageTransformer(const QVariantMap& data) con
     return data;
 }
 
-void MessageHandler::setProcessingStatus(ProcessingStatus status)
+void MessageHandler::setProcessingStatus(IMessageHandler::ProcessingStatus status)
 {
     d->setProcessingStatus(status);
 }
 
-void MessageHandler::updateStatistics(ProcessingResult result)
+void MessageHandler::updateStatistics(IMessageHandler::ProcessingResult result)
 {
     d->updateStatistics(result);
 }

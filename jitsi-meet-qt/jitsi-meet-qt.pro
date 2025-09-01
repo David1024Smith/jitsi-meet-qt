@@ -5,10 +5,10 @@
 
 TEMPLATE = app
 TARGET = jitsi-meet-qt
-INCLUDEPATH += .
+INCLUDEPATH += . include
 
 # Qt Configuration
-QT += core widgets multimedia multimediawidgets network
+QT += core widgets multimedia multimediawidgets network concurrent websockets xml
 
 # Compiler Configuration
 CONFIG += c++17
@@ -16,13 +16,14 @@ CONFIG += c++17
 # Disable deprecated APIs
 DEFINES += QT_DISABLE_DEPRECATED_UP_TO=0x060000
 
-# Include modular architecture
-include(modules/modules.pri)
+# Include modular architecture (safe mode)
+include(modules/modules_safe.pri)
 
 # Core Application Headers (Non-modular)
 HEADERS += include/AuthenticationManager.h \
            include/ConferenceManager.h \
            include/ConferenceWindow.h \
+           include/ConfigurationManager.h \
            include/ErrorDialog.h \
            include/ErrorEventBus.h \
            include/ErrorLogger.h \
@@ -31,14 +32,18 @@ HEADERS += include/AuthenticationManager.h \
            include/ILogger.h \
            include/JitsiConstants.h \
            include/JitsiError.h \
+           include/Logger.h \
            include/MainApplication.h \
+           include/MediaManager.h \
            include/MemoryLeakDetector.h \
            include/MemoryProfiler.h \
            include/ModuleError.h \
            include/NavigationBar.h \
            include/OptimizedRecentManager.h \
+           include/PerformanceManager.h \
            include/ProtocolHandler.h \
            include/RecentListWidget.h \
+           include/ScreenShareManager.h \
            include/SettingsDialog.h \
            include/StyleHelper.h \
            include/StyleUtils.h \
@@ -46,6 +51,7 @@ HEADERS += include/AuthenticationManager.h \
            include/WebRTCEngine.h \
            include/WelcomeWindow.h \
            include/WindowManager.h \
+           include/WindowStateManager.h \
            include/XMPPClient.h \
            include/models/ApplicationSettings.h \
            include/models/RecentItem.h
@@ -54,21 +60,26 @@ HEADERS += include/AuthenticationManager.h \
 SOURCES += src/AuthenticationManager.cpp \
            src/ConferenceManager.cpp \
            src/ConferenceWindow.cpp \
+           src/ConfigurationManager.cpp \
            src/ErrorDialog.cpp \
            src/ErrorEventBus.cpp \
            src/ErrorLogger.cpp \
            src/ErrorRecoveryManager.cpp \
            src/ErrorUtils.cpp \
            src/JitsiError.cpp \
+           src/Logger.cpp \
            src/main.cpp \
            src/MainApplication.cpp \
+           src/MediaManager.cpp \
            src/MemoryLeakDetector.cpp \
            src/MemoryProfiler.cpp \
            src/ModuleError.cpp \
            src/NavigationBar.cpp \
            src/OptimizedRecentManager.cpp \
+           src/PerformanceManager.cpp \
            src/ProtocolHandler.cpp \
            src/RecentListWidget.cpp \
+           src/ScreenShareManager.cpp \
            src/SettingsDialog.cpp \
            src/StyleHelper.cpp \
            src/StyleUtils.cpp \
@@ -76,14 +87,15 @@ SOURCES += src/AuthenticationManager.cpp \
            src/WebRTCEngine.cpp \
            src/WelcomeWindow.cpp \
            src/WindowManager.cpp \
+           src/WindowStateManager.cpp \
            src/XMPPClient.cpp \
            src/models/ApplicationSettings.cpp \
            src/models/RecentItem.cpp
 
-# Updated Examples (Using Modular APIs)
-SOURCES += examples/complete_integration_test.cpp \
-           examples/integration_verification.cpp \
-           examples/webrtc_integration_demo.cpp
+# Updated Examples (Using Modular APIs) - Temporarily disabled
+# SOURCES += examples/complete_integration_test.cpp \
+#            examples/integration_verification.cpp \
+#            examples/webrtc_integration_demo.cpp
 
 # Resources
 RESOURCES += resources/resources.qrc
@@ -123,6 +135,7 @@ CONFIG(release, debug|release) {
 win32 {
     DEFINES += WIN32_PLATFORM
     RC_FILE = resources/app.rc
+    QMAKE_LIBS_QT_ENTRY =
 }
 
 unix:!macx {

@@ -53,6 +53,7 @@ public:
     };
     Q_ENUM(PreferenceStatus)
 
+    explicit IPreferencesHandler(QObject* parent = nullptr) : QObject(parent) {}
     virtual ~IPreferencesHandler() = default;
 
     /**

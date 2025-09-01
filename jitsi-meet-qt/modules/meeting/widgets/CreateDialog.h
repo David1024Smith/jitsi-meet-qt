@@ -23,6 +23,8 @@ class QGroupBox;
 class QTabWidget;
 class QSlider;
 class QProgressBar;
+class MeetingManager;
+class MeetingConfig;
 
 /**
  * @brief 创建会议对话框类
@@ -224,9 +226,8 @@ public:
 
     /**
      * @brief 验证输入
-     * @return 验证是否通过
      */
-    bool validateInput();
+    void validateInput();
 
     /**
      * @brief 获取验证错误
@@ -429,6 +430,28 @@ signals:
     void getContactsRequested();
 
 private:
+    /**
+     * @brief 加载设置
+     */
+    void loadSettings();
+
+    /**
+     * @brief 保存设置
+     */
+    void saveSettings();
+    
+    /**
+     * @brief 设置会议管理器
+     * @param manager 会议管理器
+     */
+    void setMeetingManager(MeetingManager* manager);
+    
+    /**
+     * @brief 设置会议配置
+     * @param config 会议配置
+     */
+    void setMeetingConfig(MeetingConfig* config);
+
     /**
      * @brief 初始化界面
      */

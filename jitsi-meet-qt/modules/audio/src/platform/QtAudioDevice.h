@@ -3,10 +3,11 @@
 
 #include "IAudioDevice.h"
 #include "AudioFactory.h"
-#include <QAudioDeviceInfo>
+#include <QMediaDevices>
+#include <QAudioDevice>
 #include <QAudioFormat>
-#include <QAudioInput>
-#include <QAudioOutput>
+#include <QAudioSource>
+#include <QAudioSink>
 
 /**
  * @brief Qt音频设备实现类
@@ -100,10 +101,10 @@ private:
     int m_channels;                     ///< 声道数
     int m_bufferSize;                   ///< 缓冲区大小
     
-    QAudioDeviceInfo m_deviceInfo;     ///< Qt设备信息
+    QAudioDevice m_deviceInfo;     ///< Qt设备信息
     QAudioFormat m_format;              ///< 音频格式
-    QAudioInput *m_audioInput;          ///< 音频输入
-    QAudioOutput *m_audioOutput;        ///< 音频输出
+    QAudioSource *m_audioInput;         ///< 音频输入 (Qt 6 API)
+    QAudioSink *m_audioOutput;          ///< 音频输出 (Qt 6 API)
     
     QIODevice *m_inputIODevice;         ///< 输入IO设备
     QIODevice *m_outputIODevice;        ///< 输出IO设备

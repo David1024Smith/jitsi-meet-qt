@@ -1,13 +1,9 @@
 #include "BaseWidget.h"
 #include "../themes/BaseTheme.h"
-#include "../include/ThemeManager.h"
-#include <QApplication>
-#include <QPainter>
 #include <QDebug>
 
-BaseWidget::BaseWidget(QWidget *parent)
-    : QWidget(parent)
-    , m_themeName("default")
+BaseWidget::BaseWidget()
+    : m_themeName("default")
     , m_themeEnabled(true)
 {
     setupWidget();
@@ -26,7 +22,7 @@ void BaseWidget::setThemeName(const QString& themeName)
 {
     if (m_themeName != themeName) {
         m_themeName = themeName;
-        emit themeNameChanged(themeName);
+        // emit themeNameChanged(themeName); // 信号需要在具体的 QObject 子类中发出
         refreshTheme();
     }
 }
@@ -40,7 +36,7 @@ void BaseWidget::setThemeEnabled(bool enabled)
 {
     if (m_themeEnabled != enabled) {
         m_themeEnabled = enabled;
-        emit themeEnabledChanged(enabled);
+        // emit themeEnabledChanged(enabled); // 信号需要在具体的 QObject 子类中发出
         refreshTheme();
     }
 }
@@ -57,7 +53,7 @@ void BaseWidget::applyTheme(std::shared_ptr<BaseTheme> theme)
     updateThemeFonts();
     updateThemeSizes();
     applyCustomStyle();
-    emit themeApplied();
+    // emit themeApplied(); // 信号需要在具体的 QObject 子类中发出
 }
 
 void BaseWidget::refreshTheme()
@@ -111,7 +107,7 @@ void BaseWidget::setConfiguration(const QVariantMap& config)
     }
 
     onConfigurationChanged(config);
-    emit configurationChanged();
+    // emit configurationChanged(); // 信号需要在具体的 QObject 子类中发出
 }
 
 void BaseWidget::resetConfiguration()
@@ -124,7 +120,7 @@ void BaseWidget::setCustomStyleSheet(const QString& styleSheet)
     if (m_customStyleSheet != styleSheet) {
         m_customStyleSheet = styleSheet;
         applyCustomStyle();
-        emit styleSheetChanged();
+        // emit styleSheetChanged(); // 信号需要在具体的 QObject 子类中发出
     }
 }
 
@@ -141,7 +137,7 @@ void BaseWidget::applyCustomStyle()
         finalStyleSheet += "\n" + m_customStyleSheet;
     }
     
-    setStyleSheet(finalStyleSheet);
+    // setStyleSheet(finalStyleSheet); // 这需要在具体的 QWidget 子类中调用
 }
 
 bool BaseWidget::isConfigured() const
@@ -247,34 +243,15 @@ bool BaseWidget::validateConfiguration(const QVariantMap& config) const
     return true;
 }
 
-void BaseWidget::paintEvent(QPaintEvent *event)
-{
-    QWidget::paintEvent(event);
-}
-
-void BaseWidget::resizeEvent(QResizeEvent *event)
-{
-    QWidget::resizeEvent(event);
-}
-
-void BaseWidget::changeEvent(QEvent *event)
-{
-    QWidget::changeEvent(event);
-    
-    if (event->type() == QEvent::StyleChange) {
-        refreshTheme();
-    }
-}
-
-void BaseWidget::onGlobalThemeChanged()
-{
-    refreshTheme();
-}
+// 这些函数已移除，因为 BaseWidget 不再继承 QWidget
+// void BaseWidget::paintEvent(QPaintEvent *event) - 需要在具体的 QWidget 子类中实现
+// void BaseWidget::resizeEvent(QResizeEvent *event) - 需要在具体的 QWidget 子类中实现
+// void BaseWidget::changeEvent(QEvent *event) - 需要在具体的 QWidget 子类中实现
+// void BaseWidget::onGlobalThemeChanged() - 需要在具体的 QObject 子类中实现
 
 void BaseWidget::setupWidget()
 {
-    // 设置基础属性
-    setAttribute(Qt::WA_StyledBackground, true);
+    // 基础设置 - 具体的 QWidget 子类需要调用 setAttribute 等函数
 }
 
 void BaseWidget::connectSignals()

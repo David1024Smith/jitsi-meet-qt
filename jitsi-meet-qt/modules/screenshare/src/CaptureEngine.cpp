@@ -618,7 +618,7 @@ void CaptureEngine::processFrame(const QPixmap& frame)
         
         // 编码
         if (d->videoEncoder) {
-            QByteArray encodedData = d->videoEncoder->encodeFrame(processedFrame);
+            QByteArray encodedData = d->videoEncoder->encodeFrameRaw(processedFrame);
             if (!encodedData.isEmpty()) {
                 emit encodedDataReady(encodedData);
             }

@@ -88,7 +88,10 @@ bool LightTheme::apply()
     try {
         // 应用样式表到应用程序
         if (QApplication::instance()) {
-            QApplication::instance()->setStyleSheet(getStyleSheet());
+            QApplication* app = qobject_cast<QApplication*>(QApplication::instance());
+            if (app) {
+                app->setStyleSheet(getStyleSheet());
+            }
         }
         
         emit themeApplied();

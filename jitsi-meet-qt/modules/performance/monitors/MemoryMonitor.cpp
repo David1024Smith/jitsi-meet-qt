@@ -64,8 +64,9 @@ QString MemoryMonitor::version() const
 QString MemoryMonitor::description() const
 {
     return "Memory performance monitor for tracking system and process memory usage";
-}v
-oid MemoryMonitor::setMonitoringMode(MonitoringMode mode)
+}
+
+void MemoryMonitor::setMonitoringMode(MonitoringMode mode)
 {
     QMutexLocker locker(&m_dataMutex);
     if (m_monitoringMode != mode) {
@@ -187,8 +188,9 @@ qint64 MemoryMonitor::getProcessVirtualMemoryUsage(qint64 processId) const
 {
     QVariantMap processInfo = readProcessMemoryInfo(processId);
     return processInfo.value("vms", 0).toLongLong();
-}bool Memor
-yMonitor::initializeMonitor()
+}
+
+bool MemoryMonitor::initializeMonitor()
 {
     qDebug() << "MemoryMonitor: Initializing memory monitor...";
     
@@ -214,27 +216,25 @@ ResourceUsage MemoryMonitor::collectResourceUsage()
 {
     ResourceUsage usage;
     usage.timestamp = QDateTime::currentDateTime();
-    usage.resourceType = IResourceTracker::Memory;
     
     // 收集内存使用数据
     qint64 usedMemory = getUsedPhysicalMemory();
     qint64 totalMemory = getTotalPhysicalMemory();
     
-    usage.memoryUsage = totalMemory > 0 ? (100.0 * usedMemory / totalMemory) : 0.0;
-    usage.memoryUsed = usedMemory;
-    usage.memoryTotal = totalMemory;
+    usage.memory.usagePercentage = totalMemory > 0 ? (100.0 * usedMemory / totalMemory) : 0.0;
+    usage.memory.usedMemory = usedMemory;
+    usage.memory.totalMemory = totalMemory;
     
     // 根据监控模式收集不同级别的数据
     if (m_monitoringMode >= DetailedMode) {
-        usage.additionalData["virtualUsage"] = getVirtualMemoryUsage();
-        usage.additionalData["swapUsage"] = getSwapUsage();
-        usage.additionalData["cached"] = getCachedMemory();
-        usage.additionalData["buffers"] = getBufferMemory();
+        usage.memory.swapUsed = getSwapUsage();
+        usage.memory.cachedMemory = getCachedMemory();
+        usage.memory.bufferMemory = getBufferMemory();
     }
     
     if (m_monitoringMode == ProcessMode || m_monitoringMode == LeakDetectionMode) {
         qint64 processMemory = getCurrentProcessMemoryUsage();
-        usage.additionalData["processMemory"] = processMemory;
+        usage.process.memoryUsage = processMemory;
     }
     
     return usage;
@@ -302,7 +302,7 @@ void MemoryMonitor::cleanupPlatformSpecific()
     // 清理平台特定资源
 }
 
-QVariantMap MemoryMonitor::readSystemMemoryInfo()
+QVariantMap MemoryMonitor::readSystemMemoryInfo() const
 {
 #ifdef Q_OS_WIN
     QVariantMap result;
@@ -354,7 +354,7 @@ QVariantMap MemoryMonitor::readSystemMemoryInfo()
 #endif
 }
 
-QVariantMap MemoryMonitor::readProcessMemoryInfo(qint64 processId)
+QVariantMap MemoryMonitor::readProcessMemoryInfo(qint64 processId) const
 {
 #ifdef Q_OS_WIN
     QVariantMap result;

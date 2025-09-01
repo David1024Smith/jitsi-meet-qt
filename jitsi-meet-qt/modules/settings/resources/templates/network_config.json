@@ -1,0 +1,37 @@
+{
+    "network": {
+        "connection": {
+            "timeout": 30000,
+            "retryAttempts": 3,
+            "retryDelay": 1000
+        },
+        "proxy": {
+            "enabled": false,
+            "type": "http",
+            "host": "",
+            "port": 8080,
+            "username": "",
+            "password": ""
+        },
+        "bandwidth": {
+            "maxUpload": 1000,
+            "maxDownload": 2000,
+            "adaptive": true
+        },
+        "ice": {
+            "servers": [
+                {
+                    "urls": ["stun:stun.l.google.com:19302"]
+                }
+            ],
+            "gatheringTimeout": 10000
+        },
+        "signaling": {
+            "websocket": {
+                "url": "wss://meet.jit.si/xmpp-websocket",
+                "pingInterval": 30000,
+                "reconnectDelay": 5000
+            }
+        }
+    }
+}

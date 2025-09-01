@@ -74,7 +74,7 @@ RESOURCES += \
     $$CHAT_MODULE_ROOT/resources/chat_resources.qrc
 
 # Qt模块依赖
-QT += core widgets network
+QT += core widgets network sql
 
 # 编译器标志
 QMAKE_CXXFLAGS += -std=c++17

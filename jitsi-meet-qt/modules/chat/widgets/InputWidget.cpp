@@ -27,6 +27,8 @@
 #include <QFileInfo>
 #include <QUrl>
 #include <QDebug>
+//QRegExp已弃用，使用QRegularExpression替代
+#include <QRegularExpression>
 
 class InputWidget::Private
 {
@@ -49,7 +51,7 @@ public:
     QToolButton* fileButton = nullptr;
     
     // Layout
-    QHBoxLayout* mainLayout = nullptr;
+    QVBoxLayout* mainLayout = nullptr;
     QVBoxLayout* inputLayout = nullptr;
     QHBoxLayout* buttonLayout = nullptr;
     
@@ -1225,12 +1227,12 @@ QString InputWidget::formatText(const QString& text) const
 void InputWidget::detectMentionsAndCommands(const QString& text)
 {
     // Detect @mentions
-    QRegExp mentionRegex("@(\\w+)");
-    int pos = 0;
-    while ((pos = mentionRegex.indexIn(text, pos)) != -1) {
-        QString username = mentionRegex.cap(1);
+    QRegularExpression mentionRegex("@(\\w+)");
+    QRegularExpressionMatchIterator matchIterator = mentionRegex.globalMatch(text);
+    while (matchIterator.hasNext()) {
+        QRegularExpressionMatch match = matchIterator.next();
+        QString username = match.captured(1);
         emit mentionTriggered(username);
-        pos += mentionRegex.matchedLength();
     }
     
     // Detect /commands

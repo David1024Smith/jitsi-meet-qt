@@ -1,499 +1,469 @@
 #include "StyleHelper.h"
-#include <QPushButton>
-#include <QLabel>
-#include <QLineEdit>
-#include <QIcon>
-#include <QPainter>
-#include <QPixmap>
 #include <QApplication>
-#include <QScreen>
+#include <QStyleHints>
 #include <QDebug>
+#include <QFile>
+#include <QTextStream>
+#include <QDir>
+#include <QStandardPaths>
 
-// Static member initialization
-StyleHelper::ColorScheme StyleHelper::s_lightScheme;
-StyleHelper::ColorScheme StyleHelper::s_darkScheme;
-StyleHelper::ColorScheme StyleHelper::s_modernScheme;
-bool StyleHelper::s_schemesInitialized = false;
+StyleHelper* StyleHelper::s_instance = nullptr;
 
-StyleHelper::ColorScheme StyleHelper::getLightColorScheme()
+StyleHelper::StyleHelper(QObject *parent)
+    : QObject(parent)
+    , m_currentTheme(LightTheme)
+    , m_initialized(false)
 {
-    if (!s_schemesInitialized) {
-        initializeColorSchemes();
-    }
-    return s_lightScheme;
+    s_instance = this;
 }
 
-StyleHelper::ColorScheme StyleHelper::getDarkColorScheme()
+StyleHelper::~StyleHelper()
 {
-    if (!s_schemesInitialized) {
-        initializeColorSchemes();
-    }
-    return s_darkScheme;
+    s_instance = nullptr;
 }
 
-StyleHelper::ColorScheme StyleHelper::getModernColorScheme()
+StyleHelper* StyleHelper::instance()
 {
-    if (!s_schemesInitialized) {
-        initializeColorSchemes();
-    }
-    return s_modernScheme;
+    return s_instance;
 }
 
-void StyleHelper::styleButton(QPushButton* button, ButtonStyle style)
+bool StyleHelper::initialize()
 {
-    if (!button) return;
-    
-    QString styleSheet;
-    ColorScheme scheme = getLightColorScheme(); // Default to light, should be determined by theme manager
-    
-    switch (style) {
-        case ButtonStyle::Primary:
-            styleSheet = QString(
-                "QPushButton {"
-                "    background-color: %1;"
-                "    color: white;"
-                "    border: none;"
-                "    border-radius: 8px;"
-                "    padding: 12px 24px;"
-                "    font-weight: 500;"
-                "    min-width: 100px;"
-                "}"
-                "QPushButton:hover {"
-                "    background-color: %2;"
-                "}"
-                "QPushButton:pressed {"
-                "    background-color: %3;"
-                "}"
-                "QPushButton:disabled {"
-                "    background-color: #BDBDBD;"
-                "    color: #757575;"
-                "}"
-            ).arg(colorToString(scheme.primary))
-             .arg(colorToString(scheme.primaryDark))
-             .arg(colorToString(adjustColorBrightness(scheme.primaryDark, -20)));
-            break;
-            
-        case ButtonStyle::Secondary:
-            styleSheet = QString(
-                "QPushButton {"
-                "    background-color: transparent;"
-                "    color: %1;"
-                "    border: 2px solid %1;"
-                "    border-radius: 8px;"
-                "    padding: 12px 24px;"
-                "    font-weight: 500;"
-                "    min-width: 100px;"
-                "}"
-                "QPushButton:hover {"
-                "    background-color: %2;"
-                "}"
-                "QPushButton:pressed {"
-                "    background-color: %3;"
-                "}"
-            ).arg(colorToString(scheme.primary))
-             .arg(colorToString(QColor(scheme.primary.red(), scheme.primary.green(), scheme.primary.blue(), 25)))
-             .arg(colorToString(QColor(scheme.primary.red(), scheme.primary.green(), scheme.primary.blue(), 50)));
-            break;
-            
-        case ButtonStyle::Success:
-            styleSheet = QString(
-                "QPushButton {"
-                "    background-color: %1;"
-                "    color: white;"
-                "    border: none;"
-                "    border-radius: 8px;"
-                "    padding: 12px 24px;"
-                "    font-weight: 500;"
-                "    min-width: 100px;"
-                "}"
-                "QPushButton:hover {"
-                "    background-color: %2;"
-                "}"
-            ).arg(colorToString(scheme.success))
-             .arg(colorToString(adjustColorBrightness(scheme.success, -20)));
-            break;
-            
-        case ButtonStyle::Error:
-            styleSheet = QString(
-                "QPushButton {"
-                "    background-color: %1;"
-                "    color: white;"
-                "    border: none;"
-                "    border-radius: 8px;"
-                "    padding: 12px 24px;"
-                "    font-weight: 500;"
-                "    min-width: 100px;"
-                "}"
-                "QPushButton:hover {"
-                "    background-color: %2;"
-                "}"
-            ).arg(colorToString(scheme.error))
-             .arg(colorToString(adjustColorBrightness(scheme.error, -20)));
-            break;
-            
-        case ButtonStyle::Flat:
-            styleSheet = QString(
-                "QPushButton {"
-                "    background-color: transparent;"
-                "    color: %1;"
-                "    border: none;"
-                "    border-radius: 8px;"
-                "    padding: 12px 24px;"
-                "    font-weight: 500;"
-                "}"
-                "QPushButton:hover {"
-                "    background-color: %2;"
-                "}"
-            ).arg(colorToString(scheme.text))
-             .arg(colorToString(scheme.surface));
-            break;
-            
-        case ButtonStyle::Outlined:
-            styleSheet = QString(
-                "QPushButton {"
-                "    background-color: transparent;"
-                "    color: %1;"
-                "    border: 1px solid %2;"
-                "    border-radius: 8px;"
-                "    padding: 12px 24px;"
-                "    font-weight: 500;"
-                "}"
-                "QPushButton:hover {"
-                "    background-color: %2;"
-                "    border-color: %1;"
-                "}"
-            ).arg(colorToString(scheme.text))
-             .arg(colorToString(scheme.surface));
-            break;
+    if (m_initialized) {
+        return true;
     }
+
+    qDebug() << "Initializing StyleHelper...";
     
-    button->setStyleSheet(styleSheet);
+    loadDefaultColors();
+    loadDefaultFonts();
+    loadDefaultStyleSheets();
+    connectSignals();
+    
+    // Detect system theme
+    StyleTheme systemTheme = detectSystemTheme();
+    setTheme(systemTheme);
+    
+    m_initialized = true;
+    qDebug() << "StyleHelper initialized successfully";
+    
+    return true;
 }
 
-void StyleHelper::styleLineEdit(QLineEdit* lineEdit, InputStyle style)
+void StyleHelper::shutdown()
 {
-    if (!lineEdit) return;
-    
-    QString styleSheet;
-    ColorScheme scheme = getLightColorScheme();
-    
-    switch (style) {
-        case InputStyle::Default:
-            styleSheet = QString(
-                "QLineEdit {"
-                "    background-color: %1;"
-                "    border: 2px solid %2;"
-                "    border-radius: 8px;"
-                "    padding: 12px 16px;"
-                "    font-size: 11pt;"
-                "    color: %3;"
-                "    selection-background-color: %4;"
-                "}"
-                "QLineEdit:focus {"
-                "    border-color: %4;"
-                "    outline: none;"
-                "}"
-                "QLineEdit:hover {"
-                "    border-color: %5;"
-                "}"
-            ).arg(colorToString(scheme.surface))
-             .arg(colorToString(QColor("#E0E0E0")))
-             .arg(colorToString(scheme.text))
-             .arg(colorToString(scheme.primary))
-             .arg(colorToString(QColor("#BDBDBD")));
-            break;
-            
-        case InputStyle::Rounded:
-            styleSheet = QString(
-                "QLineEdit {"
-                "    background-color: %1;"
-                "    border: 2px solid %2;"
-                "    border-radius: 20px;"
-                "    padding: 12px 20px;"
-                "    font-size: 11pt;"
-                "    color: %3;"
-                "}"
-                "QLineEdit:focus {"
-                "    border-color: %4;"
-                "}"
-            ).arg(colorToString(scheme.surface))
-             .arg(colorToString(QColor("#E0E0E0")))
-             .arg(colorToString(scheme.text))
-             .arg(colorToString(scheme.primary));
-            break;
-            
-        case InputStyle::Outlined:
-            styleSheet = QString(
-                "QLineEdit {"
-                "    background-color: transparent;"
-                "    border: 2px solid %1;"
-                "    border-radius: 8px;"
-                "    padding: 12px 16px;"
-                "    font-size: 11pt;"
-                "    color: %2;"
-                "}"
-                "QLineEdit:focus {"
-                "    border-color: %3;"
-                "}"
-            ).arg(colorToString(QColor("#E0E0E0")))
-             .arg(colorToString(scheme.text))
-             .arg(colorToString(scheme.primary));
-            break;
-            
-        case InputStyle::Filled:
-            styleSheet = QString(
-                "QLineEdit {"
-                "    background-color: %1;"
-                "    border: none;"
-                "    border-bottom: 2px solid %2;"
-                "    border-radius: 4px 4px 0 0;"
-                "    padding: 16px 12px 8px 12px;"
-                "    font-size: 11pt;"
-                "    color: %3;"
-                "}"
-                "QLineEdit:focus {"
-                "    border-bottom-color: %4;"
-                "}"
-            ).arg(colorToString(scheme.surface))
-             .arg(colorToString(QColor("#E0E0E0")))
-             .arg(colorToString(scheme.text))
-             .arg(colorToString(scheme.primary));
-            break;
-    }
-    
-    lineEdit->setStyleSheet(styleSheet);
+    m_initialized = false;
 }
 
-void StyleHelper::styleLabel(QLabel* label, const QString& role)
+void StyleHelper::setTheme(StyleTheme theme)
 {
-    if (!label) return;
-    
-    ColorScheme scheme = getLightColorScheme();
-    QString styleSheet;
-    
-    if (role == "title") {
-        styleSheet = QString(
-            "QLabel {"
-            "    font-size: 24pt;"
-            "    font-weight: bold;"
-            "    color: %1;"
-            "    margin: 20px 0;"
-            "}"
-        ).arg(colorToString(scheme.primary));
-    } else if (role == "subtitle") {
-        styleSheet = QString(
-            "QLabel {"
-            "    font-size: 12pt;"
-            "    color: %1;"
-            "    margin-bottom: 30px;"
-            "}"
-        ).arg(colorToString(scheme.textSecondary));
-    } else if (role == "error") {
-        styleSheet = QString(
-            "QLabel {"
-            "    color: %1;"
-            "    font-weight: 500;"
-            "    background-color: %2;"
-            "    border: 1px solid %3;"
-            "    border-radius: 4px;"
-            "    padding: 8px 12px;"
-            "}"
-        ).arg(colorToString(scheme.error))
-         .arg(colorToString(QColor("#FFEBEE")))
-         .arg(colorToString(QColor("#FFCDD2")));
-    } else if (role == "success") {
-        styleSheet = QString(
-            "QLabel {"
-            "    color: %1;"
-            "    font-weight: 500;"
-            "    background-color: %2;"
-            "    border: 1px solid %3;"
-            "    border-radius: 4px;"
-            "    padding: 8px 12px;"
-            "}"
-        ).arg(colorToString(scheme.success))
-         .arg(colorToString(QColor("#E8F5E8")))
-         .arg(colorToString(QColor("#C8E6C9")));
-    } else {
-        // Default label style
-        styleSheet = QString(
-            "QLabel {"
-            "    color: %1;"
-            "}"
-        ).arg(colorToString(scheme.text));
+    if (m_currentTheme == theme) {
+        return;
     }
     
-    label->setStyleSheet(styleSheet);
+    m_currentTheme = theme;
+    loadDefaultColors();
+    updateStyleSheets();
+    
+    emit themeChanged(theme);
+    qDebug() << "Theme changed to:" << themeName(theme);
 }
 
-QIcon StyleHelper::createThemedIcon(const QString& iconName, const QColor& color)
+StyleHelper::StyleTheme StyleHelper::currentTheme() const
 {
+    return m_currentTheme;
+}
+
+QColor StyleHelper::getColor(ColorRole role) const
+{
+    return m_colors.value(role, QColor(Qt::black));
+}
+
+void StyleHelper::setColor(ColorRole role, const QColor& color)
+{
+    if (m_colors.value(role) != color) {
+        m_colors[role] = color;
+        updateStyleSheets();
+        emit colorChanged(role, color);
+    }
+}
+
+QFont StyleHelper::getFont(FontRole role) const
+{
+    return m_fonts.value(role, QApplication::font());
+}
+
+void StyleHelper::setFont(FontRole role, const QFont& font)
+{
+    if (m_fonts.value(role) != font) {
+        m_fonts[role] = font;
+        updateStyleSheets();
+        emit fontChanged(role, font);
+    }
+}
+
+QString StyleHelper::getIconPath(const QString& iconName) const
+{
+    return m_iconPaths.value(iconName, QString(":/icons/%1.png").arg(iconName));
+}
+
+QString StyleHelper::getStyleSheet(const QString& widgetType) const
+{
+    return m_styleSheets.value(widgetType, QString());
+}
+
+QString StyleHelper::getFullStyleSheet() const
+{
+    return m_fullStyleSheet;
+}
+
+bool StyleHelper::loadStyleSheetFile(const QString& filePath)
+{
+    QFile file(filePath);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        qWarning() << "Failed to open stylesheet file:" << filePath;
+        return false;
+    }
+    
+    QTextStream in(&file);
+    QString content = in.readAll();
+    
+    // Parse and apply the stylesheet content
     // This is a simplified implementation
-    // In a real application, you might want to load SVG icons and recolor them
-    QString iconPath = QString(":/icons/%1.svg").arg(iconName);
-    return QIcon(iconPath);
+    m_fullStyleSheet = content;
+    applyStyleToApplication();
+    
+    return true;
 }
 
-QIcon StyleHelper::createButtonIcon(const QString& iconName, ButtonStyle style)
+bool StyleHelper::saveStyleSheetFile(const QString& filePath)
 {
-    QColor iconColor;
-    ColorScheme scheme = getLightColorScheme();
-    
-    switch (style) {
-        case ButtonStyle::Primary:
-        case ButtonStyle::Success:
-        case ButtonStyle::Error:
-            iconColor = Qt::white;
-            break;
-        default:
-            iconColor = scheme.text;
-            break;
+    QFile file(filePath);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        qWarning() << "Failed to save stylesheet file:" << filePath;
+        return false;
     }
     
-    return createThemedIcon(iconName, iconColor);
+    QTextStream out(&file);
+    out << m_fullStyleSheet;
+    
+    return true;
 }
 
-QString StyleHelper::colorToString(const QColor& color)
+void StyleHelper::resetToDefaultStyle()
 {
-    if (color.alpha() == 255) {
-        return color.name();
+    loadDefaultColors();
+    loadDefaultFonts();
+    loadDefaultStyleSheets();
+    updateStyleSheets();
+}
+
+void StyleHelper::applyStyleToApplication()
+{
+    QApplication* app = qobject_cast<QApplication*>(QApplication::instance());
+    if (app) {
+        app->setStyleSheet(m_fullStyleSheet);
+        emit styleSheetChanged();
+    }
+}
+
+QString StyleHelper::colorRoleName(ColorRole role)
+{
+    switch (role) {
+    case Primary: return "Primary";
+    case Secondary: return "Secondary";
+    case Success: return "Success";
+    case Danger: return "Danger";
+    case Warning: return "Warning";
+    case Info: return "Info";
+    case Light: return "Light";
+    case Dark: return "Dark";
+    case Background: return "Background";
+    case Surface: return "Surface";
+    case Text: return "Text";
+    case TextSecondary: return "TextSecondary";
+    case Border: return "Border";
+    case Disabled: return "Disabled";
+    case Highlight: return "Highlight";
+    case Link: return "Link";
+    }
+    return "Unknown";
+}
+
+QString StyleHelper::fontRoleName(FontRole role)
+{
+    switch (role) {
+    case Default: return "Default";
+    case Title: return "Title";
+    case Subtitle: return "Subtitle";
+    case Heading1: return "Heading1";
+    case Heading2: return "Heading2";
+    case Heading3: return "Heading3";
+    case Small: return "Small";
+    case Monospace: return "Monospace";
+    case Button: return "Button";
+    }
+    return "Unknown";
+}
+
+QString StyleHelper::themeName(StyleTheme theme)
+{
+    switch (theme) {
+    case LightTheme: return "Light";
+    case DarkTheme: return "Dark";
+    case SystemTheme: return "System";
+    case CustomTheme: return "Custom";
+    }
+    return "Unknown";
+}
+
+StyleHelper::StyleTheme StyleHelper::detectSystemTheme()
+{
+    QApplication* app = qobject_cast<QApplication*>(QApplication::instance());
+    if (app) {
+        QStyleHints* hints = app->styleHints();
+        if (hints && hints->colorScheme() == Qt::ColorScheme::Dark) {
+            return DarkTheme;
+        }
+    }
+    return LightTheme;
+}
+
+QVariantMap StyleHelper::getStyleConfig() const
+{
+    QVariantMap config;
+    config["theme"] = static_cast<int>(m_currentTheme);
+    
+    // Save colors
+    QVariantMap colors;
+    for (auto it = m_colors.constBegin(); it != m_colors.constEnd(); ++it) {
+        colors[colorRoleName(it.key())] = it.value().name();
+    }
+    config["colors"] = colors;
+    
+    // Save fonts
+    QVariantMap fonts;
+    for (auto it = m_fonts.constBegin(); it != m_fonts.constEnd(); ++it) {
+        QVariantMap fontData;
+        fontData["family"] = it.value().family();
+        fontData["size"] = it.value().pointSize();
+        fontData["bold"] = it.value().bold();
+        fontData["italic"] = it.value().italic();
+        fonts[fontRoleName(it.key())] = fontData;
+    }
+    config["fonts"] = fonts;
+    
+    return config;
+}
+
+void StyleHelper::setStyleConfig(const QVariantMap& config)
+{
+    // Load theme
+    if (config.contains("theme")) {
+        setTheme(static_cast<StyleTheme>(config["theme"].toInt()));
+    }
+    
+    // Load colors
+    if (config.contains("colors")) {
+        QVariantMap colors = config["colors"].toMap();
+        for (auto it = colors.constBegin(); it != colors.constEnd(); ++it) {
+            // Find color role by name and set color
+            for (int i = Primary; i <= Link; ++i) {
+                ColorRole role = static_cast<ColorRole>(i);
+                if (colorRoleName(role) == it.key()) {
+                    setColor(role, QColor(it.value().toString()));
+                    break;
+                }
+            }
+        }
+    }
+    
+    // Load fonts
+    if (config.contains("fonts")) {
+        QVariantMap fonts = config["fonts"].toMap();
+        for (auto it = fonts.constBegin(); it != fonts.constEnd(); ++it) {
+            QVariantMap fontData = it.value().toMap();
+            QFont font;
+            font.setFamily(fontData["family"].toString());
+            font.setPointSize(fontData["size"].toInt());
+            font.setBold(fontData["bold"].toBool());
+            font.setItalic(fontData["italic"].toBool());
+            
+            // Find font role by name and set font
+            for (int i = Default; i <= Button; ++i) {
+                FontRole role = static_cast<FontRole>(i);
+                if (fontRoleName(role) == it.key()) {
+                    setFont(role, font);
+                    break;
+                }
+            }
+        }
+    }
+}
+
+void StyleHelper::loadDefaultColors()
+{
+    if (m_currentTheme == DarkTheme) {
+        // Dark theme colors
+        m_colors[Primary] = QColor(0, 122, 255);
+        m_colors[Secondary] = QColor(108, 117, 125);
+        m_colors[Success] = QColor(40, 167, 69);
+        m_colors[Danger] = QColor(220, 53, 69);
+        m_colors[Warning] = QColor(255, 193, 7);
+        m_colors[Info] = QColor(23, 162, 184);
+        m_colors[Light] = QColor(248, 249, 250);
+        m_colors[Dark] = QColor(52, 58, 64);
+        m_colors[Background] = QColor(33, 37, 41);
+        m_colors[Surface] = QColor(52, 58, 64);
+        m_colors[Text] = QColor(255, 255, 255);
+        m_colors[TextSecondary] = QColor(173, 181, 189);
+        m_colors[Border] = QColor(73, 80, 87);
+        m_colors[Disabled] = QColor(108, 117, 125);
+        m_colors[Highlight] = QColor(0, 122, 255);
+        m_colors[Link] = QColor(0, 122, 255);
     } else {
-        return QString("rgba(%1, %2, %3, %4)")
-               .arg(color.red())
-               .arg(color.green())
-               .arg(color.blue())
-               .arg(color.alpha() / 255.0, 0, 'f', 2);
+        // Light theme colors
+        m_colors[Primary] = QColor(0, 122, 255);
+        m_colors[Secondary] = QColor(108, 117, 125);
+        m_colors[Success] = QColor(40, 167, 69);
+        m_colors[Danger] = QColor(220, 53, 69);
+        m_colors[Warning] = QColor(255, 193, 7);
+        m_colors[Info] = QColor(23, 162, 184);
+        m_colors[Light] = QColor(248, 249, 250);
+        m_colors[Dark] = QColor(52, 58, 64);
+        m_colors[Background] = QColor(255, 255, 255);
+        m_colors[Surface] = QColor(248, 249, 250);
+        m_colors[Text] = QColor(33, 37, 41);
+        m_colors[TextSecondary] = QColor(108, 117, 125);
+        m_colors[Border] = QColor(222, 226, 230);
+        m_colors[Disabled] = QColor(173, 181, 189);
+        m_colors[Highlight] = QColor(0, 122, 255);
+        m_colors[Link] = QColor(0, 122, 255);
     }
 }
 
-QColor StyleHelper::adjustColorBrightness(const QColor& color, int factor)
+void StyleHelper::loadDefaultFonts()
 {
-    int r = qBound(0, color.red() + factor, 255);
-    int g = qBound(0, color.green() + factor, 255);
-    int b = qBound(0, color.blue() + factor, 255);
-    return QColor(r, g, b, color.alpha());
-}
-
-QColor StyleHelper::blendColors(const QColor& color1, const QColor& color2, double ratio)
-{
-    ratio = qBound(0.0, ratio, 1.0);
+    QFont defaultFont = QApplication::font();
     
-    int r = static_cast<int>(color1.red() * (1.0 - ratio) + color2.red() * ratio);
-    int g = static_cast<int>(color1.green() * (1.0 - ratio) + color2.green() * ratio);
-    int b = static_cast<int>(color1.blue() * (1.0 - ratio) + color2.blue() * ratio);
-    int a = static_cast<int>(color1.alpha() * (1.0 - ratio) + color2.alpha() * ratio);
+    m_fonts[Default] = defaultFont;
     
-    return QColor(r, g, b, a);
-}
-
-QString StyleHelper::createLinearGradient(const QColor& startColor, const QColor& endColor, const QString& direction)
-{
-    return QString("qlineargradient(x1: 0, y1: 0, x2: %1, y2: %2, stop: 0 %3, stop: 1 %4)")
-           .arg(direction.contains("right") ? "1" : "0")
-           .arg(direction.contains("bottom") ? "1" : "0")
-           .arg(colorToString(startColor))
-           .arg(colorToString(endColor));
-}
-
-QString StyleHelper::createRadialGradient(const QColor& centerColor, const QColor& edgeColor)
-{
-    return QString("qradialgradient(cx: 0.5, cy: 0.5, radius: 1, stop: 0 %1, stop: 1 %2)")
-           .arg(colorToString(centerColor))
-           .arg(colorToString(edgeColor));
-}
-
-QString StyleHelper::createTransition(const QString& property, const QString& duration, const QString& easing)
-{
-    // Note: Qt StyleSheets don't support CSS transitions, this is for documentation/future use
-    return QString("transition: %1 %2 %3;").arg(property, duration, easing);
-}
-
-QString StyleHelper::createBoxShadow(int offsetX, int offsetY, int blur, const QColor& color, int spread)
-{
-    // Note: Qt StyleSheets have limited shadow support, this is for documentation
-    Q_UNUSED(offsetX)
-    Q_UNUSED(offsetY)
-    Q_UNUSED(blur)
-    Q_UNUSED(color)
-    Q_UNUSED(spread)
-    return QString(); // Qt doesn't support box-shadow in stylesheets
-}
-
-QString StyleHelper::createBorder(int width, const QString& style, const QColor& color)
-{
-    return QString("border: %1px %2 %3;")
-           .arg(width)
-           .arg(style)
-           .arg(colorToString(color));
-}
-
-QString StyleHelper::createBorderRadius(int radius)
-{
-    return QString("border-radius: %1px;").arg(radius);
-}
-
-QString StyleHelper::createBorderRadius(int topLeft, int topRight, int bottomRight, int bottomLeft)
-{
-    return QString("border-radius: %1px %2px %3px %4px;")
-           .arg(topLeft)
-           .arg(topRight)
-           .arg(bottomRight)
-           .arg(bottomLeft);
-}
-
-int StyleHelper::getScaledSize(int baseSize)
-{
-    // Get system DPI scaling factor
-    qreal dpr = QApplication::primaryScreen()->devicePixelRatio();
-    return static_cast<int>(baseSize * dpr);
-}
-
-QString StyleHelper::getScaledFont(int baseSize, const QString& weight)
-{
-    int scaledSize = getScaledSize(baseSize);
-    return QString("font-size: %1pt; font-weight: %2;").arg(scaledSize).arg(weight);
-}
-
-void StyleHelper::initializeColorSchemes()
-{
-    // Light color scheme
-    s_lightScheme.primary = QColor("#2196F3");
-    s_lightScheme.primaryDark = QColor("#1976D2");
-    s_lightScheme.secondary = QColor("#FF9800");
-    s_lightScheme.background = QColor("#FAFAFA");
-    s_lightScheme.surface = QColor("#FFFFFF");
-    s_lightScheme.text = QColor("#212121");
-    s_lightScheme.textSecondary = QColor("#666666");
-    s_lightScheme.accent = QColor("#FF5722");
-    s_lightScheme.error = QColor("#F44336");
-    s_lightScheme.success = QColor("#4CAF50");
-    s_lightScheme.warning = QColor("#FF9800");
+    QFont titleFont = defaultFont;
+    titleFont.setPointSize(defaultFont.pointSize() + 8);
+    titleFont.setBold(true);
+    m_fonts[Title] = titleFont;
     
-    // Dark color scheme
-    s_darkScheme.primary = QColor("#64B5F6");
-    s_darkScheme.primaryDark = QColor("#1976D2");
-    s_darkScheme.secondary = QColor("#FFB74D");
-    s_darkScheme.background = QColor("#121212");
-    s_darkScheme.surface = QColor("#1E1E1E");
-    s_darkScheme.text = QColor("#FFFFFF");
-    s_darkScheme.textSecondary = QColor("#BDBDBD");
-    s_darkScheme.accent = QColor("#FF7043");
-    s_darkScheme.error = QColor("#F44336");
-    s_darkScheme.success = QColor("#4CAF50");
-    s_darkScheme.warning = QColor("#FF9800");
+    QFont subtitleFont = defaultFont;
+    subtitleFont.setPointSize(defaultFont.pointSize() + 4);
+    m_fonts[Subtitle] = subtitleFont;
     
-    // Modern color scheme (gradient-based)
-    s_modernScheme.primary = QColor("#2196F3");
-    s_modernScheme.primaryDark = QColor("#1565C0");
-    s_modernScheme.secondary = QColor("#9C27B0");
-    s_modernScheme.background = QColor("#F8F9FA");
-    s_modernScheme.surface = QColor("#FFFFFF");
-    s_modernScheme.text = QColor("#212121");
-    s_modernScheme.textSecondary = QColor("#6C757D");
-    s_modernScheme.accent = QColor("#E91E63");
-    s_modernScheme.error = QColor("#DC3545");
-    s_modernScheme.success = QColor("#28A745");
-    s_modernScheme.warning = QColor("#FFC107");
+    QFont h1Font = defaultFont;
+    h1Font.setPointSize(defaultFont.pointSize() + 6);
+    h1Font.setBold(true);
+    m_fonts[Heading1] = h1Font;
     
-    s_schemesInitialized = true;
+    QFont h2Font = defaultFont;
+    h2Font.setPointSize(defaultFont.pointSize() + 4);
+    h2Font.setBold(true);
+    m_fonts[Heading2] = h2Font;
+    
+    QFont h3Font = defaultFont;
+    h3Font.setPointSize(defaultFont.pointSize() + 2);
+    h3Font.setBold(true);
+    m_fonts[Heading3] = h3Font;
+    
+    QFont smallFont = defaultFont;
+    smallFont.setPointSize(defaultFont.pointSize() - 2);
+    m_fonts[Small] = smallFont;
+    
+    QFont monoFont("Consolas", defaultFont.pointSize());
+    if (!monoFont.exactMatch()) {
+        monoFont.setFamily("Courier New");
+    }
+    m_fonts[Monospace] = monoFont;
+    
+    m_fonts[Button] = defaultFont;
+}
+
+void StyleHelper::loadDefaultStyleSheets()
+{
+    // Load default stylesheets for different widget types
+    m_styleSheets["QPushButton"] = QString(
+        "QPushButton {"
+        "    background-color: %1;"
+        "    color: %2;"
+        "    border: 1px solid %3;"
+        "    padding: 8px 16px;"
+        "    border-radius: 4px;"
+        "}"
+        "QPushButton:hover {"
+        "    background-color: %4;"
+        "}"
+        "QPushButton:pressed {"
+        "    background-color: %5;"
+        "}"
+    ).arg(getColor(Primary).name())
+     .arg(getColor(Text).name())
+     .arg(getColor(Border).name())
+     .arg(getColor(Primary).lighter(110).name())
+     .arg(getColor(Primary).darker(110).name());
+    
+    m_styleSheets["QLineEdit"] = QString(
+        "QLineEdit {"
+        "    background-color: %1;"
+        "    color: %2;"
+        "    border: 1px solid %3;"
+        "    padding: 8px;"
+        "    border-radius: 4px;"
+        "}"
+        "QLineEdit:focus {"
+        "    border-color: %4;"
+        "}"
+    ).arg(getColor(Background).name())
+     .arg(getColor(Text).name())
+     .arg(getColor(Border).name())
+     .arg(getColor(Primary).name());
+}
+
+void StyleHelper::updateStyleSheets()
+{
+    loadDefaultStyleSheets();
+    generateFullStyleSheet();
+}
+
+void StyleHelper::generateFullStyleSheet()
+{
+    QStringList sheets;
+    for (auto it = m_styleSheets.constBegin(); it != m_styleSheets.constEnd(); ++it) {
+        sheets << it.value();
+    }
+    m_fullStyleSheet = sheets.join("\n\n");
+}
+
+QString StyleHelper::colorToStyleSheet(const QColor& color) const
+{
+    return color.name();
+}
+
+QString StyleHelper::fontToStyleSheet(const QFont& font) const
+{
+    return QString("font-family: %1; font-size: %2pt;")
+        .arg(font.family())
+        .arg(font.pointSize());
+}
+
+void StyleHelper::connectSignals()
+{
+    // Connect to system theme changes if available
+    QApplication* app = qobject_cast<QApplication*>(QApplication::instance());
+    if (app) {
+        QStyleHints* hints = app->styleHints();
+        if (hints) {
+            connect(hints, &QStyleHints::colorSchemeChanged, this, [this](Qt::ColorScheme scheme) {
+                if (m_currentTheme == SystemTheme) {
+                    setTheme(scheme == Qt::ColorScheme::Dark ? DarkTheme : LightTheme);
+                }
+            });
+        }
+    }
 }

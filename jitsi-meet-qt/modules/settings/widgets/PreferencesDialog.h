@@ -526,6 +526,8 @@ private slots:
 private:
     void setupUI();
     void setupStandardMode();
+    void loadProfileSettings();
+    void applyPreviewSettings();
     void setupCompactMode();
     void setupWizardMode();
     void setupExpertMode();

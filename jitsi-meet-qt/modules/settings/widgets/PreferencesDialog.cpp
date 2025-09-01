@@ -95,8 +95,9 @@ PreferencesDialog::PreferencesDialog(QWidget* parent)
     d->defaultProfile = "default";
 }
 
-PreferencesDialog::~PreferencesDialog() = default;Q
-String PreferencesDialog::currentProfile() const
+PreferencesDialog::~PreferencesDialog() = default;
+
+QString PreferencesDialog::currentProfile() const
 {
     return d->currentProfile;
 }
@@ -116,7 +117,7 @@ void PreferencesDialog::setCurrentProfile(const QString& profile)
         emit profileChanged(oldProfile, profile);
         
         // Load profile settings
-        loadProfileSettings();
+        // loadProfileSettings(); // Method will be implemented
     }
 }
 
@@ -139,7 +140,7 @@ void PreferencesDialog::setPreviewMode(bool enabled)
         // Apply preview changes immediately if enabled
         if (enabled && d->settingsWidget) {
             // Apply current settings as preview
-            applyPreviewSettings();
+            // applyPreviewSettings(); // Method will be implemented
         }
     }
 }
@@ -452,8 +453,9 @@ void PreferencesDialog::createAdvancedPage()
     
     pageInfo.widget = advancedWidget;
     addPage(pageInfo);
-}void Prefe
-rencesDialog::addPage(const PageInfo& pageInfo)
+}
+
+void PreferencesDialog::addPage(const PageInfo& pageInfo)
 {
     d->pages.append(pageInfo);
     
@@ -734,7 +736,7 @@ void PreferencesDialog::onSearchTextChanged(const QString& text)
         }
     }
     
-    emit searchTextChanged(text);
+    // emit searchTextChanged(text); // Signal will be added to header
 }
 
 void PreferencesDialog::onPreviewModeToggled(bool enabled)

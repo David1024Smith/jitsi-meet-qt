@@ -1,4 +1,4 @@
-#include "AuthenticationManager.h"
+#include "../include/AuthenticationManager.h"
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>

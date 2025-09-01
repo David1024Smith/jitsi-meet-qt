@@ -378,6 +378,7 @@ private:
 
 private:
     QTemporaryFile* m_tempFile;         ///< Qt临时文件对象
+    QFile m_file;                       ///< 用于实际I/O操作的文件对象
     QString m_nameTemplate;             ///< 文件名模板
     TempFileType m_type;                ///< 临时文件类型
     CleanupPolicy m_cleanupPolicy;      ///< 清理策略

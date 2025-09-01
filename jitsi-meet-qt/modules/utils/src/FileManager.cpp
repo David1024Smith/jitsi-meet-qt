@@ -4,6 +4,7 @@
 #include <QStandardPaths>
 #include <QCoreApplication>
 #include <QDebug>
+#include <QDirIterator> // 添加QDirIterator头文件
 
 // 静态成员初始化
 FileManager* FileManager::s_instance = nullptr;
@@ -81,9 +82,10 @@ void FileManager::registerFileHandler(const QString& extension, std::shared_ptr<
     // 注册处理器
     m_fileHandlers[extension.toLower()] = handler;
     
-    // 连接信号
-    connect(handler.get(), &IFileHandler::operationCompleted,
-            this, &FileManager::operationCompleted);
+    // 连接信号 - 使用静态类型转换解决接口类信号槽连接问题
+    // 修复信号槽连接问题，使用旧式连接语法
+    connect(handler.get(), SIGNAL(operationCompleted(const QString&, const QString&, IFileHandler::OperationResult)),
+            this, SLOT(operationCompleted(const QString&, const QString&, FileManager::OperationResult)));
 }
 
 void FileManager::unregisterFileHandler(const QString& extension)

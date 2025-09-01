@@ -1,0 +1,59 @@
+/* Audio Control Widget Styles */
+QWidget#AudioControlWidget {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 10px;
+}
+
+QPushButton#MuteButton {
+    background-color: #28a745;
+    color: white;
+    border: none;
+    border-radius: 20px;
+    width: 40px;
+    height: 40px;
+    font-weight: bold;
+}
+
+QPushButton#MuteButton:hover {
+    background-color: #218838;
+}
+
+QPushButton#MuteButton:pressed {
+    background-color: #1e7e34;
+}
+
+QPushButton#MuteButton[muted="true"] {
+    background-color: #dc3545;
+}
+
+QPushButton#MuteButton[muted="true"]:hover {
+    background-color: #c82333;
+}
+
+QLabel#AudioLevelLabel {
+    color: #495057;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+QProgressBar#AudioLevelMeter {
+    border: 2px solid #dee2e6;
+    border-radius: 5px;
+    text-align: center;
+    background-color: #e9ecef;
+}
+
+QProgressBar#AudioLevelMeter::chunk {
+    background-color: #28a745;
+    border-radius: 3px;
+}
+
+QProgressBar#AudioLevelMeter::chunk[level="medium"] {
+    background-color: #ffc107;
+}
+
+QProgressBar#AudioLevelMeter::chunk[level="high"] {
+    background-color: #dc3545;
+}

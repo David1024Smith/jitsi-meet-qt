@@ -332,7 +332,7 @@ QString HTTPProtocol::sendRequest(RequestMethod method, const QString& url,
             
             // 连接信号
             connect(reply, &QNetworkReply::finished, this, &HTTPProtocol::handleReplyFinished);
-            connect(reply, QOverload<QNetworkReply::NetworkError>::of(&QNetworkReply::error),
+            connect(reply, &QNetworkReply::errorOccurred,
                     this, &HTTPProtocol::handleNetworkError);
             connect(reply, &QNetworkReply::sslErrors, this, &HTTPProtocol::handleSslErrors);
             connect(reply, &QNetworkReply::downloadProgress, this, &HTTPProtocol::handleDownloadProgress);
@@ -357,8 +357,9 @@ QString HTTPProtocol::sendRequest(RequestMethod method, const QString& url,
     }
     
     return requestId;
-}QStr
-ing HTTPProtocol::get(const QString& url, const QVariantMap& headers)
+}
+
+QString HTTPProtocol::get(const QString& url, const QVariantMap& headers)
 {
     return sendRequest(GET, url, QByteArray(), headers);
 }
@@ -662,7 +663,7 @@ void HTTPProtocol::processRequestQueue()
             
             // 连接信号
             connect(reply, &QNetworkReply::finished, this, &HTTPProtocol::handleReplyFinished);
-            connect(reply, QOverload<QNetworkReply::NetworkError>::of(&QNetworkReply::error),
+            connect(reply, &QNetworkReply::errorOccurred,
                     this, &HTTPProtocol::handleNetworkError);
             connect(reply, &QNetworkReply::sslErrors, this, &HTTPProtocol::handleSslErrors);
             connect(reply, &QNetworkReply::downloadProgress, this, &HTTPProtocol::handleDownloadProgress);

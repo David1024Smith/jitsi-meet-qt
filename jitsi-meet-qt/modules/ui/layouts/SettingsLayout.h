@@ -150,6 +150,10 @@ private:
     void setupLayout();
     void createRegions();
     void arrangeRegions();
+    void arrangeTreeAndPanelStyle();
+    void arrangeTabsStyle();
+    void arrangeWizardStyle();
+    void arrangeCompactStyle();
     void updateLayoutStyle();
     void updateRegionVisibility();
     void updateCategoryTree();

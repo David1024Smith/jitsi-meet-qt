@@ -444,6 +444,18 @@ QVariant MeetingConfig::getCustomSetting(const QString& key, const QVariant& def
     return d->customSettings.value(key, defaultValue);
 }
 
+void MeetingConfig::setOption(const QString& key, const QVariant& value)
+{
+    // 兼容方法，将选项设置为自定义设置
+    setCustomSetting(key, value);
+}
+
+void MeetingConfig::setValue(const QString& key, const QVariant& value)
+{
+    // 兼容方法，将值设置为自定义设置
+    setCustomSetting(key, value);
+}
+
 QVariantMap MeetingConfig::toVariantMap() const
 {
     QVariantMap map;

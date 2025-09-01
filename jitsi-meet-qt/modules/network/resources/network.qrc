@@ -1,0 +1,7 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+    <qresource prefix="/network">
+        <!-- 暂时移除所有资源文件以避免编译错误 -->
+        <!-- 在实际部署时需要添加相应的资源文件 -->
+    </qresource>
+</RCC>

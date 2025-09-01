@@ -7,7 +7,7 @@
 #include <QDateTime>
 #include <QJsonObject>
 #include <QJsonDocument>
-#include "PerformanceManager.h"
+#include "../include/PerformanceMetrics.h"
 
 /**
  * @brief 性能工具类

@@ -4,6 +4,7 @@
 #include <QOpenGLFunctions>
 #include <QGuiApplication>
 #include <QScreen>
+#include <QRandomGenerator>
 
 RenderOptimizer::RenderOptimizer(QObject *parent)
     : BaseOptimizer("RenderOptimizer", parent)
@@ -205,7 +206,7 @@ bool RenderOptimizer::initializeOptimizer()
 OptimizationResult RenderOptimizer::performOptimization(OptimizationStrategy strategy)
 {
     OptimizationResult result;
-    result.optimizerName = getOptimizerName();
+    result.message = QString("Render optimization with %1").arg(getOptimizerName());
     result.timestamp = QDateTime::currentDateTime();
     
     qDebug() << "RenderOptimizer: Performing optimization with strategy" << strategy;
@@ -223,15 +224,15 @@ OptimizationResult RenderOptimizer::performOptimization(OptimizationStrategy str
             break;
         }
         
-        if (result.success) {
-            result.description = QString("Render optimization completed using %1 strategy")
-                               .arg(QMetaEnum::fromType<RenderStrategy>().valueToKey(m_renderStrategy));
+        if (result.isSuccess()) {
+            result.message = QString("Render optimization completed using %1 strategy")
+                               .arg(static_cast<int>(m_renderStrategy));
         }
         
     } catch (const std::exception& e) {
-        result.success = false;
-        result.details.errorMessage = QString("Render optimization failed: %1").arg(e.what());
-        addError(result.details.errorMessage);
+        result.status = OptimizationResultStatus::Failed;
+        result.message = QString("Render optimization failed: %1").arg(e.what());
+        result.errors << result.message;
     }
     
     return result;
@@ -340,9 +341,9 @@ QString RenderOptimizer::getOptimizerDescription() const
     return "Render optimizer for improving graphics performance and frame rate";
 }
 
-IOptimizer::OptimizationType RenderOptimizer::getOptimizerType() const
+OptimizationType RenderOptimizer::getOptimizerType() const
 {
-    return RenderOptimization;
+    return OptimizationType::Rendering;
 }
 
 void RenderOptimizer::performFrameRateMonitoring()
@@ -352,7 +353,7 @@ void RenderOptimizer::performFrameRateMonitoring()
     
     if (timeDiff > 0) {
         // 模拟帧计数更新
-        qint64 newFrames = qrand() % 10 + 55; // 模拟55-65帧
+        qint64 newFrames = QRandomGenerator::global()->bounded(10) + 55; // 模拟55-65帧
         m_frameCount += newFrames;
         
         // 计算当前帧率
@@ -365,7 +366,7 @@ void RenderOptimizer::performFrameRateMonitoring()
 OptimizationResult RenderOptimizer::performPowerSavingOptimization()
 {
     OptimizationResult result;
-    result.success = true;
+    result.status = OptimizationResultStatus::Success;
     
     updateProgress(10, "Starting power saving render optimization");
     
@@ -387,13 +388,15 @@ OptimizationResult RenderOptimizer::performPowerSavingOptimization()
     
     updateProgress(100, "Power saving optimization completed");
     
-    result.details.actionsPerformed << "Reduced render quality to 50%"
-                                   << "Set target frame rate to 30 FPS"
-                                   << "Optimized texture settings"
-                                   << "Disabled non-essential effects";
+    QStringList actions;
+    actions << "Reduced render quality to 50%"
+            << "Set target frame rate to 30 FPS"
+            << "Optimized texture settings"
+            << "Disabled non-essential effects";
+    result.message = actions.join("; ");
     
-    result.improvements.cpuImprovement = 20.0;
-    result.improvements.performanceGain = 15.0;
+    result.improvements["cpuImprovement"] = 20.0;
+    result.improvements["performanceGain"] = 15.0;
     
     return result;
 }
@@ -401,7 +404,7 @@ OptimizationResult RenderOptimizer::performPowerSavingOptimization()
 OptimizationResult RenderOptimizer::performBalancedRenderOptimization()
 {
     OptimizationResult result;
-    result.success = true;
+    result.status = OptimizationResultStatus::Success;
     
     updateProgress(10, "Starting balanced render optimization");
     
@@ -427,14 +430,16 @@ OptimizationResult RenderOptimizer::performBalancedRenderOptimization()
     
     updateProgress(100, "Balanced render optimization completed");
     
-    result.details.actionsPerformed << "Set balanced render quality (75%)"
-                                   << "Set target frame rate to 60 FPS"
-                                   << "Optimized GPU settings"
-                                   << "Optimized video codec"
-                                   << "Adjusted render pipeline";
+    QStringList actions;
+    actions << "Set balanced render quality (75%)"
+            << "Set target frame rate to 60 FPS"
+            << "Optimized GPU settings"
+            << "Optimized video codec"
+            << "Adjusted render pipeline";
+    result.message = actions.join("; ");
     
-    result.improvements.performanceGain = 18.0;
-    result.improvements.cpuImprovement = 12.0;
+    result.improvements["performanceGain"] = 18.0;
+    result.improvements["cpuImprovement"] = 12.0;
     
     return result;
 }
@@ -442,7 +447,7 @@ OptimizationResult RenderOptimizer::performBalancedRenderOptimization()
 OptimizationResult RenderOptimizer::performHighQualityOptimization()
 {
     OptimizationResult result;
-    result.success = true;
+    result.status = OptimizationResultStatus::Success;
     
     updateProgress(10, "Starting high quality render optimization");
     
@@ -468,14 +473,16 @@ OptimizationResult RenderOptimizer::performHighQualityOptimization()
     
     updateProgress(100, "High quality optimization completed");
     
-    result.details.actionsPerformed << "Set maximum render quality (100%)"
-                                   << "Set target frame rate to 120 FPS"
-                                   << "Enabled hardware acceleration"
-                                   << "Optimized texture quality"
-                                   << "Enabled advanced effects";
+    QStringList actions;
+    actions << "Set maximum render quality (100%)"
+            << "Set target frame rate to 120 FPS"
+            << "Enabled hardware acceleration"
+            << "Optimized texture quality"
+            << "Enabled advanced effects";
+    result.message = actions.join("; ");
     
-    result.improvements.performanceGain = 25.0;
-    result.improvements.cpuImprovement = 8.0;
+    result.improvements["performanceGain"] = 25.0;
+    result.improvements["cpuImprovement"] = 8.0;
     
     return result;
 }

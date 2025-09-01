@@ -6,6 +6,9 @@
 #include <QVariantMap>
 #include <memory>
 
+// 前向声明
+class IMeetingManager;
+
 class MeetingManager;
 class Meeting;
 class QVBoxLayout;
@@ -193,6 +196,39 @@ public slots:
      */
     void stopLoading();
 
+public slots:
+    /**
+     * @brief 加入会议
+     */
+    void joinMeeting();
+    
+    /**
+     * @brief 离开会议
+     */
+    void leaveMeeting();
+    
+    /**
+     * @brief 创建会议
+     */
+    void createMeeting();
+    
+    /**
+     * @brief 邀请参与者
+     */
+    void inviteParticipants();
+    
+    /**
+     * @brief 复制会议链接
+     */
+    void copyMeetingLink();
+    
+    /**
+     * @brief 设置加载状态
+     * @param loading 是否加载中
+     * @param message 加载消息
+     */
+    void setLoading(bool loading, const QString& message = QString());
+
 private slots:
     /**
      * @brief 处理加入按钮点击
@@ -235,6 +271,13 @@ private slots:
      * @param participantInfo 参与者信息
      */
     void handleParticipantJoined(const QVariantMap& participantInfo);
+    
+    /**
+     * @brief 处理参与者加入
+     * @param participantId 参与者ID
+     * @param info 参与者信息
+     */
+    void handleParticipantJoined(const QString& participantId, const QVariantMap& info);
 
     /**
      * @brief 处理参与者离开
@@ -296,6 +339,13 @@ signals:
      * @param mode 新模式
      */
     void displayModeChanged(DisplayMode mode);
+
+protected:
+    /**
+     * @brief 绘制事件
+     * @param event 绘制事件
+     */
+    void paintEvent(QPaintEvent* event) override;
 
 private:
     /**

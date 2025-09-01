@@ -1,4 +1,4 @@
-#include "NavigationBar.h"
+#include "../include/NavigationBar.h"
 #include <QApplication>
 #include <QStyle>
 

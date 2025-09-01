@@ -34,9 +34,8 @@ ConsoleLogger::ConsoleLogger(QObject* parent)
     , m_stdout(new QTextStream(stdout))
     , m_stderr(new QTextStream(stderr))
 {
-    // 设置UTF-8编码
-    m_stdout->setCodec("UTF-8");
-    m_stderr->setCodec("UTF-8");
+    // 在Qt 6中，QTextStream不再支持setCodec
+    // 使用标准输出和错误流的默认编码
     
     // 初始化默认颜色
     initializeDefaultColors();

@@ -226,14 +226,14 @@ private:
      * @brief 读取系统负载
      * @return 系统负载平均值
      */
-    QList<double> readLoadAverages();
+    QList<double> readLoadAverages() const;
 
     /**
      * @brief 读取进程CPU使用率
      * @param processId 进程ID
      * @return 进程CPU使用率
      */
-    double readProcessCPUUsage(qint64 processId);
+    double readProcessCPUUsage(qint64 processId) const;
 
 #ifdef Q_OS_WIN
     /**

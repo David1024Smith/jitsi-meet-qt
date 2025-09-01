@@ -5,6 +5,7 @@
 #include <QPushButton>
 #include <QIcon>
 #include <QSize>
+#include <QEnterEvent>
 
 /**
  * @brief 自定义按钮组件
@@ -62,15 +63,15 @@ public:
     void setIconName(const QString& iconName);
     void setIconFromTheme(const QString& iconName);
 
-    // 主题支持
-    void applyTheme(std::shared_ptr<BaseTheme> theme) override;
+    // 主题支持 (从 BaseWidget 接口实现)
+    void applyTheme(std::shared_ptr<BaseTheme> theme);
 
-    // 配置管理
-    QVariantMap getConfiguration() const override;
-    void setConfiguration(const QVariantMap& config) override;
+    // 配置管理 (从 BaseWidget 接口实现)
+    QVariantMap getConfiguration() const;
+    void setConfiguration(const QVariantMap& config);
 
-    // 组件信息
-    QString componentName() const override;
+    // 组件信息 (从 BaseWidget 接口实现)
+    QString componentName() const;
 
 signals:
     void buttonStyleChanged(ButtonStyle style);
@@ -79,20 +80,20 @@ signals:
     void iconNameChanged(const QString& iconName);
 
 protected:
-    // 主题相关
-    void onThemeChanged(std::shared_ptr<BaseTheme> theme) override;
-    QString getDefaultStyleSheet() const override;
-    void updateThemeColors() override;
-    void updateThemeFonts() override;
-    void updateThemeSizes() override;
+    // 主题相关 (从 BaseWidget 接口实现)
+    void onThemeChanged(std::shared_ptr<BaseTheme> theme);
+    QString getDefaultStyleSheet() const;
+    void updateThemeColors();
+    void updateThemeFonts();
+    void updateThemeSizes();
 
-    // 配置相关
-    QVariantMap getDefaultConfiguration() const override;
-    bool validateConfiguration(const QVariantMap& config) const override;
+    // 配置相关 (从 BaseWidget 接口实现)
+    QVariantMap getDefaultConfiguration() const;
+    bool validateConfiguration(const QVariantMap& config) const;
 
     // 事件处理
     void paintEvent(QPaintEvent *event) override;
-    void enterEvent(QEvent *event) override;
+    void enterEvent(QEnterEvent *event) override;
     void leaveEvent(QEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
@@ -121,6 +122,9 @@ private:
     // 状态跟踪
     bool m_hovered;
     bool m_pressed;
+    
+    // BaseWidget 功能组合
+    std::unique_ptr<BaseWidget> m_baseWidget;
 };
 
 #endif // CUSTOMBUTTON_H

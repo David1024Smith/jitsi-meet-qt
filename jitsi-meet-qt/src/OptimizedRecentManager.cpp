@@ -5,430 +5,340 @@
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QJsonObject>
-#include <QElapsedTimer>
-#include <QtConcurrent>
 #include <QDebug>
+
+OptimizedRecentManager* OptimizedRecentManager::s_instance = nullptr;
 
 OptimizedRecentManager::OptimizedRecentManager(QObject *parent)
     : QObject(parent)
-    , m_maxItems(50)
-    , m_lazyLoadingEnabled(true)
-    , m_autoSaveEnabled(true)
-    , m_loadWatcher(new QFutureWatcher<void>(this))
-    , m_saveWatcher(new QFutureWatcher<void>(this))
-    , m_optimizationTimer(new QTimer(this))
-    , m_lastLoadTime(0)
-    , m_isLoaded(false)
-    , m_isDirty(false)
+    , m_maxListSize(50)
+    , m_initialized(false)
 {
-    // 连接异步操作完成信号
-    connect(m_loadWatcher, &QFutureWatcher<void>::finished, 
-            this, &OptimizedRecentManager::onLoadingFinished);
-    connect(m_saveWatcher, &QFutureWatcher<void>::finished, 
-            this, &OptimizedRecentManager::onSavingFinished);
-    
-    // 设置优化定时器
-    m_optimizationTimer->setInterval(300000); // 5分钟优化一次
-    connect(m_optimizationTimer, &QTimer::timeout, 
-            this, &OptimizedRecentManager::onOptimizationTimer);
-    m_optimizationTimer->start();
-    
-    // 预分配容器空间
-    m_recentItems.reserve(m_maxItems);
-    m_urlToIndex.reserve(m_maxItems);
-    
-    qDebug() << "OptimizedRecentManager: Initialized with max items:" << m_maxItems;
+    s_instance = this;
 }
 
 OptimizedRecentManager::~OptimizedRecentManager()
 {
-    // 等待异步操作完成
-    if (m_loadWatcher->isRunning()) {
-        m_loadWatcher->waitForFinished();
+    if (m_initialized) {
+        saveRecentMeetings();
     }
-    if (m_saveWatcher->isRunning()) {
-        m_saveWatcher->waitForFinished();
-    }
-    
-    // 保存未保存的更改
-    if (m_isDirty && m_autoSaveEnabled) {
-        saveRecentItemsSync();
-    }
+    s_instance = nullptr;
 }
 
-void OptimizedRecentManager::loadRecentItemsAsync()
+OptimizedRecentManager* OptimizedRecentManager::instance()
 {
-    if (m_loadWatcher->isRunning()) {
-        return; // 已在加载中
-    }
-    
-    QFuture<void> future = QtConcurrent::run([this]() {
-        loadRecentItemsSync();
-    });
-    
-    m_loadWatcher->setFuture(future);
-    qDebug() << "OptimizedRecentManager: Started async loading";
+    return s_instance;
 }
 
-void OptimizedRecentManager::saveRecentItemsAsync()
+bool OptimizedRecentManager::initialize()
 {
-    if (!m_isDirty || m_saveWatcher->isRunning()) {
-        return;
+    if (m_initialized) {
+        return true;
     }
+
+    qDebug() << "Initializing OptimizedRecentManager...";
     
-    // 创建数据副本以避免并发访问问题
-    QList<RecentItem> itemsCopy;
-    {
-        QMutexLocker locker(&m_itemsMutex);
-        itemsCopy = m_recentItems;
-    }
+    // Load existing recent meetings
+    bool success = loadRecentMeetings();
     
-    QFuture<void> future = QtConcurrent::run([this, itemsCopy]() {
-        saveRecentItemsSync();
-    });
+    m_initialized = true;
+    qDebug() << "OptimizedRecentManager initialized successfully";
     
-    m_saveWatcher->setFuture(future);
-    qDebug() << "OptimizedRecentManager: Started async saving";
+    return success;
 }
 
-void OptimizedRecentManager::addRecentItem(const QString& url, const QString& displayName)
+void OptimizedRecentManager::shutdown()
 {
-    if (url.isEmpty()) {
-        return;
+    if (m_initialized) {
+        saveRecentMeetings();
     }
-    
-    QMutexLocker locker(&m_itemsMutex);
-    
-    // 检查是否已存在
-    auto it = std::find_if(m_recentItems.begin(), m_recentItems.end(),
-                          [&url](const RecentItem& item) { return item.url == url; });
-    
-    if (it != m_recentItems.end()) {
-        // 更新现有项目
-        it->timestamp = QDateTime::currentDateTime();
-        it->accessCount++;
-        if (!displayName.isEmpty()) {
-            it->displayName = displayName;
-        }
-    } else {
-        // 添加新项目
-        RecentItem newItem;
-        newItem.url = url;
-        newItem.displayName = displayName.isEmpty() ? url : displayName;
-        newItem.timestamp = QDateTime::currentDateTime();
-        newItem.accessCount = 1;
-        
-        m_recentItems.append(newItem);
-        emit recentItemAdded(newItem);
-    }
-    
-    // 重新排序和修剪
-    sortRecentItems();
-    trimToMaxItems();
-    
-    // 更新索引
-    updateUrlIndex();
-    
-    m_isDirty = true;
-    
-    // 清理搜索缓存
-    {
-        QMutexLocker cacheLocker(&m_cacheMutex);
-        m_searchCache.clear();
-    }
-    
-    // 自动保存
-    if (m_autoSaveEnabled) {
-        saveRecentItemsAsync();
-    }
+    m_initialized = false;
 }
 
-void OptimizedRecentManager::removeRecentItem(const QString& url)
+bool OptimizedRecentManager::addRecentMeeting(const QString& meetingId, const QString& displayName, 
+                                            const QString& url, const QVariantMap& metadata)
 {
-    QMutexLocker locker(&m_itemsMutex);
-    
-    auto it = std::find_if(m_recentItems.begin(), m_recentItems.end(),
-                          [&url](const RecentItem& item) { return item.url == url; });
-    
-    if (it != m_recentItems.end()) {
-        m_recentItems.erase(it);
-        updateUrlIndex();
-        m_isDirty = true;
-        
-        emit recentItemRemoved(url);
-        
-        // 清理搜索缓存
-        QMutexLocker cacheLocker(&m_cacheMutex);
-        m_searchCache.clear();
-        
-        if (m_autoSaveEnabled) {
-            saveRecentItemsAsync();
+    if (!validateMeetingId(meetingId)) {
+        return false;
+    }
+
+    // Check if meeting already exists
+    for (int i = 0; i < m_recentMeetings.size(); ++i) {
+        if (m_recentMeetings[i].meetingId == meetingId) {
+            // Update existing meeting
+            m_recentMeetings[i].displayName = displayName;
+            m_recentMeetings[i].url = url;
+            m_recentMeetings[i].lastJoined = QDateTime::currentDateTime();
+            m_recentMeetings[i].joinCount++;
+            m_recentMeetings[i].metadata = metadata;
+            
+            sortRecentMeetings();
+            emit recentMeetingUpdated(meetingId);
+            emit recentMeetingsChanged();
+            return true;
         }
     }
+
+    // Add new meeting
+    RecentItem item;
+    item.meetingId = meetingId;
+    item.displayName = displayName;
+    item.url = url;
+    item.lastJoined = QDateTime::currentDateTime();
+    item.joinCount = 1;
+    item.favorite = false;
+    item.metadata = metadata;
+
+    m_recentMeetings.append(item);
+    sortRecentMeetings();
+    pruneRecentMeetings();
+
+    emit recentMeetingAdded(meetingId);
+    emit recentMeetingsChanged();
+    
+    return true;
 }
 
-void OptimizedRecentManager::clearRecentItems()
+bool OptimizedRecentManager::updateRecentMeeting(const QString& meetingId, const QString& displayName, 
+                                                const QString& url, const QVariantMap& metadata)
 {
-    QMutexLocker locker(&m_itemsMutex);
-    
-    if (!m_recentItems.isEmpty()) {
-        m_recentItems.clear();
-        m_urlToIndex.clear();
-        m_isDirty = true;
-        
-        // 清理搜索缓存
-        QMutexLocker cacheLocker(&m_cacheMutex);
-        m_searchCache.clear();
-        
-        if (m_autoSaveEnabled) {
-            saveRecentItemsAsync();
-        }
-    }
-}
-
-QList<RecentItem> OptimizedRecentManager::getRecentItems(int maxCount) const
-{
-    QMutexLocker locker(&m_itemsMutex);
-    
-    if (maxCount < 0 || maxCount >= m_recentItems.size()) {
-        return m_recentItems;
-    }
-    
-    return m_recentItems.mid(0, maxCount);
-}
-
-QList<RecentItem> OptimizedRecentManager::searchRecentItems(const QString& query) const
-{
-    if (query.isEmpty()) {
-        return getRecentItems();
-    }
-    
-    // 检查缓存
-    {
-        QMutexLocker cacheLocker(&m_cacheMutex);
-        auto cacheIt = m_searchCache.find(query.toLower());
-        if (cacheIt != m_searchCache.end()) {
-            return cacheIt.value();
+    for (int i = 0; i < m_recentMeetings.size(); ++i) {
+        if (m_recentMeetings[i].meetingId == meetingId) {
+            m_recentMeetings[i].displayName = displayName;
+            m_recentMeetings[i].url = url;
+            m_recentMeetings[i].metadata = metadata;
+            
+            emit recentMeetingUpdated(meetingId);
+            emit recentMeetingsChanged();
+            return true;
         }
     }
     
-    QMutexLocker locker(&m_itemsMutex);
-    
-    QList<RecentItem> results;
-    QString lowerQuery = query.toLower();
-    
-    for (const RecentItem& item : m_recentItems) {
-        if (item.url.toLower().contains(lowerQuery) || 
-            item.displayName.toLower().contains(lowerQuery)) {
-            results.append(item);
+    return false;
+}
+
+bool OptimizedRecentManager::removeRecentMeeting(const QString& meetingId)
+{
+    for (int i = 0; i < m_recentMeetings.size(); ++i) {
+        if (m_recentMeetings[i].meetingId == meetingId) {
+            m_recentMeetings.removeAt(i);
+            emit recentMeetingRemoved(meetingId);
+            emit recentMeetingsChanged();
+            return true;
         }
     }
     
-    // 缓存结果
-    {
-        QMutexLocker cacheLocker(&m_cacheMutex);
-        m_searchCache[lowerQuery] = results;
-        
-        // 限制缓存大小
-        if (m_searchCache.size() > 100) {
-            // 在Qt 6中，需要逐个删除元素
-            auto keys = m_searchCache.keys();
-            for (int i = 50; i < keys.size(); ++i) {
-                m_searchCache.remove(keys[i]);
-            }
+    return false;
+}
+
+void OptimizedRecentManager::clearRecentMeetings()
+{
+    m_recentMeetings.clear();
+    emit recentMeetingsChanged();
+}
+
+QList<OptimizedRecentManager::RecentItem> OptimizedRecentManager::getRecentMeetings(int limit) const
+{
+    if (limit < 0 || limit >= m_recentMeetings.size()) {
+        return m_recentMeetings;
+    }
+    
+    return m_recentMeetings.mid(0, limit);
+}
+
+QList<OptimizedRecentManager::RecentItem> OptimizedRecentManager::getFavoriteMeetings() const
+{
+    QList<RecentItem> favorites;
+    for (const auto& item : m_recentMeetings) {
+        if (item.favorite) {
+            favorites.append(item);
+        }
+    }
+    return favorites;
+}
+
+bool OptimizedRecentManager::setMeetingFavorite(const QString& meetingId, bool favorite)
+{
+    for (int i = 0; i < m_recentMeetings.size(); ++i) {
+        if (m_recentMeetings[i].meetingId == meetingId) {
+            m_recentMeetings[i].favorite = favorite;
+            emit favoriteStatusChanged(meetingId, favorite);
+            emit recentMeetingsChanged();
+            return true;
         }
     }
     
-    return results;
+    return false;
 }
 
-bool OptimizedRecentManager::hasRecentItem(const QString& url) const
+bool OptimizedRecentManager::containsMeeting(const QString& meetingId) const
 {
-    QMutexLocker locker(&m_itemsMutex);
-    return m_urlToIndex.contains(url);
-}
-
-void OptimizedRecentManager::setMaxItems(int maxItems)
-{
-    if (maxItems != m_maxItems && maxItems > 0) {
-        m_maxItems = maxItems;
-        
-        QMutexLocker locker(&m_itemsMutex);
-        trimToMaxItems();
-        
-        qDebug() << "OptimizedRecentManager: Max items set to" << maxItems;
-    }
-}
-
-void OptimizedRecentManager::setLazyLoadingEnabled(bool enabled)
-{
-    m_lazyLoadingEnabled = enabled;
-    qDebug() << "OptimizedRecentManager: Lazy loading" << (enabled ? "enabled" : "disabled");
-}
-
-void OptimizedRecentManager::optimizeStorage()
-{
-    QMutexLocker locker(&m_itemsMutex);
-    
-    // 移除过期项目（超过30天未访问）
-    QDateTime cutoffDate = QDateTime::currentDateTime().addDays(-30);
-    
-    auto it = m_recentItems.begin();
-    while (it != m_recentItems.end()) {
-        if (it->timestamp < cutoffDate && it->accessCount < 2) {
-            it = m_recentItems.erase(it);
-        } else {
-            ++it;
+    for (const auto& item : m_recentMeetings) {
+        if (item.meetingId == meetingId) {
+            return true;
         }
     }
-    
-    // 重新排序和更新索引
-    sortRecentItems();
-    updateUrlIndex();
-    
-    // 清理缓存
-    {
-        QMutexLocker cacheLocker(&m_cacheMutex);
-        m_searchCache.clear();
-    }
-    
-    m_isDirty = true;
-    
-    qDebug() << "OptimizedRecentManager: Storage optimized, items count:" << m_recentItems.size();
+    return false;
 }
 
-int OptimizedRecentManager::getItemCount() const
+OptimizedRecentManager::RecentItem OptimizedRecentManager::getMeetingDetails(const QString& meetingId) const
 {
-    QMutexLocker locker(&m_itemsMutex);
-    return m_recentItems.size();
-}
-
-qint64 OptimizedRecentManager::getLoadTime() const
-{
-    return m_lastLoadTime;
-}
-
-void OptimizedRecentManager::onLoadingFinished()
-{
-    m_isLoaded = true;
-    emit recentItemsLoaded();
-    qDebug() << "OptimizedRecentManager: Loading completed in" << m_lastLoadTime << "ms";
-}
-
-void OptimizedRecentManager::onSavingFinished()
-{
-    m_isDirty = false;
-    qDebug() << "OptimizedRecentManager: Saving completed";
-}
-
-void OptimizedRecentManager::onOptimizationTimer()
-{
-    optimizeStorage();
-    
-    if (m_isDirty && m_autoSaveEnabled) {
-        saveRecentItemsAsync();
-    }
-}
-
-void OptimizedRecentManager::loadRecentItemsSync()
-{
-    QElapsedTimer timer;
-    timer.start();
-    
-    QString configPath = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
-    QDir().mkpath(configPath);
-    QString filePath = configPath + "/recent_items.json";
-    
-    QFile file(filePath);
-    if (!file.open(QIODevice::ReadOnly)) {
-        qDebug() << "OptimizedRecentManager: No existing recent items file";
-        m_lastLoadTime = timer.elapsed();
-        return;
-    }
-    
-    QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
-    QJsonArray array = doc.array();
-    
-    QMutexLocker locker(&m_itemsMutex);
-    m_recentItems.clear();
-    m_recentItems.reserve(array.size());
-    
-    for (const QJsonValue& value : array) {
-        QJsonObject obj = value.toObject();
-        
-        RecentItem item;
-        item.url = obj["url"].toString();
-        item.displayName = obj["displayName"].toString();
-        item.timestamp = QDateTime::fromString(obj["timestamp"].toString(), Qt::ISODate);
-        item.accessCount = obj["accessCount"].toInt();
-        
-        if (!item.url.isEmpty()) {
-            m_recentItems.append(item);
+    for (const auto& item : m_recentMeetings) {
+        if (item.meetingId == meetingId) {
+            return item;
         }
     }
-    
-    sortRecentItems();
-    trimToMaxItems();
-    updateUrlIndex();
-    
-    m_lastLoadTime = timer.elapsed();
-    qDebug() << "OptimizedRecentManager: Loaded" << m_recentItems.size() << "items in" << m_lastLoadTime << "ms";
+    return RecentItem();
 }
 
-void OptimizedRecentManager::saveRecentItemsSync()
+void OptimizedRecentManager::setMaxListSize(int size)
 {
-    QString configPath = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
-    QDir().mkpath(configPath);
-    QString filePath = configPath + "/recent_items.json";
-    
-    QJsonArray array;
-    
-    {
-        QMutexLocker locker(&m_itemsMutex);
-        for (const RecentItem& item : m_recentItems) {
-            QJsonObject obj;
-            obj["url"] = item.url;
-            obj["displayName"] = item.displayName;
-            obj["timestamp"] = item.timestamp.toString(Qt::ISODate);
-            obj["accessCount"] = item.accessCount;
-            array.append(obj);
+    m_maxListSize = qMax(1, size);
+    pruneRecentMeetings();
+}
+
+int OptimizedRecentManager::maxListSize() const
+{
+    return m_maxListSize;
+}
+
+bool OptimizedRecentManager::saveRecentMeetings()
+{
+    QString filePath = getStorageFilePath();
+    QDir().mkpath(QFileInfo(filePath).absolutePath());
+
+    QJsonArray jsonArray;
+    for (const auto& item : m_recentMeetings) {
+        QJsonObject jsonObj;
+        jsonObj["meetingId"] = item.meetingId;
+        jsonObj["displayName"] = item.displayName;
+        jsonObj["url"] = item.url;
+        jsonObj["lastJoined"] = item.lastJoined.toString(Qt::ISODate);
+        jsonObj["joinCount"] = item.joinCount;
+        jsonObj["favorite"] = item.favorite;
+        
+        // Convert metadata to JSON
+        QJsonObject metadataObj;
+        for (auto it = item.metadata.constBegin(); it != item.metadata.constEnd(); ++it) {
+            metadataObj[it.key()] = QJsonValue::fromVariant(it.value());
         }
+        jsonObj["metadata"] = metadataObj;
+        
+        jsonArray.append(jsonObj);
     }
-    
-    QJsonDocument doc(array);
-    
+
+    QJsonDocument doc(jsonArray);
     QFile file(filePath);
     if (file.open(QIODevice::WriteOnly)) {
         file.write(doc.toJson());
-        qDebug() << "OptimizedRecentManager: Saved" << array.size() << "items";
-    } else {
-        qWarning() << "OptimizedRecentManager: Failed to save recent items";
+        return true;
     }
+
+    qWarning() << "Failed to save recent meetings to:" << filePath;
+    return false;
 }
 
-void OptimizedRecentManager::sortRecentItems()
+bool OptimizedRecentManager::loadRecentMeetings()
 {
-    std::sort(m_recentItems.begin(), m_recentItems.end());
-}
-
-void OptimizedRecentManager::trimToMaxItems()
-{
-    if (m_recentItems.size() > m_maxItems) {
-        m_recentItems.resize(m_maxItems);
-    }
-}
-
-void OptimizedRecentManager::updateUrlIndex()
-{
-    m_urlToIndex.clear();
-    m_urlToIndex.reserve(m_recentItems.size());
+    QString filePath = getStorageFilePath();
+    QFile file(filePath);
     
-    for (int i = 0; i < m_recentItems.size(); ++i) {
-        m_urlToIndex[m_recentItems[i].url] = i;
+    if (!file.exists()) {
+        qDebug() << "Recent meetings file does not exist, starting with empty list";
+        return true;
+    }
+
+    if (!file.open(QIODevice::ReadOnly)) {
+        qWarning() << "Failed to open recent meetings file:" << filePath;
+        return false;
+    }
+
+    QJsonParseError error;
+    QJsonDocument doc = QJsonDocument::fromJson(file.readAll(), &error);
+    
+    if (error.error != QJsonParseError::NoError) {
+        qWarning() << "Failed to parse recent meetings JSON:" << error.errorString();
+        return false;
+    }
+
+    m_recentMeetings.clear();
+    QJsonArray jsonArray = doc.array();
+    
+    for (const auto& value : jsonArray) {
+        QJsonObject jsonObj = value.toObject();
+        
+        RecentItem item;
+        item.meetingId = jsonObj["meetingId"].toString();
+        item.displayName = jsonObj["displayName"].toString();
+        item.url = jsonObj["url"].toString();
+        item.lastJoined = QDateTime::fromString(jsonObj["lastJoined"].toString(), Qt::ISODate);
+        item.joinCount = jsonObj["joinCount"].toInt();
+        item.favorite = jsonObj["favorite"].toBool();
+        
+        // Convert metadata from JSON
+        QJsonObject metadataObj = jsonObj["metadata"].toObject();
+        for (auto it = metadataObj.constBegin(); it != metadataObj.constEnd(); ++it) {
+            item.metadata[it.key()] = it.value().toVariant();
+        }
+        
+        m_recentMeetings.append(item);
+    }
+
+    sortRecentMeetings();
+    qDebug() << "Loaded" << m_recentMeetings.size() << "recent meetings";
+    return true;
+}
+
+void OptimizedRecentManager::sortRecentMeetings()
+{
+    std::sort(m_recentMeetings.begin(), m_recentMeetings.end(), 
+              [](const RecentItem& a, const RecentItem& b) {
+                  // Favorites first, then by last joined time
+                  if (a.favorite != b.favorite) {
+                      return a.favorite > b.favorite;
+                  }
+                  return a.lastJoined > b.lastJoined;
+              });
+}
+
+bool OptimizedRecentManager::validateMeetingId(const QString& meetingId) const
+{
+    return !meetingId.isEmpty() && meetingId.length() <= 255;
+}
+
+void OptimizedRecentManager::pruneRecentMeetings()
+{
+    if (m_recentMeetings.size() > m_maxListSize) {
+        // Keep favorites and remove oldest non-favorites
+        QList<RecentItem> favorites;
+        QList<RecentItem> nonFavorites;
+        
+        for (const auto& item : m_recentMeetings) {
+            if (item.favorite) {
+                favorites.append(item);
+            } else {
+                nonFavorites.append(item);
+            }
+        }
+        
+        // Sort non-favorites by last joined time
+        std::sort(nonFavorites.begin(), nonFavorites.end(), 
+                  [](const RecentItem& a, const RecentItem& b) {
+                      return a.lastJoined > b.lastJoined;
+                  });
+        
+        m_recentMeetings = favorites;
+        int remainingSlots = m_maxListSize - favorites.size();
+        if (remainingSlots > 0 && !nonFavorites.isEmpty()) {
+            m_recentMeetings.append(nonFavorites.mid(0, remainingSlots));
+        }
+        
+        sortRecentMeetings();
     }
 }
 
-QString OptimizedRecentManager::generateCacheKey(const QString& url) const
+QString OptimizedRecentManager::getStorageFilePath() const
 {
-    return QString::number(qHash(url));
+    QString dataPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    return dataPath + "/recent_meetings.json";
 }

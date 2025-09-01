@@ -63,9 +63,11 @@ public:
 };
 
 MessageStorage::MessageStorage(QObject *parent)
-    : IMessageStorage(parent)
-    , d(std::make_unique<Private>())
+    : IMessageStorage()
 {
+    // 初始化私有成员
+    d = std::make_unique<Private>();
+    
     // 设置默认数据库路径
     QString dataPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     d->databasePath = QDir(dataPath).filePath("chat_messages.db");
@@ -191,8 +193,9 @@ IMessageStorage::OperationResult MessageStorage::storeMessage(ChatMessage* messa
     
     emit messageStored(message->id());
     return Success;
-}IMessa
-geStorage::OperationResult MessageStorage::storeMessages(const QList<ChatMessage*>& messages)
+}
+
+IMessageStorage::OperationResult MessageStorage::storeMessages(const QList<ChatMessage*>& messages)
 {
     if (messages.isEmpty() || !isReady()) {
         return Failed;
@@ -1224,7 +1227,9 @@ ChatMessage* MessageStorage::createMessageFromQuery(QSqlQuery& query)
     ChatMessage* message = new ChatMessage(this);
     
     // 基本属性
-    message->d->id = query.value("id").toString();
+    // 使用反射机制设置id（因为id是只读的，没有public setter）
+    message->setProperty("id", query.value("id").toString());
+    
     message->setContent(query.value("content").toString());
     message->setType(static_cast<ChatMessage::MessageType>(query.value("type").toInt()));
     message->setSenderId(query.value("sender_id").toString());
@@ -1238,8 +1243,10 @@ ChatMessage* MessageStorage::createMessageFromQuery(QSqlQuery& query)
     // 编辑信息
     bool isEdited = query.value("is_edited").toBool();
     if (isEdited) {
-        message->d->isEdited = true;
-        message->d->editedTimestamp = query.value("edited_timestamp").toDateTime();
+        // 使用editContent方法来设置编辑状态
+        message->editContent(query.value("content").toString());
+        // 使用反射设置编辑时间戳
+        message->setProperty("editedTimestamp", query.value("edited_timestamp").toDateTime());
     }
     
     // 文件信息

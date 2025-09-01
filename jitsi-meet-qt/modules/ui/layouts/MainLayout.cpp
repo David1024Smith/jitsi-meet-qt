@@ -650,8 +650,15 @@ void MainLayout::arrangeAreas()
     }
 
     // 清除现有布局
-    m_mainSplitter->clear();
-    m_contentSplitter->clear();
+    while (m_mainSplitter->count() > 0) {
+        QWidget* widget = m_mainSplitter->widget(0);
+        widget->setParent(nullptr);
+    }
+    
+    while (m_contentSplitter->count() > 0) {
+        QWidget* widget = m_contentSplitter->widget(0);
+        widget->setParent(nullptr);
+    }
 
     // 添加头部区域
     if (m_headerWidget && m_areaVisibility.value(HeaderArea, false)) {

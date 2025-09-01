@@ -1,4 +1,4 @@
-#include "MemoryProfiler.h"
+#include "../include/MemoryProfiler.h"
 #include <QDateTime>
 #include <QDebug>
 #include <QJsonDocument>

@@ -421,6 +421,7 @@ private:
     QString getBackupPath(const QString& backupName) const;
     QString generateBackupName() const;
     bool writeToFile(const QVariant& data, const QString& filePath) const;
+    bool writeToFile(const QVariant& data, const QString& filePath, StorageFormat format) const;
     QVariant readFromFile(const QString& filePath) const;
     bool atomicWrite(const QByteArray& data, const QString& filePath) const;
     QByteArray formatData(const QVariant& data, StorageFormat format) const;
@@ -428,7 +429,7 @@ private:
     QString formatToExtension(StorageFormat format) const;
     StorageFormat extensionToFormat(const QString& extension) const;
     void setupFileWatcher();
-    void updateStatistics(const QString& operation);
+    void updateStatistics(const QString& operation) const;
 
     class Private;
     std::unique_ptr<Private> d;

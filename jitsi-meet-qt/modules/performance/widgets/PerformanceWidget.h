@@ -159,7 +159,7 @@ public slots:
      * @brief 更新性能等级显示
      * @param level 性能等级
      */
-    void updatePerformanceLevel(PerformanceManager::PerformanceLevel level);
+    void updatePerformanceLevel(PerformanceLevel level);
 
     /**
      * @brief 显示阈值超出警告
@@ -379,7 +379,7 @@ private:
      * @param level 性能等级
      * @return 颜色
      */
-    QColor getPerformanceLevelColor(PerformanceManager::PerformanceLevel level) const;
+    QColor getPerformanceLevelColor(PerformanceLevel level) const;
 
     PerformanceManager* m_performanceManager;       ///< 性能管理器
     PerformanceConfig* m_config;                   ///< 配置对象

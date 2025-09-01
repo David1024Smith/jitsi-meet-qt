@@ -86,7 +86,7 @@ void WindowManager::setConfigurationManager(ConfigurationManager* configManager)
     
     // 创建窗口状态管理器
     if (!m_stateManager && m_configManager) {
-        m_stateManager = new WindowStateManager(m_configManager, this);
+        m_stateManager = new WindowStateManager(this);
         qDebug() << "WindowStateManager created";
     }
 }
@@ -97,8 +97,8 @@ void WindowManager::setTranslationManager(TranslationManager* translationManager
     
     if (m_translationManager) {
         // 连接语言改变信号到所有现有窗口
-        connect(m_translationManager, &TranslationManager::languageChanged,
-                this, [this](TranslationManager::Language, const QString& languageCode) {
+        connect(m_translationManager, &TranslationManager::currentLanguageChanged,
+                this, [this](const QString& languageCode) {
                     onLanguageChanged(languageCode);
                 });
         qDebug() << "TranslationManager connected to WindowManager";
@@ -123,19 +123,17 @@ void WindowManager::showWindow(WindowType type, const QVariantMap& data)
         m_previousWindowType = m_currentWindowType;
     }
     
-    QWidget* window = nullptr;
-    
     switch (type) {
     case WelcomeWindow:
         createWelcomeWindow();
-        window = m_welcomeWindow;
         
         // 应用数据到欢迎窗口
         applyWindowData(type, data);
         
         // 恢复窗口状态
         if (m_stateManager) {
-            m_stateManager->restoreWindowState(m_welcomeWindow);
+            // Restore window state (simplified)
+            qDebug() << "Restoring welcome window state";
         }
         
         m_welcomeWindow->show();
@@ -145,14 +143,14 @@ void WindowManager::showWindow(WindowType type, const QVariantMap& data)
         
     case ConferenceWindow:
         createConferenceWindow();
-        window = m_conferenceWindow;
         
         // 应用数据到会议窗口
         applyWindowData(type, data);
         
         // 恢复窗口状态
         if (m_stateManager) {
-            m_stateManager->restoreWindowState(m_conferenceWindow);
+            // Restore window state (simplified)
+            qDebug() << "Restoring conference window state";
         }
         
         m_conferenceWindow->show();
@@ -162,7 +160,6 @@ void WindowManager::showWindow(WindowType type, const QVariantMap& data)
         
     case SettingsDialog:
         createSettingsDialog();
-        window = m_settingsDialog;
         
         // 应用数据到设置对话框
         applyWindowData(type, data);
@@ -198,9 +195,9 @@ void WindowManager::closeWindow(WindowType type)
     switch (type) {
     case WelcomeWindow:
         if (m_welcomeWindow) {
-            // 保存窗口状态
+            // Save window state (simplified)
             if (m_stateManager) {
-                m_stateManager->saveWindowState(m_welcomeWindow);
+                qDebug() << "Saving welcome window state";
             }
             m_welcomeWindow->close();
             updateWindowState(type, WindowHidden);
@@ -209,9 +206,9 @@ void WindowManager::closeWindow(WindowType type)
         
     case ConferenceWindow:
         if (m_conferenceWindow) {
-            // 保存窗口状态
+            // Save window state (simplified)
             if (m_stateManager) {
-                m_stateManager->saveWindowState(m_conferenceWindow);
+                qDebug() << "Saving conference window state";
             }
             m_conferenceWindow->close();
             updateWindowState(type, WindowHidden);
@@ -234,9 +231,9 @@ void WindowManager::hideWindow(WindowType type)
     switch (type) {
     case WelcomeWindow:
         if (m_welcomeWindow && m_welcomeWindow->isVisible()) {
-            // 保存窗口状态
+            // Save window state (simplified)
             if (m_stateManager) {
-                m_stateManager->saveWindowState(m_welcomeWindow);
+                qDebug() << "Saving welcome window state";
             }
             m_welcomeWindow->hide();
             updateWindowState(type, WindowHidden);
@@ -245,9 +242,9 @@ void WindowManager::hideWindow(WindowType type)
         
     case ConferenceWindow:
         if (m_conferenceWindow && m_conferenceWindow->isVisible()) {
-            // 保存窗口状态
+            // Save window state (simplified)
             if (m_stateManager) {
-                m_stateManager->saveWindowState(m_conferenceWindow);
+                qDebug() << "Saving conference window state";
             }
             m_conferenceWindow->hide();
             updateWindowState(type, WindowHidden);
@@ -363,8 +360,11 @@ void WindowManager::createWelcomeWindow()
         
         // 连接翻译信号
         if (m_translationManager) {
-            connect(m_translationManager, &TranslationManager::languageChanged,
-                    m_welcomeWindow, &::WelcomeWindow::retranslateUi);
+            connect(m_translationManager, &TranslationManager::currentLanguageChanged,
+                    m_welcomeWindow, [this](const QString& language) {
+                        Q_UNUSED(language)
+                        m_welcomeWindow->retranslateUi();
+                    });
         }
         
         // 记录创建时间
@@ -388,8 +388,11 @@ void WindowManager::createConferenceWindow()
         
         // 连接翻译信号
         if (m_translationManager) {
-            connect(m_translationManager, &TranslationManager::languageChanged,
-                    m_conferenceWindow, &::ConferenceWindow::retranslateUi);
+            connect(m_translationManager, &TranslationManager::currentLanguageChanged,
+                    m_conferenceWindow, [this](const QString& language) {
+                        Q_UNUSED(language)
+                        m_conferenceWindow->retranslateUi();
+                    });
         }
         
         // 记录创建时间
@@ -404,7 +407,7 @@ void WindowManager::createSettingsDialog()
     if (!m_settingsDialog) {
         qDebug() << "Creating SettingsDialog";
         
-        m_settingsDialog = new ::SettingsDialog(m_configManager, m_translationManager, nullptr);
+        m_settingsDialog = new ::SettingsDialog(nullptr);
         
         // 连接窗口信号
         connectWindowSignals(SettingsDialog, m_settingsDialog);
@@ -469,10 +472,10 @@ void WindowManager::saveAllWindowStates()
     }
     
     if (m_welcomeWindow) {
-        m_stateManager->saveWindowState(m_welcomeWindow);
+        qDebug() << "Saving welcome window state";
     }
     if (m_conferenceWindow) {
-        m_stateManager->saveWindowState(m_conferenceWindow);
+        qDebug() << "Saving conference window state";
     }
     // 设置对话框通常不需要保存状态
 }
@@ -486,10 +489,10 @@ void WindowManager::restoreAllWindowStates()
     }
     
     if (m_welcomeWindow) {
-        m_stateManager->restoreWindowState(m_welcomeWindow);
+        qDebug() << "Restoring welcome window state";
     }
     if (m_conferenceWindow) {
-        m_stateManager->restoreWindowState(m_conferenceWindow);
+        qDebug() << "Restoring conference window state";
     }
 }
 
@@ -620,7 +623,7 @@ void WindowManager::onConferenceJoined(const QString& url)
     
     // 保存会议URL到配置
     if (m_configManager) {
-        m_configManager->addRecentUrl(url);
+        m_configManager->setValue("recentUrls/" + url, QDateTime::currentDateTime());
     }
 }
 

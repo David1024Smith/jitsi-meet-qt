@@ -179,11 +179,11 @@ private:
     class ConfigurationManager* m_configurationManager;
     class ConferenceManager* m_conferenceManager;
     class MediaManager* m_mediaManager;
-    class ChatManager* m_chatManager;
+    // class ChatManager* m_chatManager; // 暂时禁用聊天功能
     class ScreenShareManager* m_screenShareManager;
     class AuthenticationManager* m_authenticationManager;
     class ErrorRecoveryManager* m_errorRecoveryManager;
-    class ThemeManager* m_themeManager;
+    // class ThemeManager* m_themeManager; // 暂时禁用主题功能
     class PerformanceManager* m_performanceManager;
     
     // Application state

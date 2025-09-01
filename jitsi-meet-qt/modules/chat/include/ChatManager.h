@@ -97,7 +97,7 @@ public:
      * @brief 获取连接状态
      * @return 连接状态
      */
-    ConnectionStatus connectionStatus() const override;
+    IChatManager::ConnectionStatus connectionStatus() const override;
 
     /**
      * @brief 加入聊天室
@@ -132,7 +132,7 @@ public:
      * @param roomId 目标房间ID（可选，默认当前房间）
      * @return 发送是否成功
      */
-    bool sendMessage(const QString& message, MessageType type = TextMessage, const QString& roomId = QString()) override;
+    bool sendMessage(const QString& message, IChatManager::MessageType type = IChatManager::TextMessage, const QString& roomId = QString()) override;
 
     /**
      * @brief 发送文件
@@ -203,6 +203,23 @@ public:
      * @return 统计信息
      */
     QVariantMap getStatistics() const override;
+
+    /**
+     * @brief 设置XMPP客户端
+     * @param client XMPP客户端实例
+     */
+    void setXMPPClient(QObject* client);
+
+    /**
+     * @brief 设置当前房间
+     * @param roomId 房间ID
+     */
+    void setCurrentRoom(const QString& roomId);
+
+    /**
+     * @brief 标记所有消息为已读
+     */
+    void markAllAsRead();
 
 public slots:
     /**

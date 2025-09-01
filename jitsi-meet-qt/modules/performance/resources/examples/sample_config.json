@@ -1,0 +1,33 @@
+{
+    "monitoring": {
+        "enabled": true,
+        "interval_ms": 1000,
+        "metrics": ["cpu", "memory", "network", "gpu"],
+        "auto_start": true
+    },
+    "thresholds": {
+        "cpu_warning": 70,
+        "cpu_critical": 85,
+        "memory_warning": 75,
+        "memory_critical": 90,
+        "network_warning": 80,
+        "network_critical": 95
+    },
+    "optimization": {
+        "enabled": true,
+        "auto_optimize": false,
+        "strategies": ["cpu", "memory", "network"]
+    },
+    "alerts": {
+        "enabled": true,
+        "show_notifications": true,
+        "log_events": true,
+        "email_notifications": false
+    },
+    "export": {
+        "auto_export": false,
+        "export_interval_hours": 24,
+        "format": "csv",
+        "include_charts": true
+    }
+}

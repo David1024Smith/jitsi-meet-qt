@@ -6,6 +6,7 @@
 #include <QJsonParseError>
 #include <QFile>
 #include <QTextStream>
+#include <QRegularExpression>
 
 // 静态成员初始化
 UtilsConfig* UtilsConfig::s_instance = nullptr;
@@ -375,7 +376,7 @@ bool UtilsConfig::validateConfigItem(ConfigKey key, const QVariant& value) const
 {
     switch (key) {
         case ModuleVersion:
-            return value.toString().contains(QRegExp("^\\d+\\.\\d+\\.\\d+$"));
+            return value.toString().contains(QRegularExpression("^\\d+\\.\\d+\\.\\d+$"));
             
         case ModuleEnabled:
         case DebugMode:

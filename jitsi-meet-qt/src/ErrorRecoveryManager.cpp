@@ -1,5 +1,5 @@
-#include "ErrorRecoveryManager.h"
-#include "ConfigurationManager.h"
+#include "../include/ErrorRecoveryManager.h"
+#include "../include/ConfigurationManager.h"
 #include "JitsiConstants.h"
 #include <QApplication>
 #include <QStandardPaths>

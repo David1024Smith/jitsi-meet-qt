@@ -378,8 +378,9 @@ QVariantMap WebSocketProtocol::protocolStats() const
     stats["uptime"] = QDateTime::currentMSecsSinceEpoch() - stats.value("startTime", 0).toLongLong();
     
     return stats;
-}bo
-ol WebSocketProtocol::connectToServer(const QString& url)
+}
+
+bool WebSocketProtocol::connectToServer(const QString& url)
 {
     if (!isValidServerUrl(url)) {
         qWarning() << "WebSocketProtocol: Invalid server URL:" << url;

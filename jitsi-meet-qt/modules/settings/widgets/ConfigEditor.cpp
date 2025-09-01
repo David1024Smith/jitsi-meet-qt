@@ -18,6 +18,7 @@
 #include <QMenu>
 #include <QCompleter>
 #include <QSyntaxHighlighter>
+#include <QHeaderView>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonParseError>
@@ -95,8 +96,9 @@ ConfigEditor::ConfigEditor(QWidget* parent)
     setConfigText("{\n    \n}");
 }
 
-ConfigEditor::~ConfigEditor() = default;Con
-figEditor::EditorMode ConfigEditor::editorMode() const
+ConfigEditor::~ConfigEditor() = default;
+
+ConfigEditor::EditorMode ConfigEditor::editorMode() const
 {
     return d->currentMode;
 }
@@ -695,7 +697,7 @@ bool ConfigEditor::loadFromFile(const QString& filePath)
     return true;
 }
 
-bool ConfigEditor::saveToFile(const QString& filePath) const
+bool ConfigEditor::saveToFile(const QString& filePath)
 {
     QFile file(filePath);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {

@@ -71,7 +71,7 @@ exists($$PWD/performance/performance.pri) {
 # Media Modules (媒体相关模块)
 ######################################################################
 
-# 4. 相机模块 (Camera) - 已存在
+# 4. 相机模块 (Camera) -
 exists($$PWD/camera/camera.pri) {
     include($$PWD/camera/camera.pri)
     message("✓ Camera module loaded")

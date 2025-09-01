@@ -6,6 +6,7 @@
 #include <QSize>
 #include <QRect>
 #include <QMutex>
+#include <QVariantMap>
 
 /**
  * @brief 帧处理器类
@@ -83,14 +84,19 @@ public:
     QPixmap processFrame(const QPixmap& frame);
     QByteArray processFrameData(const QByteArray& data, const QSize& size);
     bool processFrameAsync(const QPixmap& frame);
+    bool isInitialized() const;
 
     // 尺寸和缩放接口
     QSize outputSize() const;
     void setOutputSize(const QSize& size);
-    ScalingMode scalingMode() const;
+    QSize targetSize() const;
+    void setTargetSize(const QSize& size);
+    Qt::TransformationMode scalingMode() const;
     void setScalingMode(ScalingMode mode);
     bool maintainAspectRatio() const;
     void setMaintainAspectRatio(bool maintain);
+    bool isScalingEnabled() const;
+    void setScalingEnabled(bool enabled);
 
     // 裁剪接口
     QRect cropRegion() const;
@@ -101,6 +107,10 @@ public:
     // 旋转和翻转接口
     RotationAngle rotation() const;
     void setRotation(RotationAngle angle);
+    bool isRotationEnabled() const;
+    void setRotationEnabled(bool enabled);
+    int rotationAngle() const;
+    void setRotationAngle(int angle);
     bool isHorizontalFlip() const;
     void setHorizontalFlip(bool flip);
     bool isVerticalFlip() const;
@@ -114,11 +124,19 @@ public:
 
     // 滤镜接口
     QList<FilterType> activeFilters() const;
-    void addFilter(FilterType filter, const QVariantMap& parameters = QVariantMap());
+    void addFilter(FilterType filter, const QVariantMap& parameters = QVariantMap{});
     void removeFilter(FilterType filter);
     void clearFilters();
     void setFilterParameter(FilterType filter, const QString& parameter, const QVariant& value);
     QVariant getFilterParameter(FilterType filter, const QString& parameter) const;
+    bool isFilteringEnabled() const;
+    void setFilteringEnabled(bool enabled);
+    int brightness() const;
+    void setBrightness(int brightness);
+    int contrast() const;
+    void setContrast(int contrast);
+    int saturation() const;
+    void setSaturation(int saturation);
 
     // 水印接口
     bool isWatermarkEnabled() const;
@@ -177,12 +195,78 @@ signals:
      * @param size 新的输出尺寸
      */
     void outputSizeChanged(const QSize& size);
+    
+    /**
+     * @brief 目标尺寸改变信号
+     * @param size 新的目标尺寸
+     */
+    void targetSizeChanged(const QSize& size);
+    
+    /**
+     * @brief 缩放模式改变信号
+     * @param mode 新的缩放模式
+     */
+    void scalingModeChanged(ScalingMode mode);
 
     /**
      * @brief 质量改变信号
      * @param quality 新的质量设置
      */
     void qualityChanged(int quality);
+    
+    /**
+     * @brief 缩放启用状态改变信号
+     * @param enabled 是否启用缩放
+     */
+    void scalingEnabledChanged(bool enabled);
+    
+    /**
+     * @brief 裁剪启用状态改变信号
+     * @param enabled 是否启用裁剪
+     */
+    void cropEnabledChanged(bool enabled);
+    
+    /**
+     * @brief 裁剪区域改变信号
+     * @param region 新的裁剪区域
+     */
+    void cropRegionChanged(const QRect& region);
+    
+    /**
+     * @brief 旋转启用状态改变信号
+     * @param enabled 是否启用旋转
+     */
+    void rotationEnabledChanged(bool enabled);
+    
+    /**
+     * @brief 旋转角度改变信号
+     * @param angle 新的旋转角度
+     */
+    void rotationAngleChanged(int angle);
+    
+    /**
+     * @brief 滤镜启用状态改变信号
+     * @param enabled 是否启用滤镜
+     */
+    void filteringEnabledChanged(bool enabled);
+    
+    /**
+     * @brief 亮度改变信号
+     * @param brightness 新的亮度值
+     */
+    void brightnessChanged(int brightness);
+    
+    /**
+     * @brief 对比度改变信号
+     * @param contrast 新的对比度值
+     */
+    void contrastChanged(int contrast);
+    
+    /**
+     * @brief 饱和度改变信号
+     * @param saturation 新的饱和度值
+     */
+    void saturationChanged(int saturation);
 
     /**
      * @brief 帧处理完成信号
@@ -216,13 +300,14 @@ private slots:
 private:
     void updateStatus(ProcessorStatus newStatus);
     QPixmap applyScaling(const QPixmap& frame);
-    QPixmap applyCropping(const QPixmap& frame);
+    QPixmap applyCrop(const QPixmap& frame);
     QPixmap applyRotation(const QPixmap& frame);
     QPixmap applyFlipping(const QPixmap& frame);
     QPixmap applyFilters(const QPixmap& frame);
     QPixmap applyWatermark(const QPixmap& frame);
     void updateStatistics(qint64 processingTime);
     void emitError(const QString& error);
+    void resetProcessor();
 
     // 滤镜实现
     QPixmap applyBlurFilter(const QPixmap& frame, const QVariantMap& params);

@@ -337,7 +337,7 @@ QString StringUtils::fromBytes(const QByteArray& bytes, Encoding encoding)
         case UTF8:
             return QString::fromUtf8(bytes);
         case UTF16:
-            return QString::fromUtf16(reinterpret_cast<const ushort*>(bytes.constData()), bytes.length() / 2);
+            return QString::fromUtf16(reinterpret_cast<const char16_t*>(bytes.constData()), bytes.length() / 2);
         case Latin1:
             return QString::fromLatin1(bytes);
         case ASCII:

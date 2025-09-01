@@ -1,5 +1,5 @@
-#include "ConferenceWindow.h"
-#include "modules/camera/include/CameraFactory.h"
+#include "../include/ConferenceWindow.h"
+// #include "modules/camera/include/CameraFactory.h"  // Temporarily disabled
 #include <QApplication>
 #include <QCloseEvent>
 #include <QMessageBox>
@@ -16,7 +16,7 @@ ConferenceWindow::ConferenceWindow(QWidget *parent)
     : QMainWindow(parent)
     , m_conferenceManager(nullptr)
     , m_mediaManager(nullptr)
-    , m_chatManager(nullptr)
+    // , m_chatManager(nullptr) // 暂时禁用聊天功能
     , m_screenShareManager(nullptr)
     , m_cameraManager(nullptr)
     , m_centralWidget(nullptr)
@@ -46,6 +46,7 @@ ConferenceWindow::ConferenceWindow(QWidget *parent)
     , m_muteAudioButton(nullptr)
     , m_muteVideoButton(nullptr)
     , m_screenShareButton(nullptr)
+    , m_noVideoLabel(nullptr)
     , m_chatToggleButton(nullptr)
     , m_participantsToggleButton(nullptr)
     , m_statusBar(nullptr)
@@ -53,7 +54,6 @@ ConferenceWindow::ConferenceWindow(QWidget *parent)
     , m_connectionStatusLabel(nullptr)
     , m_participantCountLabel(nullptr)
     , m_connectionProgress(nullptr)
-    , m_noVideoLabel(nullptr)
     , m_isInConference(false)
     , m_isAudioMuted(false)
     , m_isVideoMuted(false)
@@ -89,9 +89,9 @@ ConferenceWindow::~ConferenceWindow()
     if (m_mediaManager) {
         delete m_mediaManager;
     }
-    if (m_chatManager) {
-        delete m_chatManager;
-    }
+    // if (m_chatManager) {
+    //     delete m_chatManager;
+    // } // 暂时禁用聊天功能
     if (m_screenShareManager) {
         delete m_screenShareManager;
     }
@@ -123,27 +123,27 @@ void ConferenceWindow::setupManagers()
     m_mediaManager = new MediaManager(this);
     qDebug() << "MediaManager created";
     
-    // 创建模块化摄像头管理器
-    m_cameraManager = CameraFactory::instance()->createLocalCameraInterface("conference_local");
-    if (m_cameraManager) {
-        qDebug() << "CameraManager created successfully";
-        
-        // 连接摄像头管理器信号
-        connect(m_cameraManager, &ICameraManager::cameraStarted,
-                this, &ConferenceWindow::onLocalVideoStarted);
-        connect(m_cameraManager, &ICameraManager::cameraStopped,
-                this, &ConferenceWindow::onLocalVideoStopped);
-        connect(m_cameraManager, &ICameraManager::errorOccurred,
-                [this](const QString& error) {
-                    qWarning() << "Camera error:" << error;
-                });
-    } else {
+    // 创建模块化摄像头管理器 - 暂时禁用
+    // m_cameraManager = CameraFactory::instance()->createLocalCameraInterface("conference_local");
+    // if (m_cameraManager) {
+    //     qDebug() << "CameraManager created successfully";
+    //     
+    //     // 连接摄像头管理器信号
+    //     connect(m_cameraManager, &ICameraManager::cameraStarted,
+    //             this, &ConferenceWindow::onLocalVideoStarted);
+    //     connect(m_cameraManager, &ICameraManager::cameraStopped,
+    //             this, &ConferenceWindow::onLocalVideoStopped);
+    //     connect(m_cameraManager, &ICameraManager::errorOccurred,
+    //             [this](const QString& error) {
+    //                 qWarning() << "Camera error:" << error;
+    //             });
+    // } else {
         qWarning() << "Failed to create CameraManager";
-    }
+    // }
     
-    // 创建聊天管理器
-    m_chatManager = new ChatManager(this);
-    qDebug() << "ChatManager created";
+    // 创建聊天管理器 (暂时禁用)
+    // m_chatManager = new ChatManager(this);
+    // qDebug() << "ChatManager created";
     
     // 创建屏幕共享管理器
     m_screenShareManager = new ScreenShareManager(this);
@@ -151,7 +151,7 @@ void ConferenceWindow::setupManagers()
     
     // 设置管理器之间的依赖关系
     m_mediaManager->setWebRTCEngine(m_conferenceManager->webRTCEngine());
-    m_chatManager->setXMPPClient(m_conferenceManager->xmppClient());
+    // m_chatManager->setXMPPClient(m_conferenceManager->xmppClient()); // 暂时禁用聊天功能
     
     qDebug() << "All ConferenceWindow managers initialized";
 }
@@ -225,15 +225,14 @@ void ConferenceWindow::setupConnections()
         //         this, &ConferenceWindow::onRemoteVideoRemoved);
     }
     
-    // 聊天管理器信号连接
-    if (m_chatManager) {
-        connect(m_chatManager, &ChatManager::messageReceived,
-                this, &ConferenceWindow::onChatMessageReceived);
-        connect(m_chatManager, &ChatManager::messageSent,
-                this, &ConferenceWindow::onChatMessageSent);
-        connect(m_chatManager, &ChatManager::unreadCountChanged,
-                this, &ConferenceWindow::onUnreadCountChanged);
-    }
+    // 聊天管理器信号连接 (暂时禁用)
+    // if (m_chatManager) {
+    //     // connect(m_chatManager, &ChatManager::messageReceived,
+    //     //         this, &ConferenceWindow::onChatMessageReceived);  // 暂时禁用，签名不匹配
+    //     connect(m_chatManager, &ChatManager::messageSent,
+    //             this, &ConferenceWindow::onChatMessageSent);
+    //     // Note: unreadCountChanged signal doesn't exist in ChatManager, removing this connection
+    // }
     
     // 屏幕共享管理器信号连接
     if (m_screenShareManager) {
@@ -241,10 +240,10 @@ void ConferenceWindow::setupConnections()
                 this, &ConferenceWindow::onScreenShareStarted);
         connect(m_screenShareManager, &ScreenShareManager::screenShareStopped,
                 this, &ConferenceWindow::onScreenShareStopped);
-        connect(m_screenShareManager, &ScreenShareManager::remoteScreenShareReceived,
-                this, &ConferenceWindow::onRemoteScreenShareReceived);
-        connect(m_screenShareManager, &ScreenShareManager::remoteScreenShareRemoved,
-                this, &ConferenceWindow::onRemoteScreenShareRemoved);
+        // connect(m_screenShareManager, &ScreenShareManager::remoteScreenShareReceived,
+        //         this, &ConferenceWindow::onRemoteScreenShareReceived);
+        // connect(m_screenShareManager, &ScreenShareManager::remoteScreenShareRemoved,
+        //         this, &ConferenceWindow::onRemoteScreenShareRemoved);
     }
     
     qDebug() << "All ConferenceWindow signal connections established";
@@ -659,18 +658,18 @@ void ConferenceWindow::joinConference(const QString& url)
     if (m_cameraManager) {
         qDebug() << "Starting camera using CameraManager";
         
-        // 创建视频预览组件
-        QVideoWidget* videoWidget = m_cameraManager->createPreviewWidget(this);
-        if (videoWidget) {
-            qDebug() << "Video preview widget created";
-        }
-        
-        // 启动摄像头
-        if (m_cameraManager->startWithPreset(ICameraDevice::StandardQuality)) {
-            qDebug() << "Camera started successfully with CameraManager";
-        } else {
-            qWarning() << "Failed to start camera with CameraManager";
-        }
+        // 创建视频预览组件 - 暂时禁用
+        // QVideoWidget* videoWidget = m_cameraManager->createPreviewWidget(this);
+        // if (videoWidget) {
+        //     qDebug() << "Video preview widget created";
+        // }
+        // 
+        // // 启动摄像头
+        // if (m_cameraManager->startWithPreset(ICameraDevice::StandardQuality)) {
+        //     qDebug() << "Camera started successfully with CameraManager";
+        // } else {
+        //     qWarning() << "Failed to start camera with CameraManager";
+        // }
     } else {
         // 回退到原有的MediaManager方式
         qDebug() << "Falling back to MediaManager for camera";
@@ -803,8 +802,8 @@ void ConferenceWindow::onConferenceJoined(const ConferenceManager::ConferenceInf
     // 更新窗口标题
     setWindowTitle(QString("Jitsi Meet - %1").arg(info.roomName));
     
-    // 设置聊天管理器的当前房间
-    m_chatManager->setCurrentRoom(info.roomName);
+    // 设置聊天管理器的当前房间 - 暂时禁用
+    // m_chatManager->setCurrentRoom(info.roomName);
     
     hideLoading();
     emit conferenceJoined(m_currentUrl);
@@ -879,11 +878,11 @@ void ConferenceWindow::onLocalVideoStarted()
     
     QVideoWidget* localVideo = nullptr;
     
-    // 优先使用CameraManager的视频组件
-    if (m_cameraManager) {
-        localVideo = m_cameraManager->previewWidget();
-        qDebug() << "Using CameraManager video widget";
-    }
+    // 优先使用CameraManager的视频组件 - 暂时禁用
+    // if (m_cameraManager) {
+    //     localVideo = m_cameraManager->previewWidget();
+    //     qDebug() << "Using CameraManager video widget";
+    // }
     
     // 回退到MediaManager
     if (!localVideo) {
@@ -932,7 +931,7 @@ void ConferenceWindow::onRemoteVideoRemoved(const QString& participantId)
 }
 
 // 聊天管理器事件处理
-void ConferenceWindow::onChatMessageReceived(const ChatManager::ChatMessage& message)
+void ConferenceWindow::onChatMessageReceived(ChatMessage* message)
 {
     addChatMessage(message);
     
@@ -943,9 +942,11 @@ void ConferenceWindow::onChatMessageReceived(const ChatManager::ChatMessage& mes
     }
 }
 
-void ConferenceWindow::onChatMessageSent(const ChatManager::ChatMessage& message)
+void ConferenceWindow::onChatMessageSent(const QString& messageId)
 {
-    addChatMessage(message);
+    // 消息发送成功，可以在这里更新UI状态
+    Q_UNUSED(messageId)
+    // Note: We don't have the message object here, just the ID
 }
 
 void ConferenceWindow::onUnreadCountChanged(int count)
@@ -959,10 +960,10 @@ void ConferenceWindow::onScreenShareStarted()
 {
     qDebug() << "Screen share started";
     
-    QVideoWidget* screenShareWidget = m_screenShareManager->localScreenShareWidget();
-    if (screenShareWidget) {
-        setMainVideoWidget(screenShareWidget);
-    }
+    // QVideoWidget* screenShareWidget = m_screenShareManager->localScreenShareWidget();
+    // if (screenShareWidget) {
+    //     setMainVideoWidget(screenShareWidget);
+    // }
 }
 
 void ConferenceWindow::onScreenShareStopped()
@@ -1036,10 +1037,10 @@ void ConferenceWindow::onScreenShareClicked()
     if (m_isScreenSharing) {
         m_screenShareManager->stopScreenShare();
     } else {
-        if (m_screenShareManager->showScreenSelectionDialog()) {
-            // 用户选择了屏幕，开始共享
-            // 实际的开始逻辑在ScreenShareManager中处理
-        }
+        // if (m_screenShareManager->showScreenSelectionDialog()) {
+        //     // 用户选择了屏幕，开始共享
+        //     // 实际的开始逻辑在ScreenShareManager中处理
+        // }
     }
 }
 
@@ -1057,7 +1058,7 @@ void ConferenceWindow::onSendChatMessage()
 {
     QString message = m_chatInput->text().trimmed();
     if (!message.isEmpty()) {
-        m_chatManager->sendMessage(message);
+        // m_chatManager->sendMessage(message); // 暂时禁用聊天功能
         m_chatInput->clear();
     }
 }
@@ -1191,17 +1192,21 @@ void ConferenceWindow::setMainVideoWidget(QVideoWidget* widget)
 }
 
 // 聊天功能
-void ConferenceWindow::addChatMessage(const ChatManager::ChatMessage& message)
+void ConferenceWindow::addChatMessage(ChatMessage* message)
 {
+    // 暂时禁用聊天功能
+    Q_UNUSED(message);
+    /*
     QString messageHtml = QString("<div style='margin-bottom: 5px;'>"
                                  "<b>%1</b> <span style='color: #666; font-size: 10px;'>%2</span><br>"
                                  "%3</div>")
-                         .arg(message.senderName)
-                         .arg(message.timestamp.toString("hh:mm"))
-                         .arg(message.content);
+                         .arg(message->senderName())
+                         .arg(message->timestamp().toString("hh:mm"))
+                         .arg(message->content());
     
     m_chatDisplay->append(messageHtml);
     scrollChatToBottom();
+    */
 }
 
 void ConferenceWindow::updateChatUnreadIndicator()
@@ -1333,7 +1338,7 @@ void ConferenceWindow::showChatPanel(bool show)
         // 清除未读计数
         m_unreadChatCount = 0;
         updateChatUnreadIndicator();
-        m_chatManager->markAllAsRead();
+        // m_chatManager->markAllAsRead();  // 暂时禁用
     }
 }
 

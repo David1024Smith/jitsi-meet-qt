@@ -1,7 +1,7 @@
 #include "UIModule.h"
 #include "UIManager.h"
 #include "ThemeFactory.h"
-#include "config/UIConfig.h"
+#include "../config/UIConfig.h"
 #include <QDebug>
 
 UIModule* UIModule::s_instance = nullptr;
@@ -169,7 +169,9 @@ void UIModule::onThemeChanged(const QString& themeName)
 bool UIModule::loadConfiguration(const QVariantMap& config)
 {
     if (m_config) {
-        return m_config->fromVariantMap(config);
+        // 修复返回值问题，fromVariantMap可能是void返回类型
+        m_config->fromVariantMap(config);
+        return true;
     }
     return false;
 }

@@ -1,0 +1,26 @@
+﻿/* Dark Theme Styles */
+QMainWindow {
+    background-color: #2b2b2b;
+    color: #ffffff;
+}
+
+QMenuBar {
+    background-color: #3c3c3c;
+    color: #ffffff;
+    border-bottom: 1px solid #555;
+}
+
+QStatusBar {
+    background-color: #2b2b2b;
+    color: #ffffff;
+    border-top: 1px solid #555;
+}
+
+QPushButton {
+    background-color: #0d6efd;
+    color: white;
+}
+
+QPushButton:hover {
+    background-color: #0b5ed7;
+}

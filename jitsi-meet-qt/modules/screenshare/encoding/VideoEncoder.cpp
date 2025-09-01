@@ -2,14 +2,15 @@
 #include <QBuffer>
 #include <QDebug>
 #include <QMutexLocker>
+#include <QThread>
 
 class VideoEncoder::Private
 {
 public:
     Private()
         : initialized(false)
-        , format(VideoEncoder::H264)
-        , quality(VideoEncoder::Medium)
+        , format(static_cast<VideoEncoder::EncodingFormat>(0)) // 使用默认编码格式
+        , quality(VideoEncoder::Medium) // 使用中等质量
         , bitrate(2000)
         , frameRate(30)
         , keyFrameInterval(30)
@@ -112,7 +113,7 @@ void VideoEncoder::setEncodingQuality(EncodingQuality quality)
             d->bitrate = 5000;
             d->compressionLevel = 3;
             break;
-        case Ultra:
+        case VeryHigh:
             d->bitrate = 10000;
             d->compressionLevel = 1;
             break;
@@ -187,7 +188,7 @@ int VideoEncoder::keyFrameInterval() const
     return d->keyFrameInterval;
 }
 
-QByteArray VideoEncoder::encodeFrame(const QPixmap& frame)
+QByteArray VideoEncoder::encodeFrameRaw(const QPixmap& frame)
 {
     QMutexLocker locker(&d->mutex);
     
@@ -211,26 +212,26 @@ QByteArray VideoEncoder::encodeFrame(const QPixmap& frame)
         int quality = 75;
         
         switch (d->format) {
-        case H264:
-        case VP8:
-        case VP9:
-        case AV1:
+        case EncodingFormat::H264:
+        case EncodingFormat::VP8:
+        case EncodingFormat::VP9:
+        case EncodingFormat::AV1:
             format = "JPEG"; // 简化实现，实际应该使用对应的视频编码
             break;
         }
         
         // 根据质量调整压缩参数
         switch (d->quality) {
-        case Low:
+        case EncodingQuality::Low:
             quality = 50;
             break;
-        case Medium:
+        case EncodingQuality::Medium:
             quality = 75;
             break;
-        case High:
+        case EncodingQuality::High:
             quality = 90;
             break;
-        case Ultra:
+        case EncodingQuality::VeryHigh:
             quality = 100;
             format = "PNG";
             break;
@@ -383,7 +384,7 @@ void VideoEncoder::setEncodingPreset(EncodingPreset preset)
 // 编码接口实现
 bool VideoEncoder::encodeFrame(const QPixmap& frame)
 {
-    QByteArray data = encodeFrame(frame);
+    QByteArray data = encodeFrameRaw(frame);
     return !data.isEmpty();
 }
 

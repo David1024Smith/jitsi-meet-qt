@@ -57,7 +57,7 @@ public:
      * @param filePath 配置文件路径
      * @return 保存是否成功
      */
-    bool saveConfig(const QString& filePath = QString()) const;
+    bool saveConfig(const QString& filePath = QString());
 
     /**
      * @brief 重置为默认配置
@@ -68,7 +68,7 @@ public:
      * @brief 验证配置
      * @return 配置是否有效
      */
-    bool validateConfig() const;
+    bool validateConfig();
 
     // 监控配置
     /**
@@ -436,6 +436,7 @@ private:
      * @param config 配置映射
      */
     void saveToJsonObject(QJsonObject& obj, const QVariantMap& config) const;
+    void setNestedValue(QJsonObject& obj, const QStringList& keyParts, const QJsonValue& value) const;
 
     QVariantMap m_config;                   ///< 配置数据
     QString m_configFilePath;               ///< 配置文件路径

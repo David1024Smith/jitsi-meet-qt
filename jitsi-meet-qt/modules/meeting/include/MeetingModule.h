@@ -153,9 +153,9 @@ signals:
     void initialized(bool success);
 
     /**
-     * @brief 模块关闭信号
+     * @brief 模块关闭完成信号
      */
-    void shutdown();
+    void shutdownCompleted();
 
     /**
      * @brief 配置改变信号

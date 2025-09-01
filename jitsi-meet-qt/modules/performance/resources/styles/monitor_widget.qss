@@ -1,0 +1,40 @@
+/* Monitor Widget Styles */
+QWidget#MonitorWidget {
+    background-color: white;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 10px;
+}
+
+QLabel#MonitorTitle {
+    font-size: 16px;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 10px;
+}
+
+QWidget#MonitorContent {
+    background-color: transparent;
+}
+
+QPushButton#MonitorButton {
+    background-color: #2196F3;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 8px 16px;
+    font-weight: bold;
+}
+
+QPushButton#MonitorButton:hover {
+    background-color: #1976D2;
+}
+
+QPushButton#MonitorButton:pressed {
+    background-color: #0D47A1;
+}
+
+QPushButton#MonitorButton:disabled {
+    background-color: #ccc;
+    color: #999;
+}

@@ -215,7 +215,7 @@ bool SettingsConfig::loadConfiguration(const QString& filePath)
     return success;
 }
 
-bool SettingsConfig::saveConfiguration(const QString& filePath) const
+bool SettingsConfig::saveConfiguration(const QString& filePath)
 {
     QString path = filePath.isEmpty() ? configPath() : filePath;
     
@@ -581,7 +581,7 @@ void SettingsConfig::setStrictValidation(bool strict)
     d->strictValidation = strict;
 }
 
-QPair<bool, QStringList> SettingsConfig::validateConfiguration() const
+QPair<bool, QStringList> SettingsConfig::validateConfiguration()
 {
     QStringList errors;
     

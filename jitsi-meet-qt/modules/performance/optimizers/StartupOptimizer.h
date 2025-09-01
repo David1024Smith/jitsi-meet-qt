@@ -2,9 +2,11 @@
 #define STARTUPOPTIMIZER_H
 
 #include "BaseOptimizer.h"
+#include "../include/OptimizationType.h"
 #include <QSettings>
 #include <QDir>
 #include <QFileInfo>
+#include <QMutex>
 
 /**
  * @brief 启动优化器类
@@ -157,13 +159,13 @@ protected:
      * @brief 获取优化前指标
      * @return 优化前指标
      */
-    QVariantMap getBeforeMetrics() const override;
+    QVariantMap getBeforeMetrics() const;
 
     /**
      * @brief 获取优化后指标
      * @return 优化后指标
      */
-    QVariantMap getAfterMetrics() const override;
+    QVariantMap getAfterMetrics() const;
 
 private:
     /**

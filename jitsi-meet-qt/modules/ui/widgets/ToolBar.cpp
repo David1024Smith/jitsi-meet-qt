@@ -118,7 +118,7 @@ QAction* ToolBar::addAction(const QIcon& icon, const QString& text, const QObjec
 CustomButton* ToolBar::addCustomButton(const QString& text)
 {
     CustomButton* button = new CustomButton(text, this);
-    addWidget(button);
+    QAction* action = QToolBar::addWidget(static_cast<QWidget*>(static_cast<QPushButton*>(button)));
     m_customButtons.append(button);
     
     connect(button, &CustomButton::clicked, this, &ToolBar::onCustomButtonClicked);
@@ -131,7 +131,7 @@ CustomButton* ToolBar::addCustomButton(const QString& text)
 CustomButton* ToolBar::addCustomButton(const QIcon& icon, const QString& text)
 {
     CustomButton* button = new CustomButton(icon, text, this);
-    addWidget(button);
+    QAction* action = QToolBar::addWidget(static_cast<QWidget*>(static_cast<QPushButton*>(button)));
     m_customButtons.append(button);
     
     connect(button, &CustomButton::clicked, this, &ToolBar::onCustomButtonClicked);
@@ -145,8 +145,15 @@ void ToolBar::removeCustomButton(CustomButton* button)
 {
     if (m_customButtons.contains(button)) {
         m_customButtons.removeOne(button);
-        removeWidget(button);
-        button->deleteLater();
+        // QToolBar没有removeWidget方法，需要使用removeAction
+        for (QAction* action : actions()) {
+            if (widgetForAction(action) == static_cast<QWidget*>(static_cast<QPushButton*>(button))) {
+                removeAction(action);
+                break;
+            }
+        }
+        // 修复多重继承歧义 - 明确指定 QPushButton 的 deleteLater
+        static_cast<QPushButton*>(button)->deleteLater();
         emit customButtonRemoved(button);
     }
 }
@@ -225,7 +232,7 @@ void ToolBar::setActionsEnabled(bool enabled)
     }
     
     for (CustomButton* button : m_customButtons) {
-        button->setEnabled(enabled);
+        static_cast<QPushButton*>(button)->setEnabled(enabled); // 修复多继承歧义问题
     }
 }
 
@@ -383,7 +390,8 @@ void ToolBar::onActionTriggered()
 
 void ToolBar::onCustomButtonClicked()
 {
-    CustomButton* button = qobject_cast<CustomButton*>(sender());
+    // 修复多继承歧义问题，使用dynamic_cast代替qobject_cast
+    CustomButton* button = dynamic_cast<CustomButton*>(static_cast<QObject*>(sender()));
     if (button) {
         qDebug() << "Custom button clicked:" << button->text();
     }

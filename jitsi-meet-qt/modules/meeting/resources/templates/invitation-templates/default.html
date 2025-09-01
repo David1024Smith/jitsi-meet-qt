@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Meeting Invitation</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .header { background: #007bff; color: white; padding: 20px; text-align: center; }
+        .content { padding: 20px; }
+        .meeting-info { background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 15px 0; }
+        .join-button { background: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>You're Invited to a Meeting</h1>
+    </div>
+    <div class="content">
+        <p>Hello {participant_name},</p>
+        <p>You have been invited to join a meeting:</p>
+        
+        <div class="meeting-info">
+            <h3>{meeting_title}</h3>
+            <p><strong>Date:</strong> {meeting_date}</p>
+            <p><strong>Time:</strong> {meeting_time}</p>
+            <p><strong>Duration:</strong> {meeting_duration}</p>
+            <p><strong>Host:</strong> {host_name}</p>
+        </div>
+        
+        <a href="{meeting_url}" class="join-button">Join Meeting</a>
+        
+        <p><strong>Meeting ID:</strong> {meeting_id}</p>
+        <p><strong>Password:</strong> {meeting_password}</p>
+        
+        <p>Best regards,<br>{host_name}</p>
+    </div>
+</body>
+</html>

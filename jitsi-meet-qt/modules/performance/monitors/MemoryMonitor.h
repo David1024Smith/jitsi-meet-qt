@@ -279,14 +279,14 @@ private:
      * @brief 读取系统内存信息
      * @return 系统内存信息
      */
-    QVariantMap readSystemMemoryInfo();
+    QVariantMap readSystemMemoryInfo() const;
 
     /**
      * @brief 读取进程内存信息
      * @param processId 进程ID
      * @return 进程内存信息
      */
-    QVariantMap readProcessMemoryInfo(qint64 processId);
+    QVariantMap readProcessMemoryInfo(qint64 processId) const;
 
     /**
      * @brief 计算内存碎片化

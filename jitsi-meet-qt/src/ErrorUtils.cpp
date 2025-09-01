@@ -1,4 +1,4 @@
-#include "ErrorUtils.h"
+#include "../include/ErrorUtils.h"
 #include "JitsiConstants.h"
 #include <QNetworkInterface>
 #include <QSysInfo>

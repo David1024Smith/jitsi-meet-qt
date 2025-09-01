@@ -17,10 +17,10 @@ XMPPClient::XMPPClient(QObject *parent)
     , m_heartbeatTimer(new QTimer(this))
     , m_reconnectTimer(new QTimer(this))
     , m_connectionState(Disconnected)
-    , m_reconnectAttempts(0)
     , m_currentUrlIndex(0)
     , m_audioMuted(false)
     , m_videoMuted(false)
+    , m_reconnectAttempts(0)
 {
     // 设置心跳定时器
     m_heartbeatTimer->setSingleShot(false);

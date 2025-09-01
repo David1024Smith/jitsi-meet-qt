@@ -6,6 +6,8 @@
 #include <QMutexLocker>
 #include <QDebug>
 #include <QCursor>
+#include <QBuffer>
+#include <QIODevice>
 
 class RegionCapture::Private
 {
@@ -138,7 +140,7 @@ bool RegionCapture::startCapture()
         
     } catch (const std::exception& e) {
         emitError(QString("Failed to start region capture: %1").arg(e.what()));
-        updateStatus(Error);
+        updateStatus(IScreenCapture::Error);
         return false;
     }
 }

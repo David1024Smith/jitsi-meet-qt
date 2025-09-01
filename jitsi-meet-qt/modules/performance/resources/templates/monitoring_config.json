@@ -1,0 +1,83 @@
+{
+    "monitoring": {
+        "general": {
+            "enabled": true,
+            "interval": 1000,
+            "autoStart": true,
+            "logToFile": true,
+            "logPath": "./logs/performance.log",
+            "maxLogSize": 10485760,
+            "rotateLogFiles": true
+        },
+        "cpu": {
+            "enabled": true,
+            "sampleInterval": 1000,
+            "trackPerCore": false,
+            "thresholds": {
+                "warning": 70.0,
+                "critical": 90.0
+            },
+            "alertOnSpike": true,
+            "spikeThreshold": 95.0,
+            "spikeDuration": 5000
+        },
+        "memory": {
+            "enabled": true,
+            "sampleInterval": 1000,
+            "trackVirtualMemory": true,
+            "trackPhysicalMemory": true,
+            "trackSwapMemory": true,
+            "thresholds": {
+                "warning": 80.0,
+                "critical": 95.0
+            },
+            "detectMemoryLeaks": true,
+            "leakDetectionInterval": 30000
+        },
+        "network": {
+            "enabled": true,
+            "sampleInterval": 1000,
+            "trackBandwidth": true,
+            "trackConnections": true,
+            "trackPacketLoss": true,
+            "thresholds": {
+                "bandwidthWarning": 80.0,
+                "bandwidthCritical": 95.0,
+                "packetLossWarning": 1.0,
+                "packetLossCritical": 5.0
+            }
+        },
+        "gpu": {
+            "enabled": false,
+            "sampleInterval": 2000,
+            "trackUtilization": true,
+            "trackMemory": true,
+            "trackTemperature": false,
+            "thresholds": {
+                "utilizationWarning": 80.0,
+                "utilizationCritical": 95.0,
+                "memoryWarning": 85.0,
+                "memoryCritical": 95.0
+            }
+        },
+        "disk": {
+            "enabled": true,
+            "sampleInterval": 5000,
+            "trackUsage": true,
+            "trackIOPS": false,
+            "thresholds": {
+                "usageWarning": 85.0,
+                "usageCritical": 95.0
+            }
+        },
+        "application": {
+            "enabled": true,
+            "trackFrameRate": true,
+            "trackResponseTime": true,
+            "trackThreadCount": true,
+            "trackHandleCount": false,
+            "frameRateTarget": 60,
+            "responseTimeThreshold": 100
+        }
+    }
+}

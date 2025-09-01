@@ -2,327 +2,193 @@
 #define SETTINGSDIALOG_H
 
 #include <QDialog>
-#include <QLineEdit>
-#include <QComboBox>
-#include <QCheckBox>
-#include <QSpinBox>
-#include <QPushButton>
-#include <QLabel>
-#include <QGroupBox>
-#include <QVBoxLayout>
-#include <QHBoxLayout>
-#include <QFormLayout>
-#include <QDialogButtonBox>
-#include <QProgressBar>
-#include <QSlider>
-#include <QVideoWidget>
-#include "models/ApplicationSettings.h"
+#include <QMap>
+#include <QVariantMap>
 
-class ConfigurationManager;
-class TranslationManager;
-class MediaManager;
-struct ApplicationSettings;
+class QTabWidget;
+class QDialogButtonBox;
+class QVBoxLayout;
+class QWidget;
+class QStackedWidget;
+class QListWidget;
+class QSplitter;
+class QLabel;
 
 /**
- * @brief 设置对话框类，提供应用程序配置界面
+ * @brief 设置对话框
+ * 
+ * 该对话框提供应用程序的设置界面，包括多个设置分类和选项。
  */
 class SettingsDialog : public QDialog
 {
     Q_OBJECT
 
 public:
-    /**
-     * @brief 构造函数
-     * @param configManager 配置管理器
-     * @param translationManager 翻译管理器
-     * @param mediaManager 媒体管理器
-     * @param parent 父窗口
-     */
-    explicit SettingsDialog(ConfigurationManager* configManager,
-                           TranslationManager* translationManager,
-                           MediaManager* mediaManager,
-                           QWidget* parent = nullptr);
+    enum SettingsPage {
+        GeneralPage,
+        AudioPage,
+        VideoPage,
+        NetworkPage,
+        SecurityPage,
+        AppearancePage,
+        AdvancedPage,
+        AboutPage
+    };
+    Q_ENUM(SettingsPage)
 
-    /**
-     * @brief 析构函数
-     */
+    explicit SettingsDialog(QWidget *parent = nullptr);
     ~SettingsDialog();
 
-public slots:
     /**
-     * @brief 显示设置对话框
+     * @brief 显示特定设置页面
+     * @param page 设置页面
      */
-    void showSettings();
+    void showPage(SettingsPage page);
 
     /**
-     * @brief 重置所有设置为默认值
+     * @brief 获取当前设置页面
+     * @return 当前页面
      */
-    void resetToDefaults();
-
-signals:
-    /**
-     * @brief 设置已保存信号
-     */
-    void settingsSaved();
+    SettingsPage currentPage() const;
 
     /**
-     * @brief 语言改变信号
-     * @param language 新的语言代码
+     * @brief 设置设置值
+     * @param key 设置键
+     * @param value 设置值
      */
-    void languageChanged(const QString& language);
-
-private slots:
-    /**
-     * @brief 服务器URL输入改变时的处理
-     */
-    void onServerUrlChanged();
+    void setSetting(const QString& key, const QVariant& value);
 
     /**
-     * @brief 语言选择改变时的处理
+     * @brief 获取设置值
+     * @param key 设置键
+     * @param defaultValue 默认值
+     * @return 设置值
      */
-    void onLanguageChanged();
+    QVariant getSetting(const QString& key, const QVariant& defaultValue = QVariant()) const;
 
     /**
-     * @brief 深色模式切换时的处理
+     * @brief 重置所有设置
      */
-    void onDarkModeToggled();
+    void resetAllSettings();
+
+    /**
+     * @brief 重置特定页面的设置
+     * @param page 设置页面
+     */
+    void resetPageSettings(SettingsPage page);
+
+    /**
+     * @brief 应用设置
+     * @return 是否成功应用
+     */
+    bool applySettings();
+
+    /**
+     * @brief 加载设置
+     * @return 是否成功加载
+     */
+    bool loadSettings();
 
     /**
      * @brief 保存设置
+     * @return 是否成功保存
      */
-    void saveSettings();
+    bool saveSettings();
 
     /**
-     * @brief 取消设置更改
-     */
-    void cancelSettings();
-
-    /**
-     * @brief 应用设置（不关闭对话框）
-     */
-    void applySettings();
-
-    /**
-     * @brief 恢复默认设置
-     */
-    void restoreDefaults();
-
-    /**
-     * @brief 验证服务器URL
-     */
-    void validateServerUrl();
-
-    /**
-     * @brief 当翻译管理器语言改变时更新界面
-     */
-    void onTranslationChanged();
-
-    /**
-     * @brief 摄像头选择改变时的处理
-     */
-    void onCameraChanged();
-
-    /**
-     * @brief 麦克风选择改变时的处理
-     */
-    void onMicrophoneChanged();
-
-    /**
-     * @brief 扬声器选择改变时的处理
-     */
-    void onSpeakerChanged();
-
-    /**
-     * @brief 测试摄像头
-     */
-    void testCamera();
-
-    /**
-     * @brief 测试麦克风
-     */
-    void testMicrophone();
-
-    /**
-     * @brief 测试扬声器
-     */
-    void testSpeaker();
-
-    /**
-     * @brief 停止所有设备测试
-     */
-    void stopAllTests();
-
-    /**
-     * @brief 麦克风音量改变时的处理
-     */
-    void onMicrophoneVolumeChanged(int volume);
-
-    /**
-     * @brief 扬声器音量改变时的处理
-     */
-    void onSpeakerVolumeChanged(int volume);
-
-private:
-    /**
-     * @brief 初始化用户界面
-     */
-    void setupUI();
-
-    /**
-     * @brief 创建服务器设置组
-     * @return 服务器设置组框
-     */
-    QGroupBox* createServerGroup();
-
-    /**
-     * @brief 创建界面设置组
-     * @return 界面设置组框
-     */
-    QGroupBox* createInterfaceGroup();
-
-    /**
-     * @brief 创建音视频设备设置组
-     * @return 音视频设备设置组框
-     */
-    QGroupBox* createMediaDeviceGroup();
-
-    /**
-     * @brief 创建会议设置组
-     * @return 会议设置组框
-     */
-    QGroupBox* createConferenceGroup();
-
-    /**
-     * @brief 创建高级设置组
-     * @return 高级设置组框
-     */
-    QGroupBox* createAdvancedGroup();
-
-    /**
-     * @brief 设置信号连接
-     */
-    void setupConnections();
-
-    /**
-     * @brief 加载当前设置到界面
-     */
-    void loadSettings();
-
-    /**
-     * @brief 从界面获取设置
-     * @return 应用程序设置
-     */
-    ApplicationSettings getSettingsFromUI() const;
-
-    /**
-     * @brief 更新界面文本（用于多语言支持）
-     */
-    void updateUIText();
-
-    /**
-     * @brief 验证设置输入
+     * @brief 验证设置
      * @return 是否有效
      */
-    bool validateInput();
+    bool validateSettings();
 
     /**
-     * @brief 显示验证错误
-     * @param message 错误消息
+     * @brief 获取验证错误
+     * @return 错误列表
      */
-    void showValidationError(const QString& message);
+    QStringList validationErrors() const;
+
+public slots:
+    /**
+     * @brief 接受设置
+     */
+    void accept() override;
 
     /**
-     * @brief 设置控件启用状态
-     * @param enabled 是否启用
+     * @brief 拒绝设置
      */
-    void setControlsEnabled(bool enabled);
+    void reject() override;
+
+signals:
+    /**
+     * @brief 设置已更改信号
+     * @param settings 设置映射
+     */
+    void settingsChanged(const QVariantMap& settings);
 
     /**
-     * @brief 检查设置是否有更改
-     * @return 是否有更改
+     * @brief 设置已应用信号
      */
-    bool hasChanges() const;
+    void settingsApplied();
 
     /**
-     * @brief 刷新设备列表
+     * @brief 设置已重置信号
      */
-    void refreshDeviceList();
+    void settingsReset();
 
     /**
-     * @brief 更新设备测试状态
+     * @brief 页面已更改信号
+     * @param page 设置页面
      */
-    void updateTestStatus();
+    void pageChanged(SettingsPage page);
 
-    /**
-     * @brief 初始化设备列表
-     */
-    void initializeDeviceLists();
+private slots:
+    void onPageChanged(int index);
+    void onApplyClicked();
+    void onResetClicked();
+    void onCategorySelectionChanged();
+    void onSettingValueChanged();
+    void onRestoreDefaultsClicked();
 
 private:
-    // 管理器
-    ConfigurationManager* m_configManager;
-    TranslationManager* m_translationManager;
-    MediaManager* m_mediaManager;
+    void setupUI();
+    void createPages();
+    void createGeneralPage();
+    void createAudioPage();
+    void createVideoPage();
+    void createNetworkPage();
+    void createSecurityPage();
+    void createAppearancePage();
+    void createAdvancedPage();
+    void createAboutPage();
+    void setupConnections();
+    void updateButtonStates();
+    void savePageState(SettingsPage page);
+    void restorePageState(SettingsPage page);
+    QString pageToString(SettingsPage page) const;
+    SettingsPage stringToPage(const QString& pageName) const;
+    QWidget* createPageWidget(SettingsPage page);
+    void collectSettings();
+    void applySettingsToPage(SettingsPage page);
+    void validatePage(SettingsPage page);
 
-    // 服务器设置
-    QGroupBox* m_serverGroup;
-    QLineEdit* m_serverUrlEdit;
-    QSpinBox* m_serverTimeoutSpin;
-    QLabel* m_serverUrlLabel;
-    QLabel* m_serverTimeoutLabel;
-    QLabel* m_serverUrlStatusLabel;
-
-    // 界面设置
-    QGroupBox* m_interfaceGroup;
-    QComboBox* m_languageCombo;
-    QCheckBox* m_darkModeCheck;
-    QCheckBox* m_rememberWindowStateCheck;
-    QLabel* m_languageLabel;
-
-    // 音视频设备设置
-    QGroupBox* m_mediaDeviceGroup;
-    QComboBox* m_cameraCombo;
-    QComboBox* m_microphoneCombo;
-    QComboBox* m_speakerCombo;
-    QPushButton* m_testCameraButton;
-    QPushButton* m_testMicrophoneButton;
-    QPushButton* m_testSpeakerButton;
-    QVideoWidget* m_cameraPreview;
-    QProgressBar* m_microphoneLevel;
-    QSlider* m_microphoneVolumeSlider;
-    QSlider* m_speakerVolumeSlider;
-    QLabel* m_cameraLabel;
-    QLabel* m_microphoneLabel;
-    QLabel* m_speakerLabel;
-    QLabel* m_microphoneVolumeLabel;
-    QLabel* m_speakerVolumeLabel;
-
-    // 会议设置
-    QGroupBox* m_conferenceGroup;
-    QCheckBox* m_autoJoinAudioCheck;
-    QCheckBox* m_autoJoinVideoCheck;
-
-    // 高级设置
-    QGroupBox* m_advancedGroup;
-    QSpinBox* m_maxRecentItemsSpin;
-    QPushButton* m_clearRecentButton;
-    QLabel* m_maxRecentItemsLabel;
-
-    // 按钮
-    QDialogButtonBox* m_buttonBox;
-    QPushButton* m_applyButton;
-    QPushButton* m_resetButton;
-
-    // 布局
     QVBoxLayout* m_mainLayout;
-
-    // 原始设置（用于检测更改）
-    ApplicationSettings m_originalSettings;
-
-    // 设备测试状态
-    bool m_cameraTestActive;
-    bool m_microphoneTestActive;
-    bool m_speakerTestActive;
+    QSplitter* m_splitter;
+    QListWidget* m_categoryList;
+    QStackedWidget* m_pageStack;
+    QDialogButtonBox* m_buttonBox;
+    QLabel* m_headerLabel;
+    
+    QMap<SettingsPage, QWidget*> m_pageWidgets;
+    QMap<SettingsPage, QVariantMap> m_pageSettings;
+    QMap<SettingsPage, bool> m_pageModified;
+    
+    QVariantMap m_settings;
+    QVariantMap m_originalSettings;
+    QStringList m_errors;
+    
+    SettingsPage m_currentPage;
+    bool m_settingsModified;
+    bool m_applyingSettings;
 };
 
 #endif // SETTINGSDIALOG_H

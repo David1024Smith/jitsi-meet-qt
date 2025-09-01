@@ -45,6 +45,12 @@ public:
     Q_ENUM(QualityPreset)
 
     /**
+     * @brief 构造函数
+     * @param parent 父对象
+     */
+    explicit IAudioDevice(QObject* parent = nullptr) : QObject(parent) {}
+
+    /**
      * @brief 虚析构函数
      */
     virtual ~IAudioDevice() = default;

@@ -7,7 +7,7 @@
 #include <QStringList>
 #include <QDateTime>
 #include <QVariantMap>
-#include <QSqlDatabase>
+#include <QtSql/QSqlDatabase>
 #include <QMutex>
 #include <memory>
 

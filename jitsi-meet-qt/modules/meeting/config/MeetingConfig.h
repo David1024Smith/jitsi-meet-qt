@@ -334,6 +334,20 @@ public:
      * @return 配置值
      */
     QVariant getCustomSetting(const QString& key, const QVariant& defaultValue = QVariant()) const;
+    
+    /**
+     * @brief 设置选项（兼容方法）
+     * @param key 选项键
+     * @param value 选项值
+     */
+    void setOption(const QString& key, const QVariant& value);
+    
+    /**
+     * @brief 设置值（兼容方法）
+     * @param key 值键
+     * @param value 值
+     */
+    void setValue(const QString& key, const QVariant& value);
 
     /**
      * @brief 转换为映射

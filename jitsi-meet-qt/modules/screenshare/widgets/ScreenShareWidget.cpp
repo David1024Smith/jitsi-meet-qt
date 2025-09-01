@@ -104,11 +104,11 @@ void ScreenShareWidget::setScreenShareManager(ScreenShareManager* manager)
     
     if (d->manager) {
         // 连接新的管理器信号
-        connect(d->manager, &ScreenShareManager::statusChanged,
+        connect(d->manager, &IScreenShareManager::statusChanged,
                 this, &ScreenShareWidget::onManagerStatusChanged);
-        connect(d->manager, &ScreenShareManager::errorOccurred,
+        connect(d->manager, &IScreenShareManager::shareError,
                 this, &ScreenShareWidget::onManagerError);
-        connect(d->manager, &ScreenShareManager::statisticsUpdated,
+        connect(d->manager, &IScreenShareManager::statisticsUpdated,
                 this, &ScreenShareWidget::onStatisticsUpdated);
         
         updateUI();
@@ -201,16 +201,16 @@ void ScreenShareWidget::startSharing()
         d->config->setTargetScreen(selectedSource);
         break;
     case ScreenSelector::WindowSelection:
-        d->config->setCaptureMode(IScreenCapture::WindowCapture);
+        d->config->setCaptureMode(IScreenCapture::Window);
         d->config->setTargetWindow(selectedSource);
         break;
     case ScreenSelector::RegionSelection:
-        d->config->setCaptureMode(IScreenCapture::RegionCapture);
+        d->config->setCaptureMode(IScreenCapture::Region);
         d->config->setCaptureRegion(d->screenSelector->selectedRegion());
         break;
     }
     
-    if (d->manager->startSharing()) {
+    if (d->manager->startScreenShare()) {
         d->sharing = true;
         d->currentSource = selectedSource;
         d->statisticsTimer->start();
@@ -225,7 +225,7 @@ void ScreenShareWidget::startSharing()
 void ScreenShareWidget::stopSharing()
 {
     if (d->manager && d->sharing) {
-        d->manager->stopSharing();
+        d->manager->stopScreenShare();
         d->sharing = false;
         d->currentSource.clear();
         d->statisticsTimer->stop();
@@ -240,7 +240,7 @@ void ScreenShareWidget::stopSharing()
 void ScreenShareWidget::pauseSharing()
 {
     if (d->manager && d->sharing) {
-        d->manager->pauseSharing();
+        d->manager->pauseScreenShare();
     }
     
     updateUI();
@@ -249,7 +249,7 @@ void ScreenShareWidget::pauseSharing()
 void ScreenShareWidget::resumeSharing()
 {
     if (d->manager && d->sharing) {
-        d->manager->resumeSharing();
+        d->manager->resumeScreenShare();
     }
     
     updateUI();

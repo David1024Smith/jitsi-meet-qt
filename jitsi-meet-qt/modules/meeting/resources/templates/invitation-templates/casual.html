@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Meeting Invitation</title>
+    <style>
+        body { font-family: 'Comic Sans MS', cursive; margin: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        .container { background: rgba(255,255,255,0.1); padding: 30px; border-radius: 15px; backdrop-filter: blur(10px); }
+        .emoji { font-size: 2em; }
+        .meeting-card { background: rgba(255,255,255,0.2); padding: 20px; border-radius: 10px; margin: 20px 0; }
+        .join-btn { background: #ff6b6b; color: white; padding: 15px 30px; border: none; border-radius: 25px; font-size: 16px; cursor: pointer; text-decoration: none; display: inline-block; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1><span class="emoji">🎉</span> Hey {participant_name}! <span class="emoji">🎉</span></h1>
+        
+        <p>You're invited to join our awesome meeting!</p>
+        
+        <div class="meeting-card">
+            <h2><span class="emoji">📅</span> {meeting_title}</h2>
+            <p><span class="emoji">🕐</span> <strong>When:</strong> {meeting_date} at {meeting_time}</p>
+            <p><span class="emoji">⏱️</span> <strong>Duration:</strong> {meeting_duration}</p>
+            <p><span class="emoji">👤</span> <strong>Host:</strong> {host_name}</p>
+        </div>
+        
+        <p>Ready to join? Just click the button below!</p>
+        
+        <a href="{meeting_url}" class="join-btn">
+            <span class="emoji">🚀</span> Join the Fun!
+        </a>
+        
+        <p><strong>Meeting ID:</strong> {meeting_id}<br>
+        <strong>Password:</strong> {meeting_password}</p>
+        
+        <p>Can't wait to see you there! <span class="emoji">😊</span></p>
+        
+        <p>Cheers,<br>{host_name} <span class="emoji">✨</span></p>
+    </div>
+</body>
+</html>

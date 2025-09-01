@@ -1,0 +1,76 @@
+{
+    "video": {
+        "input": {
+            "defaultDevice": "default",
+            "resolution": {
+                "width": 1280,
+                "height": 720
+            },
+            "frameRate": 30,
+            "format": "YUV420P",
+            "autoExposure": true,
+            "autoWhiteBalance": true,
+            "autoFocus": true
+        },
+        "output": {
+            "maxResolution": {
+                "width": 1920,
+                "height": 1080
+            },
+            "minResolution": {
+                "width": 320,
+                "height": 240
+            },
+            "adaptiveResolution": true,
+            "maxFrameRate": 60,
+            "minFrameRate": 5
+        },
+        "codec": {
+            "preferredCodec": "VP8",
+            "fallbackCodec": "H264",
+            "bitrate": {
+                "max": 2500000,
+                "min": 150000,
+                "start": 800000
+            },
+            "enableHardwareAcceleration": true
+        },
+        "quality": {
+            "profiles": {
+                "low": {
+                    "width": 320,
+                    "height": 240,
+                    "frameRate": 15,
+                    "bitrate": 150000
+                },
+                "medium": {
+                    "width": 640,
+                    "height": 480,
+                    "frameRate": 30,
+                    "bitrate": 500000
+                },
+                "high": {
+                    "width": 1280,
+                    "height": 720,
+                    "frameRate": 30,
+                    "bitrate": 1200000
+                },
+                "ultra": {
+                    "width": 1920,
+                    "height": 1080,
+                    "frameRate": 30,
+                    "bitrate": 2500000
+                }
+            },
+            "defaultProfile": "medium",
+            "adaptiveQuality": true
+        },
+        "advanced": {
+            "enableVideoDebug": false,
+            "logLevel": "info",
+            "enableMetrics": true,
+            "metricsInterval": 5000,
+            "enableBandwidthAdaptation": true
+        }
+    }
+}

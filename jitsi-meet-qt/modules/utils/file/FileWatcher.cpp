@@ -1,6 +1,7 @@
 #include "FileWatcher.h"
 #include <QDir>
 #include <QDirIterator>
+#include <QRegularExpression>
 #include <QDebug>
 
 FileWatcher::FileWatcher(QObject* parent)
@@ -451,8 +452,8 @@ bool FileWatcher::matchesFilters(const QString& path, const WatchConfig& config)
     if (!config.nameFilters.isEmpty()) {
         bool matches = false;
         for (const QString& filter : config.nameFilters) {
-            QRegExp regex(filter, Qt::CaseInsensitive, QRegExp::Wildcard);
-            if (regex.exactMatch(fileName)) {
+            QRegularExpression regex(QRegularExpression::wildcardToRegularExpression(filter), QRegularExpression::CaseInsensitiveOption);
+            if (regex.match(fileName).hasMatch()) {
                 matches = true;
                 break;
             }
@@ -464,8 +465,8 @@ bool FileWatcher::matchesFilters(const QString& path, const WatchConfig& config)
     
     // 检查排除过滤器
     for (const QString& filter : config.excludeFilters) {
-        QRegExp regex(filter, Qt::CaseInsensitive, QRegExp::Wildcard);
-        if (regex.exactMatch(fileName)) {
+        QRegularExpression regex(QRegularExpression::wildcardToRegularExpression(filter), QRegularExpression::CaseInsensitiveOption);
+        if (regex.match(fileName).hasMatch()) {
             return false;
         }
     }

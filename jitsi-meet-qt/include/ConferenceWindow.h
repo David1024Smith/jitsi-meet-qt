@@ -22,12 +22,14 @@
 #include "NavigationBar.h"
 #include "ConferenceManager.h"
 #include "MediaManager.h"
-#include "ChatManager.h"
+// #include "ChatManager.h" // 暂时禁用聊天功能
 #include "ScreenShareManager.h"
 #include "JitsiError.h"
+// #include "modules/chat/models/ChatMessage.h"  // Temporarily disabled
 
 // 前向声明
 class ICameraManager;
+class ChatMessage;
 
 class ConferenceWindow : public QMainWindow
 {
@@ -78,8 +80,8 @@ private slots:
     void onRemoteVideoRemoved(const QString& participantId);
     
     // 聊天管理器事件
-    void onChatMessageReceived(const ChatManager::ChatMessage& message);
-    void onChatMessageSent(const ChatManager::ChatMessage& message);
+    void onChatMessageReceived(ChatMessage* message);
+    void onChatMessageSent(const QString& messageId);
     void onUnreadCountChanged(int count);
     
     // 屏幕共享管理器事件
@@ -128,7 +130,7 @@ private:
     void setMainVideoWidget(QVideoWidget* widget);
     
     // 聊天功能
-    void addChatMessage(const ChatManager::ChatMessage& message);
+    void addChatMessage(ChatMessage* message);
     void updateChatUnreadIndicator();
     void scrollChatToBottom();
     
@@ -158,7 +160,7 @@ private:
     // 管理器组件
     ConferenceManager* m_conferenceManager;
     MediaManager* m_mediaManager;
-    ChatManager* m_chatManager;
+    // ChatManager* m_chatManager; // 暂时禁用聊天功能
     ScreenShareManager* m_screenShareManager;
     
     // 新的模块化摄像头管理器

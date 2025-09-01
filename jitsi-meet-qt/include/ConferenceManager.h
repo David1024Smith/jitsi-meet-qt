@@ -267,13 +267,11 @@ private slots:
 
     // WebRTC引擎事件处理
     void onWebRTCConnectionStateChanged(WebRTCEngine::ConnectionState state);
-    void onWebRTCLocalStreamReady(QVideoWidget* videoWidget);
-    void onWebRTCRemoteStreamReceived(const QString& participantId, QVideoWidget* videoWidget);
-    void onWebRTCRemoteStreamRemoved(const QString& participantId);
-    void onWebRTCIceCandidate(const WebRTCEngine::IceCandidate& candidate);
-    void onWebRTCOfferCreated(const QString& sdp);
-    void onWebRTCAnswerCreated(const QString& sdp);
-    void onWebRTCError(const QString& message);
+    void onWebRTCParticipantJoined(const QString& participantId, const QVariantMap& info);
+    void onWebRTCParticipantLeft(const QString& participantId);
+    void onWebRTCStreamAdded(const QString& streamId, const WebRTCEngine::MediaStreamInfo& info);
+    void onWebRTCStreamRemoved(const QString& streamId);
+    void onWebRTCMessageReceived(const QString& message, const QString& from);
 
     // 重连机制
     void onReconnectTimer();

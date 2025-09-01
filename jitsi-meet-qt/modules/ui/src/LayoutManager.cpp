@@ -10,6 +10,8 @@ LayoutManager::LayoutManager(QObject *parent)
     : QObject(parent)
     , m_status(NotInitialized)
     , m_currentLayoutName("main")
+    , m_currentLayoutType(MainLayout)
+    , m_responsiveModeEnabled(false)
 {
 }
 
@@ -342,4 +344,195 @@ bool LayoutManager::validateLayoutName(const QString& layoutName) const
 
     // 可以添加更多验证逻辑
     return true;
+}
+//
+ ILayoutManager 接口的缺失实现
+
+bool LayoutManager::setLayout(LayoutType layoutType)
+{
+    QString layoutName;
+    switch (layoutType) {
+        case MainLayout:
+            layoutName = "main";
+            break;
+        case ConferenceLayout:
+            layoutName = "conference";
+            break;
+        case SettingsLayout:
+            layoutName = "settings";
+            break;
+        default:
+            return false;
+    }
+    
+    if (setLayout(layoutName)) {
+        m_currentLayoutType = layoutType;
+        return true;
+    }
+    return false;
+}
+
+LayoutManager::LayoutType LayoutManager::currentLayoutType() const
+{
+    return m_currentLayoutType;
+}
+
+QStringList LayoutManager::supportedLayoutTypes() const
+{
+    return QStringList() << "MainLayout" << "ConferenceLayout" << "SettingsLayout";
+}
+
+bool LayoutManager::hasLayout(const QString& layoutName) const
+{
+    return m_registeredLayouts.contains(layoutName);
+}
+
+bool LayoutManager::isLayoutSupported(LayoutType layoutType) const
+{
+    return layoutType == MainLayout || 
+           layoutType == ConferenceLayout || 
+           layoutType == SettingsLayout;
+}
+
+bool LayoutManager::applyLayout(QWidget* widget)
+{
+    return applyLayoutToWidget(m_currentLayoutName, widget);
+}
+
+bool LayoutManager::applyLayoutToWindow(QWidget* window)
+{
+    return applyLayout(window);
+}
+
+bool LayoutManager::refreshLayout()
+{
+    return updateLayout();
+}
+
+bool LayoutManager::setResponsiveMode(bool enabled)
+{
+    if (m_responsiveModeEnabled != enabled) {
+        m_responsiveModeEnabled = enabled;
+        emit responsiveModeChanged(enabled);
+        return true;
+    }
+    return false;
+}
+
+bool LayoutManager::isResponsiveModeEnabled() const
+{
+    return m_responsiveModeEnabled;
+}
+
+bool LayoutManager::adaptToSize(const QSize& size)
+{
+    if (m_responsiveModeEnabled) {
+        // 实现响应式尺寸适配逻辑
+        emit sizeAdapted(size);
+        return true;
+    }
+    return false;
+}
+
+bool LayoutManager::adaptToGeometry(const QRect& geometry)
+{
+    return adaptToSize(geometry.size());
+}
+
+bool LayoutManager::setLayoutProperty(const QString& property, const QVariant& value)
+{
+    m_layoutConfiguration[property] = value;
+    return true;
+}
+
+QVariant LayoutManager::getLayoutProperty(const QString& property) const
+{
+    return m_layoutConfiguration.value(property);
+}
+
+bool LayoutManager::applyLayoutConfiguration(const QVariantMap& config)
+{
+    m_layoutConfiguration = config;
+    return true;
+}
+
+QVariantMap LayoutManager::getLayoutConfiguration() const
+{
+    return m_layoutConfiguration;
+}
+
+bool LayoutManager::addLayoutComponent(const QString& name, QWidget* widget)
+{
+    if (m_layoutComponents.contains(name)) {
+        return false;
+    }
+    
+    m_layoutComponents[name] = widget;
+    emit componentAdded(name);
+    return true;
+}
+
+bool LayoutManager::removeLayoutComponent(const QString& name)
+{
+    if (!m_layoutComponents.contains(name)) {
+        return false;
+    }
+    
+    m_layoutComponents.remove(name);
+    emit componentRemoved(name);
+    return true;
+}
+
+QWidget* LayoutManager::getLayoutComponent(const QString& name) const
+{
+    return m_layoutComponents.value(name, nullptr);
+}
+
+QStringList LayoutManager::getLayoutComponents() const
+{
+    return m_layoutComponents.keys();
+}
+
+bool LayoutManager::setLayoutConstraints(const QString& componentName, const QVariantMap& constraints)
+{
+    m_layoutConstraints[componentName] = constraints;
+    emit constraintsChanged(componentName);
+    return true;
+}
+
+QVariantMap LayoutManager::getLayoutConstraints(const QString& componentName) const
+{
+    return m_layoutConstraints.value(componentName);
+}
+
+bool LayoutManager::validateLayoutConstraints() const
+{
+    // 实现约束验证逻辑
+    return true;
+}
+
+QString LayoutManager::getLayoutDisplayName(const QString& layoutName) const
+{
+    if (layoutName == "main") return "Main Layout";
+    if (layoutName == "conference") return "Conference Layout";
+    if (layoutName == "settings") return "Settings Layout";
+    return layoutName;
+}
+
+QString LayoutManager::getLayoutDescription(const QString& layoutName) const
+{
+    if (layoutName == "main") return "Main application layout";
+    if (layoutName == "conference") return "Conference meeting layout";
+    if (layoutName == "settings") return "Settings and preferences layout";
+    return QString("Layout: %1").arg(layoutName);
+}
+
+QVariantMap LayoutManager::getLayoutMetadata(const QString& layoutName) const
+{
+    QVariantMap metadata;
+    metadata["name"] = layoutName;
+    metadata["displayName"] = getLayoutDisplayName(layoutName);
+    metadata["description"] = getLayoutDescription(layoutName);
+    metadata["version"] = "1.0.0";
+    return metadata;
 }

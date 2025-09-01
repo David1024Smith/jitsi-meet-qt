@@ -4,8 +4,8 @@
 #include <QObject>
 #include <QWebSocket>
 #include <QTimer>
-#include <QDomDocument>
-#include <QDomElement>
+#include <QtXml/QDomDocument>
+#include <QtXml/QDomElement>
 #include <QUrl>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>

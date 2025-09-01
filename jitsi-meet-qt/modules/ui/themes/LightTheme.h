@@ -103,6 +103,10 @@ private:
     QString generateLightToolBarStyleSheet() const;
     QString generateLightStatusBarStyleSheet() const;
     QString generateLightDialogStyleSheet() const;
+    
+    // 主题基本信息
+    QString m_name;
+    QString m_displayName;
 
     // 亮色主题颜色定义
     QColor m_primaryColor;

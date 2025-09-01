@@ -59,7 +59,7 @@ public:
         VeryFast,       ///< 很快编码
         Faster,         ///< 较快编码
         Fast,           ///< 快速编码
-        Medium,         ///< 中等编码
+        MediumPreset,   ///< 中等编码
         Slow,           ///< 慢速编码
         Slower,         ///< 较慢编码
         VerySlow        ///< 很慢编码
@@ -94,6 +94,8 @@ public:
     // 视频参数接口
     QSize resolution() const;
     void setResolution(const QSize& size);
+    QSize frameSize() const;
+    void setFrameSize(const QSize& size);
     int frameRate() const;
     void setFrameRate(int fps);
     int bitrate() const;
@@ -111,6 +113,7 @@ public:
 
     // 编码接口
     bool encodeFrame(const QPixmap& frame);
+    QByteArray encodeFrameRaw(const QPixmap& frame);
     bool encodeFrameData(const QByteArray& data, const QSize& size);
     void flush();
 
@@ -126,6 +129,11 @@ public slots:
      * @brief 重置编码器
      */
     void reset();
+    
+    /**
+     * @brief 重置编码器内部状态
+     */
+    void resetEncoder();
 
     /**
      * @brief 重置统计信息
@@ -167,6 +175,24 @@ signals:
      * @param resolution 新的分辨率
      */
     void resolutionChanged(const QSize& resolution);
+    
+    /**
+     * @brief 帧率改变信号
+     * @param fps 新的帧率
+     */
+    void frameRateChanged(int fps);
+    
+    /**
+     * @brief 帧大小改变信号
+     * @param size 新的帧大小
+     */
+    void frameSizeChanged(const QSize& size);
+    
+    /**
+     * @brief 质量改变信号
+     * @param quality 新的质量设置
+     */
+    void qualityChanged(EncodingQuality quality);
 
     /**
      * @brief 编码数据就绪信号
@@ -174,6 +200,12 @@ signals:
      * @param timestamp 时间戳
      */
     void encodedDataReady(const QByteArray& data, qint64 timestamp);
+    
+    /**
+     * @brief 帧编码信号
+     * @param data 编码后的数据
+     */
+    void frameEncoded(const QByteArray& data);
 
     /**
      * @brief 关键帧编码信号

@@ -5,13 +5,13 @@
 #include <QVariant>
 #include <QStringList>
 #include <QJsonObject>
-#include <QJsonSchema>
+#include <QJsonDocument>
+#include <functional>
 
 /**
  * @brief 配置验证器接口
  * 
- * 定义了配置验证的核心接口，支持多种验证规则、JSON模式验证和自定义验证器。
- * 提供了完整的配置验证框架，确保配置数据的有效性和一致性。
+ * 提供配置数据验证的统一接口
  */
 class IConfigValidator : public QObject
 {
@@ -19,16 +19,51 @@ class IConfigValidator : public QObject
 
 public:
     /**
-     * @brief 验证规则类型枚举
+     * @brief 验证结果枚举
+     */
+    enum ValidationResultEnum {
+        Valid,          ///< 验证通过
+        Invalid,        ///< 验证失败
+        ValidWithWarning ///< 验证通过但有警告
+    };
+    Q_ENUM(ValidationResultEnum)
+    
+    /**
+     * @brief 验证结果结构体
+     */
+    struct ValidationResult {
+        bool isValid;       ///< 是否有效
+        QString key;        ///< 验证的键
+        QVariant value;     ///< 验证的值
+        int severityLevel;  ///< 严重程度级别
+        QString message;    ///< 验证消息
+        
+        ValidationResult() : isValid(true), severityLevel(0) {} // 0 对应 Info
+    };
+
+    /**
+     * @brief 验证错误类型
+     */
+    enum ErrorType {
+        TypeError,      ///< 类型错误
+        RangeError,     ///< 范围错误
+        FormatError,    ///< 格式错误
+        RequiredError,  ///< 必需字段缺失
+        CustomError     ///< 自定义错误
+    };
+    Q_ENUM(ErrorType)
+
+    /**
+     * @brief 验证规则枚举
      */
     enum ValidationRule {
         Required,       ///< 必需字段
-        Range,          ///< 数值范围
+        Range,          ///< 范围验证
         MinLength,      ///< 最小长度
         MaxLength,      ///< 最大长度
         Pattern,        ///< 正则表达式模式
         Enum,           ///< 枚举值
-        Type,           ///< 数据类型
+        Type,           ///< 类型验证
         Custom          ///< 自定义验证
     };
     Q_ENUM(ValidationRule)
@@ -37,38 +72,150 @@ public:
      * @brief 验证严重程度
      */
     enum ValidationSeverity {
-        Info,       ///< 信息
-        Warning,    ///< 警告
-        Error,      ///< 错误
-        Critical    ///< 严重错误
+        Info,           ///< 信息
+        Warning,        ///< 警告
+        Error,          ///< 错误
+        Critical        ///< 严重错误
     };
     Q_ENUM(ValidationSeverity)
-
-    /**
-     * @brief 验证结果结构
-     */
-    struct ValidationResult {
-        bool isValid;                   ///< 是否有效
-        QString key;                    ///< 配置键
-        QString message;                ///< 验证消息
-        ValidationSeverity severity;    ///< 严重程度
-        QVariant actualValue;           ///< 实际值
-        QVariant expectedValue;         ///< 期望值
-
-        ValidationResult() : isValid(true), severity(Info) {}
-        ValidationResult(bool valid, const QString& k, const QString& msg, 
-                        ValidationSeverity sev = Error, const QVariant& actual = QVariant(), 
-                        const QVariant& expected = QVariant())
-            : isValid(valid), key(k), message(msg), severity(sev), 
-              actualValue(actual), expectedValue(expected) {}
-    };
+    
+    // 定义默认错误级别常量
+    static const ValidationSeverity ErrorLevel = Error;
 
     /**
      * @brief 自定义验证器函数类型
      */
     using CustomValidatorFunction = std::function<ValidationResult(const QString&, const QVariant&)>;
 
+    /**
+     * @brief 验证错误信息结构
+     */
+    struct ValidationError {
+        QString field;      ///< 字段名
+        ErrorType type;     ///< 错误类型
+        QString message;    ///< 错误消息
+        QVariant expected;  ///< 期望值
+        QVariant actual;    ///< 实际值
+    };
+
+    explicit IConfigValidator(QObject* parent = nullptr) : QObject(parent) {}
     virtual ~IConfigValidator() = default;
+
+    /**
+     * @brief 验证单个配置值
+     * @param key 配置键
+     * @param value 配置值
+     * @return 验证结果
+     */
+    virtual ValidationResult validateValue(const QString& key, const QVariant& value) const = 0;
+
+    /**
+     * @brief 验证配置对象
+     * @param config 配置对象
+     * @return 验证结果列表
+     */
+    virtual QList<ValidationResult> validateConfig(const QVariantMap& config) const = 0;
+
+    /**
+     * @brief 验证JSON配置
+     * @param json JSON对象
+     * @return 验证结果列表
+     */
+    virtual QList<ValidationResult> validateJson(const QJsonObject& json) const = 0;
+
+    /**
+     * @brief 获取最后的验证错误
+     * @return 错误列表
+     */
+    virtual QList<ValidationError> getLastErrors() const = 0;
+
+    /**
+     * @brief 获取验证警告
+     * @return 警告列表
+     */
+    virtual QStringList getWarnings() const = 0;
+
+    /**
+     * @brief 设置JSON模式
+     * @param schema JSON模式
+     * @return 设置是否成功
+     */
+    virtual bool setJsonSchema(const QJsonObject& schema) = 0;
+
+    /**
+     * @brief 从文件加载JSON模式
+     * @param schemaFilePath 模式文件路径
+     * @return 加载是否成功
+     */
+    virtual bool loadJsonSchema(const QString& schemaFilePath) = 0;
+
+    /**
+     * @brief 使用模式验证JSON
+     * @param json JSON对象
+     * @return 验证结果列表
+     */
+    virtual QList<ValidationResult> validateWithSchema(const QJsonObject& json) const = 0;
+
+    /**
+     * @brief 获取所有验证规则
+     * @return 规则映射
+     */
+    virtual QMap<QString, QList<ValidationRule>> getAllRules() const = 0;
+
+    /**
+     * @brief 检查是否有规则
+     * @param key 配置键
+     * @return 是否有规则
+     */
+    virtual bool hasRules(const QString& key) const = 0;
+
+    /**
+     * @brief 清除所有规则
+     */
+    virtual void clearRules() = 0;
+
+    /**
+     * @brief 设置严格模式
+     * @param strict 是否严格
+     */
+    virtual void setStrictMode(bool strict) = 0;
+
+    /**
+     * @brief 检查是否严格模式
+     * @return 是否严格模式
+     */
+    virtual bool isStrictMode() const = 0;
+
+    /**
+     * @brief 设置默认严重程度
+     * @param severity 严重程度
+     */
+    virtual void setDefaultSeverity(ValidationSeverity severity) = 0;
+
+    /**
+     * @brief 获取默认严重程度
+     * @return 严重程度
+     */
+    virtual ValidationSeverity defaultSeverity() const = 0;
+
+    /**
+     * @brief 导出规则到JSON
+     * @return JSON对象
+     */
+    virtual QJsonObject exportRulesToJson() const = 0;
+
+    /**
+     * @brief 从JSON导入规则
+     * @param json JSON对象
+     * @return 导入是否成功
+     */
+    virtual bool importRulesFromJson(const QJsonObject& json) = 0;
+
+    /**
+     * @brief 创建预定义规则集
+     * @param ruleSetName 规则集名称
+     */
+    virtual void createPredefinedRuleSet(const QString& ruleSetName) = 0;
 
     /**
      * @brief 初始化验证器
@@ -83,168 +230,44 @@ public:
      * @param parameters 规则参数
      * @param severity 严重程度
      */
-    virtual void addRule(const QString& key, ValidationRule rule, 
-                        const QVariantList& parameters = QVariantList(), 
-                        ValidationSeverity severity = Error) = 0;
+    virtual void addRule(const QString& key, ValidationRule rule,
+                        const QVariantList& parameters = QVariantList(),
+                        ValidationSeverity severity = ErrorLevel) = 0;
 
     /**
      * @brief 添加自定义验证器
-     * @param key 配置键
-     * @param validator 自定义验证函数
+     * @param key 字段键
+     * @param validator 验证函数
      * @param severity 严重程度
      */
-    virtual void addCustomValidator(const QString& key, CustomValidatorFunction validator, 
-                                   ValidationSeverity severity = Error) = 0;
+    virtual void addCustomValidator(const QString& key, CustomValidatorFunction validator,
+                                  ValidationSeverity severity = ErrorLevel) = 0;
 
     /**
      * @brief 移除验证规则
      * @param key 配置键
-     * @param rule 验证规则（可选，不指定则移除所有规则）
+     * @param rule 验证规则
      */
-    virtual void removeRule(const QString& key, ValidationRule rule = ValidationRule::Custom) = 0;
-
-    /**
-     * @brief 验证单个配置项
-     * @param key 配置键
-     * @param value 配置值
-     * @return 验证结果
-     */
-    virtual ValidationResult validateValue(const QString& key, const QVariant& value) const = 0;
-
-    /**
-     * @brief 验证配置映射
-     * @param config 配置映射
-     * @return 验证结果列表
-     */
-    virtual QList<ValidationResult> validateConfig(const QVariantMap& config) const = 0;
-
-    /**
-     * @brief 验证JSON对象
-     * @param json JSON对象
-     * @return 验证结果列表
-     */
-    virtual QList<ValidationResult> validateJson(const QJsonObject& json) const = 0;
-
-    /**
-     * @brief 设置JSON模式
-     * @param schema JSON模式对象
-     * @return 设置是否成功
-     */
-    virtual bool setJsonSchema(const QJsonObject& schema) = 0;
-
-    /**
-     * @brief 从文件加载JSON模式
-     * @param schemaFilePath 模式文件路径
-     * @return 加载是否成功
-     */
-    virtual bool loadJsonSchema(const QString& schemaFilePath) = 0;
-
-    /**
-     * @brief 使用JSON模式验证
-     * @param json 待验证的JSON对象
-     * @return 验证结果列表
-     */
-    virtual QList<ValidationResult> validateWithSchema(const QJsonObject& json) const = 0;
-
-    /**
-     * @brief 获取所有验证规则
-     * @return 规则映射（键 -> 规则列表）
-     */
-    virtual QMap<QString, QList<ValidationRule>> getAllRules() const = 0;
-
-    /**
-     * @brief 检查是否有验证规则
-     * @param key 配置键
-     * @return 是否有规则
-     */
-    virtual bool hasRules(const QString& key) const = 0;
-
-    /**
-     * @brief 清除所有验证规则
-     */
-    virtual void clearRules() = 0;
-
-    /**
-     * @brief 设置验证模式
-     * @param strict 是否严格模式（严格模式下警告也会导致验证失败）
-     */
-    virtual void setStrictMode(bool strict) = 0;
-
-    /**
-     * @brief 获取验证模式
-     * @return 是否为严格模式
-     */
-    virtual bool isStrictMode() const = 0;
-
-    /**
-     * @brief 设置默认严重程度
-     * @param severity 默认严重程度
-     */
-    virtual void setDefaultSeverity(ValidationSeverity severity) = 0;
-
-    /**
-     * @brief 获取默认严重程度
-     * @return 默认严重程度
-     */
-    virtual ValidationSeverity defaultSeverity() const = 0;
-
-    /**
-     * @brief 导出验证规则到JSON
-     * @return JSON对象
-     */
-    virtual QJsonObject exportRulesToJson() const = 0;
-
-    /**
-     * @brief 从JSON导入验证规则
-     * @param json JSON对象
-     * @return 导入是否成功
-     */
-    virtual bool importRulesFromJson(const QJsonObject& json) = 0;
-
-    /**
-     * @brief 创建预定义规则集
-     * @param ruleSetName 规则集名称（如 "audio", "video", "network"）
-     */
-    virtual void createPredefinedRuleSet(const QString& ruleSetName) = 0;
+    virtual void removeRule(const QString& key, ValidationRule rule = Custom) = 0;
 
 signals:
     /**
      * @brief 验证完成信号
-     * @param results 验证结果列表
-     */
-    void validationCompleted(const QList<ValidationResult>& results);
-
-    /**
-     * @brief 验证失败信号
-     * @param key 配置键
      * @param result 验证结果
+     * @param errors 错误列表
      */
-    void validationFailed(const QString& key, const ValidationResult& result);
+    void validationCompleted(ValidationResult result, const QList<ValidationError>& errors);
 
     /**
-     * @brief 规则添加信号
-     * @param key 配置键
-     * @param rule 验证规则
+     * @brief 验证警告信号
+     * @param warnings 警告列表
      */
-    void ruleAdded(const QString& key, ValidationRule rule);
-
-    /**
-     * @brief 规则移除信号
-     * @param key 配置键
-     * @param rule 验证规则
-     */
-    void ruleRemoved(const QString& key, ValidationRule rule);
-
-    /**
-     * @brief 错误发生信号
-     * @param error 错误信息
-     */
-    void errorOccurred(const QString& error);
+    void validationWarning(const QStringList& warnings);
 };
 
-// 便利宏定义
-#define VALIDATION_RESULT_SUCCESS ValidationResult(true, QString(), QString(), IConfigValidator::Info)
-#define VALIDATION_RESULT_ERROR(key, msg) ValidationResult(false, key, msg, IConfigValidator::Error)
-#define VALIDATION_RESULT_WARNING(key, msg) ValidationResult(true, key, msg, IConfigValidator::Warning)
+Q_DECLARE_METATYPE(IConfigValidator::ValidationResultEnum)
+Q_DECLARE_METATYPE(IConfigValidator::ValidationResult)
+Q_DECLARE_METATYPE(IConfigValidator::ErrorType)
+Q_DECLARE_METATYPE(IConfigValidator::ValidationError)
 
 #endif // ICONFIGVALIDATOR_H

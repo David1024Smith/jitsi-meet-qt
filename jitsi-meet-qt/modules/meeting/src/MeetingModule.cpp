@@ -111,7 +111,7 @@ void MeetingModule::shutdown()
     // 清理资源
     cleanup();
     
-    emit shutdown();
+    emit shutdownCompleted();
     qDebug() << "Meeting module shutdown completed";
 }
 

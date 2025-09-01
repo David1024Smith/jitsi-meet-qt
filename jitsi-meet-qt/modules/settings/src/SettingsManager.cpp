@@ -1,8 +1,8 @@
 #include "SettingsManager.h"
-#include "interfaces/IConfigValidator.h"
-#include "storage/LocalStorage.h"
-#include "storage/CloudStorage.h"
-#include "storage/RegistryStorage.h"
+#include "../interfaces/IConfigValidator.h"
+#include "../storage/LocalStorage.h"
+#include "../storage/CloudStorage.h"
+#include "../storage/RegistryStorage.h"
 
 #include <QDebug>
 #include <QTimer>
@@ -195,7 +195,7 @@ QVariant SettingsManager::value(const QString& key, const QVariant& defaultValue
     }
     
     QVariant storedValue = settings->value(key, defaultValue);
-    updateStatistics("read");
+    const_cast<SettingsManager*>(this)->updateStatistics("read");
     
     return d->encryptionEnabled ? decryptValue(storedValue) : storedValue;
 }
@@ -321,7 +321,7 @@ bool SettingsManager::validate() const
         }
     }
     
-    return d->validator->validate(allSettings);
+    return d->validator->validateConfig(allSettings).isEmpty();
 }
 
 void SettingsManager::reset(SettingsScope scope)
@@ -705,7 +705,7 @@ QVariant SettingsManager::decryptValue(const QVariant& value) const
     return QVariant(data);
 }
 
-void SettingsManager::updateStatistics(const QString& operation) const
+void SettingsManager::updateStatistics(const QString& operation)
 {
     QString countKey = operation + "_count";
     int currentCount = d->statistics.value(countKey, 0).toInt();

@@ -4,6 +4,7 @@
 #include "../interfaces/IScreenShareManager.h"
 #include <QTimer>
 #include <QMutex>
+#include <QVideoWidget>
 
 class IScreenCapture;
 class CaptureEngine;
@@ -64,6 +65,30 @@ public:
     int getCurrentBitrate() const override;
     qint64 getTotalFrames() const override;
 
+signals:
+    /**
+     * @brief 屏幕共享开始信号
+     */
+    void screenShareStarted();
+
+    /**
+     * @brief 屏幕共享停止信号
+     */
+    void screenShareStopped();
+
+    /**
+     * @brief 远程屏幕共享接收信号
+     * @param participantId 参与者ID
+     * @param widget 视频控件
+     */
+    void remoteScreenShareReceived(const QString& participantId, QVideoWidget* widget);
+
+    /**
+     * @brief 远程屏幕共享移除信号
+     * @param participantId 参与者ID
+     */
+    void remoteScreenShareRemoved(const QString& participantId);
+
     // 扩展功能接口
     void setAutoQualityAdjustment(bool enabled);
     bool isAutoQualityAdjustmentEnabled() const;
@@ -87,6 +112,18 @@ public slots:
      * @brief 重置统计信息
      */
     void resetStatistics();
+
+    /**
+     * @brief 显示屏幕选择对话框
+     * @return 是否选择了屏幕
+     */
+    bool showScreenSelectionDialog();
+
+    /**
+     * @brief 获取本地屏幕共享控件
+     * @return 屏幕共享控件
+     */
+    QVideoWidget* localScreenShareWidget() const;
 
 private slots:
     void onCaptureStatusChanged(IScreenCapture::CaptureStatus status);

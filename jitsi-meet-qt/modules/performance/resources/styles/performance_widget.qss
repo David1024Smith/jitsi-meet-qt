@@ -1,0 +1,46 @@
+/* Performance Widget Styles */
+QWidget#PerformanceWidget {
+    background-color: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+}
+
+QLabel#MetricLabel {
+    font-weight: bold;
+    color: #333;
+    font-size: 14px;
+}
+
+QLabel#MetricValue {
+    font-size: 18px;
+    font-weight: bold;
+    color: #2196F3;
+}
+
+QLabel#MetricValue[status="warning"] {
+    color: #FF9800;
+}
+
+QLabel#MetricValue[status="critical"] {
+    color: #F44336;
+}
+
+QProgressBar {
+    border: 2px solid #ddd;
+    border-radius: 5px;
+    text-align: center;
+    background-color: #f0f0f0;
+}
+
+QProgressBar::chunk {
+    background-color: #4CAF50;
+    border-radius: 3px;
+}
+
+QProgressBar::chunk[status="warning"] {
+    background-color: #FF9800;
+}
+
+QProgressBar::chunk[status="critical"] {
+    background-color: #F44336;
+}
