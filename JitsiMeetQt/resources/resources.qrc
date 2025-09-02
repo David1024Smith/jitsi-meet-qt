@@ -1,0 +1,38 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+    <qresource prefix="/">
+        <!-- 图标资源 -->
+        <file>icons/app.ico</file>
+        <file>icons/app.png</file>
+        <file>icons/app.svg</file>
+        <file>icons/conference.png</file>
+        <file>icons/settings.png</file>
+        <file>icons/settings.svg</file>
+        <file>icons/exit.png</file>
+        <file>icons/minimize.png</file>
+        <file>icons/maximize.png</file>
+        <file>icons/close.png</file>
+        <file>icons/microphone.svg</file>
+        <file>icons/microphone-off.svg</file>
+        <file>icons/camera.svg</file>
+        <file>icons/camera-off.svg</file>
+        <file>icons/screen-share.svg</file>
+        <file>icons/chat.svg</file>
+        <file>icons/fullscreen.svg</file>
+        <file>icons/leave.svg</file>
+        
+        <!-- 图片资源 -->
+        <file>images/logo.png</file>
+        <file>images/background.png</file>
+        <file>images/welcome.png</file>
+        
+        <!-- 样式表资源 -->
+        <file>styles/main.qss</file>
+        <file>styles/dark.qss</file>
+        <file>styles/light.qss</file>
+        
+        <!-- 翻译文件 -->
+        <file>translations/jitsi_zh_CN.qm</file>
+        <file>translations/jitsi_en_US.qm</file>
+    </qresource>
+</RCC>

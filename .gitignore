@@ -67,3 +67,5 @@ jitsi-meet-qt/docs/
 .trae/
 .vscode/
 jitsi-meet-qt/
+.vscode/
+JitsiMeetQt/.qmake.stash
