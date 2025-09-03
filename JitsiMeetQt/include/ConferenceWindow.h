@@ -2,7 +2,7 @@
 #define CONFERENCEWINDOW_H
 
 #include <QMainWindow>
-// WebEngine相关头文件
+// WebView相关头文件
 #include <QWebEngineView>
 #include <QWebEnginePage>
 #include <QWebEngineProfile>
@@ -34,7 +34,7 @@
 
 
 QT_BEGIN_NAMESPACE
-// WebEngine classes
+// WebView classes
 class QWebEngineView;
 class QWebEnginePage;
 class QWebEngineProfile;
@@ -242,6 +242,17 @@ public slots:
     void onConferenceLeft();
     
     /**
+     * @brief 处理会议失败事件
+     * @param error 错误信息
+     */
+    void onConferenceFailed(const QString& error);
+    
+    /**
+     * @brief 处理会议准备关闭事件
+     */
+    void onReadyToClose();
+    
+    /**
      * @brief 处理参与者加入事件
      * @param participantId 参与者ID
      * @param displayName 显示名称
@@ -275,17 +286,10 @@ public slots:
     void onVideoMuteChanged(bool muted);
     
     /**
-     * @brief 处理屏幕共享状态变化事件
+     * @brief 屏幕共享状态变化处理
      * @param sharing 是否正在共享屏幕
      */
     void onScreenShareChanged(bool sharing);
-    
-    /**
-     * @brief 处理功能权限请求事件
-     * @param url 请求权限的URL
-     * @param feature 请求的功能
-     */
-    void onFeaturePermissionRequested(const QUrl& url, QWebEnginePage::Feature feature);
     
     /**
      * @brief 处理Jitsi Meet加载完成事件
@@ -370,6 +374,18 @@ signals:
     void conferenceLeft(const QString& roomName);
     
     /**
+     * @brief 会议失败信号
+     * @param roomName 房间名称
+     * @param error 错误信息
+     */
+    void conferenceFailed(const QString& roomName, const QString& error);
+    
+    /**
+     * @brief 会议准备关闭信号
+     */
+    void readyToClose();
+    
+    /**
      * @brief 会议加载失败信号
      * @param error 错误信息
      */
@@ -429,15 +445,23 @@ private slots:
     
     /**
      * @brief 网络诊断完成槽函数
-     * @param results 诊断结果
+     * @param success 诊断是否成功
+     * @param summary 诊断摘要
      */
-    void onNetworkDiagnosticsCompleted(const QJsonObject& results);
+    void onNetworkDiagnosticsCompleted(bool success, const QString& summary);
     
     /**
      * @brief 网络诊断错误槽函数
      * @param error 错误信息
      */
     void onNetworkDiagnosticsError(const QString& error);
+    
+    /**
+     * @brief 处理功能权限请求
+     * @param url 请求URL
+     * @param feature 请求的功能
+     */
+    void onFeaturePermissionRequested(const QUrl& url, QWebEnginePage::Feature feature);
     
     // WebEngine信号处理
     // onLoadStarted、onLoadProgress、onLoadFinished、onTitleChanged和onUrlChanged方法已在前面声明，此处删除重复声明
@@ -464,7 +488,7 @@ private:
     void initializeJavaScriptBridge();
     
     /**
-     * @brief 设置WebEngine配置
+     * @brief 设置WebEngine设置
      */
     void setupWebEngineSettings();
     
@@ -541,11 +565,10 @@ private:
     // UI组件
     QWidget* m_centralWidget;           ///< 中央窗口部件
     QVBoxLayout* m_mainLayout;          ///< 主布局
-    // WebEngine组件 - 已启用MSVC WebEngine支持
-#ifdef _MSC_VER
+    
+    // WebView组件 - WebView支持
     QWebEngineView* m_webView;          ///< Web视图
     QWebEnginePage* m_webPage;          ///< Web页面
-#endif
     QWebChannel* m_webChannel;          ///< Web通道
     QWebSocket* m_webSocket;            ///< Web套接字
     QLabel* m_statusDisplay;            ///< 状态显示
