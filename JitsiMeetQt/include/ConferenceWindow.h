@@ -2,12 +2,16 @@
 #define CONFERENCEWINDOW_H
 
 #include <QMainWindow>
-// WebEngine temporarily disabled due to MSVC configuration issues
-// #include <QWebEngineView>
-// #include <QWebEnginePage>
-// #include <QWebEngineProfile>
+// WebEngine相关头文件
+#include <QWebEngineView>
+#include <QWebEnginePage>
+#include <QWebEngineProfile>
+#include <QWebEngineSettings>
 #include <QLabel>
 #include <QWidget>
+#include <QTextEdit>
+#include <QWebChannel>
+#include <QWebSocket>
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -26,13 +30,14 @@
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QSslConfiguration>
+#include "NetworkDiagnostics.h"
 
 
 QT_BEGIN_NAMESPACE
-// WebEngine classes temporarily disabled
-// class QWebEngineView;
-// class QWebEnginePage;
-// class QWebEngineProfile;
+// WebEngine classes
+class QWebEngineView;
+class QWebEnginePage;
+class QWebEngineProfile;
 class QLabel;
 class QWidget;
 class QVBoxLayout;
@@ -270,10 +275,81 @@ public slots:
     void onVideoMuteChanged(bool muted);
     
     /**
-     * @brief 处理屏幕共享状态变化
-     * @param sharing 是否正在共享
+     * @brief 处理屏幕共享状态变化事件
+     * @param sharing 是否正在共享屏幕
      */
     void onScreenShareChanged(bool sharing);
+    
+    /**
+     * @brief 处理功能权限请求事件
+     * @param url 请求权限的URL
+     * @param feature 请求的功能
+     */
+    void onFeaturePermissionRequested(const QUrl& url, QWebEnginePage::Feature feature);
+    
+    /**
+     * @brief 处理Jitsi Meet加载完成事件
+     */
+    void onJitsiMeetLoaded();
+    
+    /**
+     * @brief 处理会议状态更新事件
+     * @param state 会议状态JSON对象
+     */
+    void onConferenceStateUpdated(const QJsonObject& state);
+    
+    /**
+     * @brief 处理JavaScript错误事件
+     * @param error 错误信息
+     */
+    void onJavaScriptError(const QString& error);
+    
+    /**
+     * @brief 处理Promise拒绝事件
+     * @param reason 拒绝原因
+     */
+    void onPromiseRejected(const QString& reason);
+    
+    /**
+     * @brief 处理API连接成功
+     */
+    void onApiConnected();
+    
+    /**
+     * @brief 处理API连接断开
+     */
+    void onApiDisconnected();
+    
+    /**
+     * @brief 处理房间加入成功
+     * @param roomName 房间名称
+     */
+    void onRoomJoined(const QString& roomName);
+    
+    /**
+     * @brief 处理房间离开
+     * @param roomName 房间名称
+     */
+    void onRoomLeft(const QString& roomName);
+    
+    /**
+     * @brief 处理API错误
+     * @param error 错误信息
+     */
+    void onApiError(const QString& error);
+
+private:
+    /**
+     * @brief 启用或禁用会议控制按钮
+     * @param enabled 是否启用
+     */
+    void enableConferenceControls(bool enabled);
+    
+    /**
+     * @brief 显示错误消息
+     * @param message 错误消息
+     */
+    void showErrorMessage(const QString& message);
 
 signals:
     /**
@@ -350,6 +426,18 @@ private slots:
      * @param error 网络错误类型
      */
     void onNetworkError(QNetworkReply::NetworkError error);
+    
+    /**
+     * @brief 网络诊断完成槽函数
+     * @param results 诊断结果
+     */
+    void onNetworkDiagnosticsCompleted(const QJsonObject& results);
+    
+    /**
+     * @brief 网络诊断错误槽函数
+     * @param error 错误信息
+     */
+    void onNetworkDiagnosticsError(const QString& error);
     
     // WebEngine信号处理
     // onLoadStarted、onLoadProgress、onLoadFinished、onTitleChanged和onUrlChanged方法已在前面声明，此处删除重复声明
@@ -453,9 +541,13 @@ private:
     // UI组件
     QWidget* m_centralWidget;           ///< 中央窗口部件
     QVBoxLayout* m_mainLayout;          ///< 主布局
-    // WebEngine components temporarily disabled
-    // QWebEngineView* m_webView;          ///< Web视图
-    // QWebEnginePage* m_webPage;          ///< Web页面
+    // WebEngine组件 - 已启用MSVC WebEngine支持
+#ifdef _MSC_VER
+    QWebEngineView* m_webView;          ///< Web视图
+    QWebEnginePage* m_webPage;          ///< Web页面
+#endif
+    QWebChannel* m_webChannel;          ///< Web通道
+    QWebSocket* m_webSocket;            ///< Web套接字
     QLabel* m_statusDisplay;            ///< 状态显示
     QWidget* m_webContainer;            ///< Web容器
     
@@ -484,6 +576,7 @@ private:
     // 配置和API
     ConfigurationManager* m_configManager; ///< 配置管理器
     JitsiMeetAPI* m_jitsiAPI;           ///< Jitsi Meet API
+    NetworkDiagnostics* m_networkDiagnostics; ///< 网络诊断工具
     
     // 状态变量
     QString m_currentUrl;               ///< 当前URL

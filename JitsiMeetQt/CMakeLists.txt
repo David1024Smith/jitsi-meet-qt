@@ -6,8 +6,13 @@ project(JitsiMeetQt VERSION 1.0.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# 查找Qt6组件
-find_package(Qt6 REQUIRED COMPONENTS Core Widgets WebEngineWidgets Network)
+# 设置编码为UTF-8
+if(MSVC)
+    add_compile_options(/utf-8)
+endif()
+
+# 查找Qt5组件
+find_package(Qt5 REQUIRED COMPONENTS Core Widgets WebEngineWidgets Network WebChannel WebSockets)
 
 # 启用Qt的MOC、UIC和RCC
 set(CMAKE_AUTOMOC ON)
@@ -26,29 +31,25 @@ include_directories(include/utils)
 set(SOURCES
     src/main.cpp
     src/MainApplication.cpp
-    src/windows/ConferenceWindow.cpp
-    src/windows/WelcomeWindow.cpp
-    src/dialogs/SettingsDialog.cpp
-    src/widgets/ConferenceWidget.cpp
-    src/models/ConfigurationManager.cpp
-    src/models/RecentMeetingsModel.cpp
-    src/utils/ProtocolHandler.cpp
-    src/utils/JitsiMeetAPI.cpp
-    src/utils/NetworkManager.cpp
+    src/ConferenceWindow.cpp
+    src/WelcomeWindow.cpp
+    src/SettingsDialog.cpp
+    src/ConfigurationManager.cpp
+    src/ProtocolHandler.cpp
+    src/JitsiMeetAPI.cpp
+    src/NetworkDiagnostics.cpp
 )
 
 # 头文件
 set(HEADERS
     include/MainApplication.h
-    include/windows/ConferenceWindow.h
-    include/windows/WelcomeWindow.h
-    include/dialogs/SettingsDialog.h
-    include/widgets/ConferenceWidget.h
-    include/models/ConfigurationManager.h
-    include/models/RecentMeetingsModel.h
-    include/utils/ProtocolHandler.h
-    include/utils/JitsiMeetAPI.h
-    include/utils/NetworkManager.h
+    include/ConferenceWindow.h
+    include/WelcomeWindow.h
+    include/SettingsDialog.h
+    include/ConfigurationManager.h
+    include/ProtocolHandler.h
+    include/JitsiMeetAPI.h
+    include/NetworkDiagnostics.h
 )
 
 # 资源文件
@@ -61,10 +62,12 @@ add_executable(JitsiMeetQt ${SOURCES} ${HEADERS} ${RESOURCES})
 
 # 链接Qt库
 target_link_libraries(JitsiMeetQt
-    Qt6::Core
-    Qt6::Widgets
-    Qt6::WebEngineWidgets
-    Qt6::Network
+    Qt5::Core
+    Qt5::Widgets
+    Qt5::WebEngineWidgets
+    Qt5::Network
+    Qt5::WebChannel
+    Qt5::WebSockets
 )
 
 # Windows特定设置

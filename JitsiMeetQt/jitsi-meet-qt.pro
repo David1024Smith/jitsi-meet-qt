@@ -1,6 +1,4 @@
-QT += core widgets network
-# webenginewidgets temporarily disabled due to MSVC configuration issues
-# QT += webenginewidgets
+QT += core widgets network webenginewidgets
 
 CONFIG += c++17
 
@@ -47,6 +45,12 @@ RESOURCES += resources/resources.qrc
 win32 {
     CONFIG += console
     # RC_ICONS = resources/icons/app.ico
+    
+    # MSVC编译器配置
+    msvc {
+        QMAKE_MSC_VER = 1929  # Visual Studio 2019 v16.11
+        QMAKE_MSVC_VER = 16.11
+    }
     
     # 调试配置
     CONFIG(debug, debug|release) {

@@ -133,6 +133,7 @@ int main(int argc, char *argv[])
         }
         
         // 初始化应用程序
+        qDebug() << "开始初始化应用程序...";
         if (!app.initialize()) {
             qCritical() << "应用程序初始化失败";
             QMessageBox::critical(nullptr, 
@@ -141,8 +142,10 @@ int main(int argc, char *argv[])
             return 2;
         }
         
+        qDebug() << "应用程序初始化成功，显示欢迎窗口...";
         // 显示欢迎窗口
         app.showWelcomeWindow();
+        qDebug() << "欢迎窗口已显示，进入事件循环...";
         
         // 进入事件循环
         int result = app.exec();

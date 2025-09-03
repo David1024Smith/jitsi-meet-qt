@@ -21,11 +21,11 @@
 #include <QSizePolicy>
 #include <QScreen>
 #include <QWindow>
-// WebEngine temporarily disabled due to MSVC configuration issues
-// #include <QWebEngineView>
-// #include <QWebEnginePage>
-// #include <QWebEngineProfile>
-// #include <QWebEngineSettings>
+#include <QWebEngineView>
+#include <QWebEnginePage>
+#include <QWebEngineProfile>
+#include <QWebEngineSettings>
+#include <QWebChannel>
 #include <QLabel>
 #include <QWidget>
 #include <QJsonObject>
@@ -44,7 +44,8 @@ ConferenceWindow::ConferenceWindow(QWidget *parent)
     : QMainWindow(parent)
     , m_centralWidget(nullptr)
     , m_mainLayout(nullptr)
-    // , m_webView(nullptr)  // 注释掉WebEngine相关代码
+    , m_webView(nullptr)
+    , m_webPage(nullptr)
     , m_statusDisplay(nullptr)
     , m_webContainer(nullptr)
     , m_toolbar(nullptr)
@@ -63,6 +64,7 @@ ConferenceWindow::ConferenceWindow(QWidget *parent)
     , m_networkManager(nullptr)
     , m_configManager(ConfigurationManager::instance())
     , m_jitsiAPI(nullptr)
+    , m_networkDiagnostics(nullptr)
     , m_currentUrl()
     , m_currentRoom()
     , m_currentServer()
@@ -81,6 +83,7 @@ ConferenceWindow::ConferenceWindow(QWidget *parent)
     // 初始化组件
     initializeUI();
     initializeToolbar();
+    initializeWebEngine();
     
     // 创建定时器
     m_connectionTimer = new QTimer(this);
@@ -96,6 +99,39 @@ ConferenceWindow::ConferenceWindow(QWidget *parent)
     
     // 创建Jitsi Meet API
     m_jitsiAPI = new JitsiMeetAPI(this);
+    
+    // 创建网络诊断工具
+    m_networkDiagnostics = new NetworkDiagnostics(this);
+    connect(m_networkDiagnostics, &NetworkDiagnostics::diagnosisCompleted,
+            this, [this](bool success, const QString& summary) {
+                QJsonObject results;
+                results["success"] = success;
+                results["summary"] = summary;
+                onNetworkDiagnosticsCompleted(results);
+            });
+    connect(m_networkDiagnostics, &NetworkDiagnostics::diagnosisProgress,
+            this, [this](int progress, const QString& currentStep) {
+                qDebug() << "ConferenceWindow: 网络诊断进度:" << progress << "% -" << currentStep;
+            });
+    
+    // 连接JitsiMeetAPI信号槽
+    connect(m_jitsiAPI, &JitsiMeetAPI::serverConnected, this, &ConferenceWindow::onApiConnected);
+    connect(m_jitsiAPI, &JitsiMeetAPI::serverDisconnected, this, &ConferenceWindow::onApiDisconnected);
+    connect(m_jitsiAPI, &JitsiMeetAPI::roomJoined, this, &ConferenceWindow::onRoomJoined);
+    connect(m_jitsiAPI, &JitsiMeetAPI::roomLeft, this, &ConferenceWindow::onRoomLeft);
+    connect(m_jitsiAPI, &JitsiMeetAPI::participantsUpdated, this, 
+            [this](const QString& roomName, const QJsonArray& participants) {
+                Q_UNUSED(roomName); // 忽略roomName参数
+                // 处理参与者更新逻辑
+                qDebug() << "ConferenceWindow: 参与者列表更新，当前参与者数量:" << participants.size();
+            });
+    // 使用lambda表达式适配chatMessageReceived信号的参数差异
+    connect(m_jitsiAPI, &JitsiMeetAPI::chatMessageReceived, this, 
+            [this](const QString& roomName, const QString& senderId, const QString& message, qint64 timestamp) {
+                Q_UNUSED(roomName); // 忽略roomName参数
+                onChatMessageReceived(senderId, message, timestamp);
+            });
+    connect(m_jitsiAPI, &JitsiMeetAPI::apiError, this, &ConferenceWindow::onApiError);
     
     // 恢复窗口状态
     restoreWindowState();
@@ -170,73 +206,36 @@ void ConferenceWindow::initializeUI()
  */
 void ConferenceWindow::initializeWebEngine()
 {
+    qDebug() << "ConferenceWindow: 初始化WebEngine";
     
     // 创建Web容器
     m_webContainer = new QWidget(this);
     QVBoxLayout* containerLayout = new QVBoxLayout(m_webContainer);
     
-    // 创建状态显示标签
-    m_statusDisplay = new QLabel("Jitsi Meet 会议界面（简化版）", this);
-    m_statusDisplay->setAlignment(Qt::AlignCenter);
-    m_statusDisplay->setStyleSheet("QLabel { background-color: #f0f0f0; border: 1px solid #ccc; padding: 20px; font-size: 14px; }");
+    // 创建Web视图（使用QWebEngineView）
+    m_webView = new QWebEngineView(this);
     
-    // 创建Web视图（使用QWebEngineView）- 注释掉WebEngine相关代码
-    // m_webView = new QWebEngineView(this);
+    // 设置WebEngine配置
+    setupWebEngineSettings();
     
-    // 连接WebEngine信号 - 注释掉WebEngine相关代码
-    // connect(m_webView, &QWebEngineView::loadStarted, this, &ConferenceWindow::onLoadStarted);
-    // connect(m_webView, &QWebEngineView::loadProgress, this, &ConferenceWindow::onLoadProgress);
-    // connect(m_webView, &QWebEngineView::loadFinished, this, &ConferenceWindow::onLoadFinished);
-    // connect(m_webView, &QWebEngineView::titleChanged, this, &ConferenceWindow::onTitleChanged);
-    // connect(m_webView, &QWebEngineView::urlChanged, this, &ConferenceWindow::onUrlChanged);
+    // 连接WebEngine信号
+    connect(m_webView, &QWebEngineView::loadStarted, this, &ConferenceWindow::onLoadStarted);
+    connect(m_webView, &QWebEngineView::loadProgress, this, &ConferenceWindow::onLoadProgress);
+    connect(m_webView, &QWebEngineView::loadFinished, this, &ConferenceWindow::onLoadFinished);
+    connect(m_webView, &QWebEngineView::titleChanged, this, &ConferenceWindow::onTitleChanged);
+    connect(m_webView, &QWebEngineView::urlChanged, this, &ConferenceWindow::onUrlChanged);
     
     // 添加到容器布局
-    containerLayout->addWidget(m_statusDisplay);
-    // containerLayout->addWidget(m_webView);  // 注释掉WebEngine相关代码
+    containerLayout->addWidget(m_webView);
+    
+    // 初始化JavaScript桥接
+    initializeJavaScriptBridge();
     
     // 添加到主布局
     m_mainLayout->addWidget(m_webContainer);
-    
-    // 设置基本配置
-    setupWebEngineSettings();
 }
 
-/**
- * @brief 设置WebEngine配置
- */
-void ConferenceWindow::setupWebEngineSettings()
-{
-    // 设置WebEngine配置
-    
-    // 注释掉WebEngine相关代码
-    /*
-    if (!m_webView) {
-        return;
-    }
-    
-    // 获取WebEngine页面和设置
-    QWebEnginePage* page = m_webView->page();
-    QWebEngineSettings* settings = page->settings();
-    
-    // 启用必要的功能
-    settings->setAttribute(QWebEngineSettings::JavascriptEnabled, true);
-    settings->setAttribute(QWebEngineSettings::LocalStorageEnabled, true);
-    settings->setAttribute(QWebEngineSettings::LocalContentCanAccessRemoteUrls, true);
-    settings->setAttribute(QWebEngineSettings::AllowRunningInsecureContent, true);
-    settings->setAttribute(QWebEngineSettings::PluginsEnabled, true);
-    settings->setAttribute(QWebEngineSettings::FullScreenSupportEnabled, true);
-    settings->setAttribute(QWebEngineSettings::WebRTCPublicInterfacesOnly, false);
-    
-    // 设置用户代理
-    QString userAgent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36";
-    page->profile()->setHttpUserAgent(userAgent);
-    */
-    
-    // 设置状态显示
-    if (m_statusDisplay) {
-        m_statusDisplay->setText("Jitsi Meet 客户端已就绪");
-    }
-}
+// 删除重复的setupWebEngineSettings函数定义，保留后面的正确版本
 
 /**
  * @brief 初始化工具栏
@@ -246,6 +245,7 @@ void ConferenceWindow::initializeToolbar()
     
     // 创建工具栏
     m_toolbar = addToolBar(tr("会议控制"));
+    m_toolbar->setObjectName("conferenceToolbar");  // 设置对象名称以避免警告
     m_toolbar->setMovable(false);
     m_toolbar->setFloatable(false);
     
@@ -299,26 +299,77 @@ void ConferenceWindow::initializeToolbar()
 }
 
 /**
- * @brief 初始化JavaScript桥接
+ * @brief 设置WebEngine配置
  */
-void ConferenceWindow::initializeJavaScriptBridge()
+void ConferenceWindow::setupWebEngineSettings()
 {
+    qDebug() << "ConferenceWindow: 设置WebEngine配置";
     
-    // 注释掉WebEngine相关代码
-    /*
     if (!m_webView) {
         return;
     }
     
-    // 注入JavaScript代码将在页面加载完成后执行
-    // 这里可以设置JavaScript与Qt的通信桥接
+    QWebEngineSettings* settings = m_webView->settings();
     
-    // 连接JavaScript控制台消息
-    connect(m_webView->page(), &QWebEnginePage::javaScriptConsoleMessage,
-            [this](QWebEnginePage::JavaScriptConsoleMessageLevel level, const QString &message, int lineNumber, const QString &sourceID) {
-                qDebug() << "JavaScript Console:" << message << "at line" << lineNumber << "in" << sourceID;
-            });
-    */
+    // 启用JavaScript
+    settings->setAttribute(QWebEngineSettings::JavascriptEnabled, true);
+    
+    // 启用本地存储
+    settings->setAttribute(QWebEngineSettings::LocalStorageEnabled, true);
+    
+    // 启用WebGL
+    settings->setAttribute(QWebEngineSettings::WebGLEnabled, true);
+    
+    // 启用媒体访问
+    settings->setAttribute(QWebEngineSettings::PluginsEnabled, true);
+    
+    // 启用自动播放媒体
+    settings->setAttribute(QWebEngineSettings::PlaybackRequiresUserGesture, false);
+    
+    // 允许运行不安全内容（用于开发环境）
+    settings->setAttribute(QWebEngineSettings::AllowRunningInsecureContent, true);
+    
+    // 启用全屏支持
+    settings->setAttribute(QWebEngineSettings::FullScreenSupportEnabled, true);
+    
+    // 允许本地内容访问远程URL
+    settings->setAttribute(QWebEngineSettings::LocalContentCanAccessRemoteUrls, true);
+    
+    // 启用WebRTC功能
+    settings->setAttribute(QWebEngineSettings::WebRTCPublicInterfacesOnly, false);
+    
+    // 设置用户代理 - 使用标准Chrome用户代理以确保兼容性
+    QString userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36";
+    m_webView->page()->profile()->setHttpUserAgent(userAgent);
+    
+    // 设置状态显示
+    if (m_statusDisplay) {
+        m_statusDisplay->setText("Jitsi Meet 客户端已就绪");
+    }
+}
+
+/**
+ * @brief 初始化JavaScript桥接
+ */
+void ConferenceWindow::initializeJavaScriptBridge()
+{
+    qDebug() << "ConferenceWindow: 初始化JavaScript桥接";
+    
+    if (!m_webView) {
+        return;
+    }
+    
+    // 注意：javaScriptConsoleMessage是受保护的信号，无法直接连接
+    // 如需处理JavaScript控制台消息，需要创建QWebEnginePage的子类
+    
+    // 连接权限请求信号（用于摄像头和麦克风访问）
+    connect(m_webView->page(), &QWebEnginePage::featurePermissionRequested,
+            this, &ConferenceWindow::onFeaturePermissionRequested);
+    
+    // 注册JavaScript桥接对象
+    QWebChannel* channel = new QWebChannel(this);
+    channel->registerObject(QStringLiteral("qtBridge"), this);
+    m_webView->page()->setWebChannel(channel);
 }
 
 /**
@@ -326,10 +377,8 @@ void ConferenceWindow::initializeJavaScriptBridge()
  */
 void ConferenceWindow::injectJavaScript()
 {
-    // 注入JavaScript代码
+    qDebug() << "ConferenceWindow: 注入JavaScript代码";
     
-    // 注释掉WebEngine相关代码
-    /*
     if (!m_webView) {
         return;
     }
@@ -339,78 +388,376 @@ void ConferenceWindow::injectJavaScript()
         window.qtJitsiMeet = {
             // 会议控制方法
             toggleMute: function() {
-                if (window.APP && window.APP.conference) {
-                    window.APP.conference.toggleAudioMuted();
+                try {
+                    if (window.APP && window.APP.conference) {
+                        window.APP.conference.toggleAudioMuted();
+                        return true;
+                    }
+                    // 尝试使用iframe API
+                    if (window.parent && window.parent.postMessage) {
+                        window.parent.postMessage({
+                            type: 'jitsi_meet_command',
+                            command: 'toggleAudio'
+                        }, '*');
+                        return true;
+                    }
+                } catch (e) {
+                    console.error('Qt: toggleMute error:', e);
                 }
+                return false;
             },
             
             toggleCamera: function() {
-                if (window.APP && window.APP.conference) {
-                    window.APP.conference.toggleVideoMuted();
+                try {
+                    if (window.APP && window.APP.conference) {
+                        window.APP.conference.toggleVideoMuted();
+                        return true;
+                    }
+                    // 尝试使用iframe API
+                    if (window.parent && window.parent.postMessage) {
+                        window.parent.postMessage({
+                            type: 'jitsi_meet_command',
+                            command: 'toggleVideo'
+                        }, '*');
+                        return true;
+                    }
+                } catch (e) {
+                    console.error('Qt: toggleCamera error:', e);
                 }
+                return false;
             },
             
             toggleScreenShare: function() {
-                if (window.APP && window.APP.conference) {
-                    window.APP.conference.toggleScreenSharing();
+                try {
+                    if (window.APP && window.APP.conference) {
+                        window.APP.conference.toggleScreenSharing();
+                        return true;
+                    }
+                    // 尝试使用iframe API
+                    if (window.parent && window.parent.postMessage) {
+                        window.parent.postMessage({
+                            type: 'jitsi_meet_command',
+                            command: 'toggleShareScreen'
+                        }, '*');
+                        return true;
+                    }
+                } catch (e) {
+                    console.error('Qt: toggleScreenShare error:', e);
                 }
+                return false;
             },
             
             toggleChat: function() {
-                if (window.APP && window.APP.UI) {
-                    window.APP.UI.toggleChat();
+                try {
+                    if (window.APP && window.APP.UI) {
+                        window.APP.UI.toggleChat();
+                        return true;
+                    }
+                    // 尝试使用iframe API
+                    if (window.parent && window.parent.postMessage) {
+                        window.parent.postMessage({
+                            type: 'jitsi_meet_command',
+                            command: 'toggleChat'
+                        }, '*');
+                        return true;
+                    }
+                } catch (e) {
+                    console.error('Qt: toggleChat error:', e);
                 }
+                return false;
             },
             
             leaveConference: function() {
-                if (window.APP && window.APP.conference) {
-                    window.APP.conference.hangup();
+                try {
+                    if (window.APP && window.APP.conference) {
+                        window.APP.conference.hangup();
+                        return true;
+                    }
+                    // 尝试使用iframe API
+                    if (window.parent && window.parent.postMessage) {
+                        window.parent.postMessage({
+                            type: 'jitsi_meet_command',
+                            command: 'hangup'
+                        }, '*');
+                        return true;
+                    }
+                } catch (e) {
+                    console.error('Qt: leaveConference error:', e);
                 }
+                return false;
             },
             
             setDisplayName: function(name) {
-                if (window.APP && window.APP.conference) {
-                    window.APP.conference.changeLocalDisplayName(name);
+                try {
+                    if (window.APP && window.APP.conference) {
+                        window.APP.conference.changeLocalDisplayName(name);
+                        return true;
+                    }
+                    // 尝试使用iframe API
+                    if (window.parent && window.parent.postMessage) {
+                        window.parent.postMessage({
+                            type: 'jitsi_meet_command',
+                            command: 'displayName',
+                            displayName: name
+                        }, '*');
+                        return true;
+                    }
+                } catch (e) {
+                    console.error('Qt: setDisplayName error:', e);
                 }
+                return false;
             },
             
             sendChatMessage: function(message) {
-                if (window.APP && window.APP.conference) {
-                    window.APP.conference.sendTextMessage(message);
+                try {
+                    if (window.APP && window.APP.conference) {
+                        window.APP.conference.sendTextMessage(message);
+                        return true;
+                    }
+                    // 尝试使用iframe API
+                    if (window.parent && window.parent.postMessage) {
+                        window.parent.postMessage({
+                            type: 'jitsi_meet_command',
+                            command: 'sendChatMessage',
+                            message: message
+                        }, '*');
+                        return true;
+                    }
+                } catch (e) {
+                    console.error('Qt: sendChatMessage error:', e);
                 }
+                return false;
+            },
+            
+            // 获取会议状态
+            getConferenceState: function() {
+                try {
+                    if (window.APP && window.APP.conference) {
+                        return {
+                            isJoined: window.APP.conference.isJoined(),
+                            participantCount: window.APP.conference.getParticipantCount(),
+                            isAudioMuted: window.APP.conference.isLocalAudioMuted(),
+                            isVideoMuted: window.APP.conference.isLocalVideoMuted()
+                        };
+                    }
+                } catch (e) {
+                    console.error('Qt: getConferenceState error:', e);
+                }
+                return null;
             }
         };
         
         // 监听Jitsi Meet事件
-        if (window.APP) {
-            // 会议加入事件
-            window.APP.conference.addConferenceListener('conference.joined', function() {
-                console.log('Qt: Conference joined');
-            });
-            
-            // 会议离开事件
-            window.APP.conference.addConferenceListener('conference.left', function() {
-                console.log('Qt: Conference left');
-            });
-            
-            // 参与者事件
-            window.APP.conference.addConferenceListener('participant.joined', function(id, user) {
-                console.log('Qt: Participant joined:', id, user.getDisplayName());
-            });
-            
-            window.APP.conference.addConferenceListener('participant.left', function(id, user) {
-                console.log('Qt: Participant left:', id);
-            });
-            
-            // 音视频状态变化
-            window.APP.conference.addConferenceListener('track.audioLevelsChanged', function(audioLevels) {
-                // 音频级别变化
-            });
+        function setupJitsiEventListeners() {
+            try {
+                // 监听iframe API事件
+                window.addEventListener('message', function(event) {
+                    if (event.data && event.data.type === 'jitsi_meet_event') {
+                        handleJitsiEvent(event.data);
+                    }
+                });
+                
+                // 如果有直接的APP对象，也监听其事件
+                if (window.APP && window.APP.conference) {
+                    // 会议加入事件
+                    window.APP.conference.addConferenceListener('conference.joined', function() {
+                        console.log('Qt: Conference joined');
+                        if (window.qtBridge) {
+                            window.qtBridge.onConferenceJoined();
+                        }
+                    });
+                    
+                    // 会议离开事件
+                    window.APP.conference.addConferenceListener('conference.left', function() {
+                        console.log('Qt: Conference left');
+                        if (window.qtBridge) {
+                            window.qtBridge.onConferenceLeft();
+                        }
+                    });
+                    
+                    // 参与者事件
+                    window.APP.conference.addConferenceListener('participant.joined', function(id, user) {
+                        console.log('Qt: Participant joined:', id, user.getDisplayName());
+                        if (window.qtBridge) {
+                            window.qtBridge.onParticipantJoined(id, user.getDisplayName());
+                        }
+                    });
+                    
+                    // 参与者离开事件
+                    window.APP.conference.addConferenceListener('participant.left', function(id, user) {
+                        console.log('Qt: Participant left:', id, user.getDisplayName());
+                        if (window.qtBridge) {
+                            window.qtBridge.onParticipantLeft(id, user.getDisplayName());
+                        }
+                    });
+                    
+                    // 音频状态变化事件
+                    window.APP.conference.addConferenceListener('track.audioLevelsChanged', function(audioLevels) {
+                        if (window.qtBridge) {
+                            window.qtBridge.onAudioLevelsChanged(JSON.stringify(audioLevels));
+                        }
+                    });
+                    
+                    // 视频状态变化事件
+                    window.APP.conference.addConferenceListener('track.videoTypeChanged', function(participantId, videoType) {
+                        if (window.qtBridge) {
+                            window.qtBridge.onVideoTypeChanged(participantId, videoType);
+                        }
+                    });
+                    
+                    // 聊天消息接收事件
+                    window.APP.conference.addConferenceListener('message.received', function(id, text, ts) {
+                        console.log('Qt: Chat message received:', text);
+                        if (window.qtBridge) {
+                            window.qtBridge.onChatMessageReceived(id, text, ts);
+                        }
+                    });
+                    
+                    // 音频静音状态变化
+                    window.APP.conference.addConferenceListener('audio.muted', function(muted) {
+                        if (window.qtBridge) {
+                            window.qtBridge.onAudioMuteChanged(muted);
+                        }
+                    });
+                    
+                    // 视频静音状态变化
+                    window.APP.conference.addConferenceListener('video.muted', function(muted) {
+                        if (window.qtBridge) {
+                            window.qtBridge.onVideoMuteChanged(muted);
+                        }
+                    });
+                    
+                    // 屏幕共享状态变化
+                    window.APP.conference.addConferenceListener('screen.sharing.toggled', function(isSharing) {
+                        if (window.qtBridge) {
+                            window.qtBridge.onScreenShareChanged(isSharing);
+                        }
+                    });
+                }
+            } catch (e) {
+                console.error('Qt: setupJitsiEventListeners error:', e);
+            }
         }
+        
+        // 处理iframe API事件
+        function handleJitsiEvent(eventData) {
+            try {
+                if (!window.qtBridge) return;
+                
+                switch (eventData.event) {
+                    case 'videoConferenceJoined':
+                        console.log('Qt: Conference joined via iframe API');
+                        window.qtBridge.onConferenceJoined();
+                        break;
+                    case 'videoConferenceLeft':
+                        console.log('Qt: Conference left via iframe API');
+                        window.qtBridge.onConferenceLeft();
+                        break;
+                    case 'participantJoined':
+                        console.log('Qt: Participant joined via iframe API:', eventData.id);
+                        window.qtBridge.onParticipantJoined(eventData.id, eventData.displayName || '');
+                        break;
+                    case 'participantLeft':
+                        console.log('Qt: Participant left via iframe API:', eventData.id);
+                        window.qtBridge.onParticipantLeft(eventData.id, eventData.displayName || '');
+                        break;
+                    case 'audioMuteStatusChanged':
+                        window.qtBridge.onAudioMuteChanged(eventData.muted);
+                        break;
+                    case 'videoMuteStatusChanged':
+                        window.qtBridge.onVideoMuteChanged(eventData.muted);
+                        break;
+                    case 'screenSharingStatusChanged':
+                        window.qtBridge.onScreenShareChanged(eventData.on);
+                        break;
+                    case 'incomingMessage':
+                        console.log('Qt: Chat message received via iframe API:', eventData.message);
+                        window.qtBridge.onChatMessageReceived(eventData.from, eventData.message, Date.now());
+                        break;
+                    default:
+                        console.log('Qt: Unhandled Jitsi event:', eventData.event);
+                }
+            } catch (e) {
+                console.error('Qt: handleJitsiEvent error:', e);
+            }
+        }
+        
+        // 初始化事件监听器
+        setupJitsiEventListeners();
+        
+        // 延迟重试设置事件监听器，以防APP对象还未加载
+        setTimeout(function() {
+            setupJitsiEventListeners();
+        }, 2000);
+        
+        setTimeout(function() {
+            setupJitsiEventListeners();
+        }, 5000);
+        
+        // 添加全局错误处理
+        window.addEventListener('error', function(event) {
+            console.error('Qt: JavaScript error:', event.error);
+            if (window.qtBridge) {
+                window.qtBridge.onJavaScriptError(event.error.toString());
+            }
+        });
+        
+        // 添加未处理的Promise拒绝处理
+        window.addEventListener('unhandledrejection', function(event) {
+            console.error('Qt: Unhandled promise rejection:', event.reason);
+            if (window.qtBridge) {
+                window.qtBridge.onJavaScriptError('Promise rejection: ' + event.reason);
+            }
+        });
+        
+        // 定期检查Jitsi Meet状态
+        setInterval(function() {
+            try {
+                if (window.qtJitsiMeet && window.qtBridge) {
+                    var state = window.qtJitsiMeet.getConferenceState();
+                    if (state) {
+                        window.qtBridge.onConferenceStateUpdate(JSON.stringify(state));
+                    }
+                }
+            } catch (e) {
+                // 静默处理，避免日志污染
+            }
+        }, 5000);
+        
+        // 检测Jitsi Meet是否已加载
+        function checkJitsiMeetLoaded() {
+            if (window.APP || document.querySelector('[data-jitsi-meet-loaded]')) {
+                console.log('Qt: Jitsi Meet detected as loaded');
+                if (window.qtBridge) {
+                    window.qtBridge.onJitsiMeetLoaded();
+                }
+                return true;
+            }
+            return false;
+        }
+        
+        // 立即检查
+        if (!checkJitsiMeetLoaded()) {
+            // 如果未加载，定期检查
+            var loadCheckInterval = setInterval(function() {
+                if (checkJitsiMeetLoaded()) {
+                    clearInterval(loadCheckInterval);
+                }
+            }, 1000);
+            
+            // 10秒后停止检查
+            setTimeout(function() {
+                clearInterval(loadCheckInterval);
+            }, 10000);
+        }
+        
+        console.log('Qt: JavaScript bridge initialized');
     )";
     
-    m_webView->page()->runJavaScript(script);
-    */
+    m_webView->page()->runJavaScript(script, [this](const QVariant &result) {
+        Q_UNUSED(result)
+        qDebug() << "ConferenceWindow: JavaScript代码注入完成";
+    });
 }
 
 /**
@@ -472,16 +819,15 @@ bool ConferenceWindow::loadConference(const QString& url, const QString& display
     m_isLoading = true;
     m_connectionTimer->start(CONNECTION_TIMEOUT);
     
-    // 注释掉WebEngine相关代码
-    /*
     // 使用QWebEngineView加载实际的Jitsi Meet页面
+    qDebug() << "ConferenceWindow: 开始加载会议URL:" << fullUrl;
     m_webView->load(QUrl(fullUrl));
     
     // 初始化WebEngine（如果还未初始化）
     if (!m_webView->page()) {
+        qDebug() << "ConferenceWindow: WebEngine页面未初始化，重新初始化";
         initializeWebEngine();
     }
-    */
     
     // 更新UI
     updateWindowTitle();
@@ -616,7 +962,16 @@ void ConferenceWindow::leaveConference()
     qDebug() << "ConferenceWindow: 离开会议";
     
     if (m_isInConference) {
-        // 通过JavaScript离开会议
+        // 使用JitsiMeetAPI离开房间
+        if (m_jitsiAPI) {
+            qDebug() << "ConferenceWindow: 使用JitsiMeetAPI离开房间:" << m_currentRoom;
+            m_jitsiAPI->leaveRoom(m_currentRoom);
+            
+            qDebug() << "ConferenceWindow: 使用JitsiMeetAPI断开服务器连接";
+            m_jitsiAPI->disconnectFromServer();
+        }
+        
+        // 通过JavaScript离开会议（作为备用方案）
         executeJavaScript("if (window.qtJitsiMeet) { window.qtJitsiMeet.leaveConference(); }");
         
         // 更新状态
@@ -647,14 +1002,24 @@ void ConferenceWindow::joinConference(const QString& roomName, const QString& se
 {
     qDebug() << "加入会议:" << roomName << "服务器:" << serverUrl;
     
-    // 使用loadRoom方法加载会议
+    // 首先使用JitsiMeetAPI连接服务器
+    if (m_jitsiAPI) {
+        qDebug() << "ConferenceWindow: 使用JitsiMeetAPI连接服务器:" << serverUrl;
+        m_jitsiAPI->connectToServer(serverUrl);
+        
+        // 连接成功后加入房间
+        qDebug() << "ConferenceWindow: 使用JitsiMeetAPI加入房间:" << roomName;
+        m_jitsiAPI->joinRoom(roomName, m_displayName);
+    }
+    
+    // 同时使用WebEngine加载会议页面（作为备用方案）
     if (loadRoom(roomName, serverUrl)) {
         show();
         raise();
         activateWindow();
     } else {
-        qWarning() << "无法加入会议:" << roomName;
-        showError(QString("无法加入会议: %1").arg(roomName));
+        qWarning() << "无法加载会议页面:" << roomName;
+        showError(QString("无法加载会议页面: %1").arg(roomName));
     }
 }
 
@@ -758,6 +1123,13 @@ void ConferenceWindow::sendChatMessage(const QString& message)
     qDebug() << "ConferenceWindow: 发送聊天消息:" << message;
     
     if (m_isInConference && !message.isEmpty()) {
+        // 使用JitsiMeetAPI发送聊天消息
+        if (m_jitsiAPI) {
+            qDebug() << "ConferenceWindow: 使用JitsiMeetAPI发送聊天消息:" << message;
+            m_jitsiAPI->sendChatMessage(m_currentRoom, message);
+        }
+        
+        // 通过JavaScript发送聊天消息（作为备用方案）
         QString escapedMessage = message;
         escapedMessage.replace("'", "\\'");  // 转义单引号
         QString script = QString("if (window.qtJitsiMeet) { window.qtJitsiMeet.sendChatMessage('%1'); }")
@@ -775,9 +1147,8 @@ void ConferenceWindow::executeJavaScript(const QString& script, std::function<vo
 {
     qDebug() << "ConferenceWindow: 执行JavaScript:" << script;
     
-    // 注释掉WebEngine相关代码
-    /*
     if (!m_webView) {
+        qWarning() << "ConferenceWindow: WebView未初始化，无法执行JavaScript";
         if (callback) {
             callback(QVariant());
         }
@@ -791,7 +1162,6 @@ void ConferenceWindow::executeJavaScript(const QString& script, std::function<vo
     } else {
         m_webView->page()->runJavaScript(script);
     }
-    */
 }
 
 /**
@@ -850,6 +1220,44 @@ void ConferenceWindow::onLoadFinished(bool success)
         } else {
             emit conferenceLoadFailed(tr("连接失败，已达到最大重试次数"));
         }
+    }
+}
+
+/**
+ * @brief 处理功能权限请求事件
+ * @param url 请求权限的URL
+ * @param feature 请求的功能
+ */
+void ConferenceWindow::onFeaturePermissionRequested(const QUrl& url, QWebEnginePage::Feature feature)
+{
+    qDebug() << "ConferenceWindow: 收到功能权限请求 - URL:" << url << "功能:" << feature;
+    
+    // 自动授权摄像头和麦克风权限
+    switch (feature) {
+    case QWebEnginePage::MediaAudioCapture:
+        qDebug() << "ConferenceWindow: 授权麦克风访问权限";
+        m_webView->page()->setFeaturePermission(url, feature, QWebEnginePage::PermissionGrantedByUser);
+        break;
+    case QWebEnginePage::MediaVideoCapture:
+        qDebug() << "ConferenceWindow: 授权摄像头访问权限";
+        m_webView->page()->setFeaturePermission(url, feature, QWebEnginePage::PermissionGrantedByUser);
+        break;
+    case QWebEnginePage::MediaAudioVideoCapture:
+        qDebug() << "ConferenceWindow: 授权音视频访问权限";
+        m_webView->page()->setFeaturePermission(url, feature, QWebEnginePage::PermissionGrantedByUser);
+        break;
+    case QWebEnginePage::DesktopVideoCapture:
+        qDebug() << "ConferenceWindow: 授权屏幕共享权限";
+        m_webView->page()->setFeaturePermission(url, feature, QWebEnginePage::PermissionGrantedByUser);
+        break;
+    case QWebEnginePage::DesktopAudioVideoCapture:
+        qDebug() << "ConferenceWindow: 授权桌面音视频捕获权限";
+        m_webView->page()->setFeaturePermission(url, feature, QWebEnginePage::PermissionGrantedByUser);
+        break;
+    default:
+        qDebug() << "ConferenceWindow: 拒绝未知功能权限请求";
+        m_webView->page()->setFeaturePermission(url, feature, QWebEnginePage::PermissionDeniedByUser);
+        break;
     }
 }
 
@@ -999,6 +1407,136 @@ void ConferenceWindow::onScreenShareChanged(bool sharing)
     m_isScreenSharing = sharing;
     m_screenShareAction->setChecked(sharing);
     m_screenShareAction->setText(sharing ? tr("停止共享") : tr("屏幕共享"));
+}
+
+/**
+ * @brief 处理Jitsi Meet加载完成事件
+ */
+void ConferenceWindow::onJitsiMeetLoaded()
+{
+    qDebug() << "Jitsi Meet已加载完成";
+    
+    // 隐藏加载指示器
+    showLoadingIndicator(false);
+    
+    // 更新状态
+    if (m_statusLabel) {
+        m_statusLabel->setText("会议已准备就绪");
+    }
+    
+    // 注入JavaScript代码
+    injectJavaScript();
+    
+    // 如果有显示名称，设置显示名称
+    if (!m_displayName.isEmpty()) {
+        setDisplayName(m_displayName);
+    }
+}
+
+/**
+ * @brief 处理会议状态更新事件
+ * @param state 会议状态JSON对象
+ */
+void ConferenceWindow::onConferenceStateUpdated(const QJsonObject& state)
+{
+    qDebug() << "会议状态更新:" << state;
+    
+    // 更新参与者数量
+    if (state.contains("participantCount")) {
+        int count = state["participantCount"].toInt();
+        m_participantCount = count;
+        if (m_participantCountLabel) {
+            m_participantCountLabel->setText(QString("参与者: %1").arg(count));
+        }
+        emit participantCountChanged(count);
+    }
+    
+    // 更新音频状态
+    if (state.contains("audioMuted")) {
+        bool muted = state["audioMuted"].toBool();
+        if (m_isMuted != muted) {
+            m_isMuted = muted;
+            onAudioMuteChanged(muted);
+        }
+    }
+    
+    // 更新视频状态
+    if (state.contains("videoMuted")) {
+        bool muted = state["videoMuted"].toBool();
+        if (m_isCameraOff != muted) {
+            m_isCameraOff = muted;
+            onVideoMuteChanged(muted);
+        }
+    }
+    
+    // 更新屏幕共享状态
+    if (state.contains("screenSharing")) {
+        bool sharing = state["screenSharing"].toBool();
+        if (m_isScreenSharing != sharing) {
+            m_isScreenSharing = sharing;
+            onScreenShareChanged(sharing);
+        }
+    }
+    
+    // 更新会议状态
+    if (state.contains("inConference")) {
+        bool inConference = state["inConference"].toBool();
+        if (m_isInConference != inConference) {
+            m_isInConference = inConference;
+            if (inConference) {
+                onConferenceJoined();
+            } else {
+                onConferenceLeft();
+            }
+        }
+    }
+}
+
+/**
+ * @brief 处理JavaScript错误事件
+ * @param error 错误信息
+ */
+void ConferenceWindow::onJavaScriptError(const QString& error)
+{
+    qWarning() << "JavaScript错误:" << error;
+    
+    // 显示错误信息
+    if (m_statusLabel) {
+        m_statusLabel->setText(QString("JavaScript错误: %1").arg(error));
+    }
+    
+    // 可以考虑重新注入JavaScript代码
+    QTimer::singleShot(2000, this, [this]() {
+        qDebug() << "尝试重新注入JavaScript代码";
+        injectJavaScript();
+    });
+}
+
+/**
+ * @brief 处理Promise拒绝事件
+ * @param reason 拒绝原因
+ */
+void ConferenceWindow::onPromiseRejected(const QString& reason)
+{
+    qWarning() << "Promise被拒绝:" << reason;
+    
+    // 记录Promise拒绝事件
+    if (m_statusLabel) {
+        m_statusLabel->setText(QString("操作失败: %1").arg(reason));
+    }
+    
+    // 可以根据拒绝原因采取相应的恢复措施
+    if (reason.contains("conference", Qt::CaseInsensitive)) {
+        // 会议相关的Promise拒绝，可能需要重新加载
+        QTimer::singleShot(3000, this, [this]() {
+            if (!m_isInConference && !m_currentUrl.isEmpty()) {
+                qDebug() << "尝试重新加载会议";
+                if (m_webView) {
+                    m_webView->load(QUrl(m_currentUrl));
+                }
+            }
+        });
+    }
 }
 
 /**
@@ -1368,6 +1906,23 @@ void ConferenceWindow::onJavaScriptMessage(const QJsonObject& message)
         // 错误消息
         QString errorMsg = message["message"].toString();
         onNetworkError(errorMsg);
+    } else if (type == "jitsiMeetLoaded") {
+        // Jitsi Meet加载完成
+        onJitsiMeetLoaded();
+    } else if (type == "conferenceStateUpdate") {
+        // 会议状态更新
+        onConferenceStateUpdated(message);
+    } else if (type == "javascriptError") {
+        // JavaScript错误
+        QString error = message["error"].toString();
+        QString source = message["source"].toString();
+        int line = message["line"].toInt();
+        QString detailedError = QString("%1 (来源: %2, 行: %3)").arg(error, source).arg(line);
+        onJavaScriptError(detailedError);
+    } else if (type == "promiseRejected") {
+        // Promise拒绝
+        QString reason = message["reason"].toString();
+        onPromiseRejected(reason);
     }
 }
 
@@ -1433,6 +1988,11 @@ void ConferenceWindow::onNetworkError(QNetworkReply::NetworkError error)
             break;
         case QNetworkReply::HostNotFoundError:
             errorMsg = tr("主机未找到");
+            // 启动网络诊断
+            if (m_networkDiagnostics && !m_currentUrl.isEmpty()) {
+                QUrl url(m_currentUrl);
+                m_networkDiagnostics->startDiagnosis(url.host());
+            }
             break;
         case QNetworkReply::TimeoutError:
             errorMsg = tr("连接超时");
@@ -1554,7 +2114,231 @@ void ConferenceWindow::onNetworkError(QNetworkReply::NetworkError error)
             m_isLoading = false;
             showLoadingIndicator(false);
             showError(errorMsg);
-            emit conferenceLoadFailed(errorMsg);
+}
+    }
+    
+    emit conferenceLoadFailed(errorMsg);
+}
+
+/**
+ * @brief 处理API连接成功
+ */
+void ConferenceWindow::onApiConnected()
+{
+    qDebug() << "ConferenceWindow: API连接成功";
+    // 可以在这里更新UI状态，显示连接成功
+}
+
+/**
+ * @brief 处理API连接断开
+ */
+void ConferenceWindow::onApiDisconnected()
+{
+    qDebug() << "ConferenceWindow: API连接断开";
+    // 可以在这里更新UI状态，显示连接断开
+}
+
+/**
+ * @brief 处理房间加入成功
+ * @param roomName 房间名称
+ */
+void ConferenceWindow::onRoomJoined(const QString& roomName)
+{
+    qDebug() << "ConferenceWindow: 成功加入房间:" << roomName;
+    m_isInConference = true;
+    m_currentRoom = roomName;
+    
+    // 更新UI状态
+    enableConferenceControls(true);
+    
+    // 发射信号
+    emit conferenceJoined(roomName);
+}
+
+/**
+ * @brief 处理房间离开
+ * @param roomName 房间名称
+ */
+void ConferenceWindow::onRoomLeft(const QString& roomName)
+{
+    qDebug() << "ConferenceWindow: 离开房间:" << roomName;
+    m_isInConference = false;
+    
+    // 更新UI状态
+    enableConferenceControls(false);
+    
+    // 发射信号
+    emit conferenceLeft(roomName);
+}
+
+/**
+ * @brief 处理API错误
+ * @param error 错误信息
+ */
+void ConferenceWindow::onApiError(const QString& error)
+{
+    qWarning() << "ConferenceWindow: API错误:" << error;
+    
+    // 显示错误消息
+    showErrorMessage(tr("API错误: %1").arg(error));
+    
+    // 发射错误信号
+    emit conferenceLoadFailed(error);
+}
+
+/**
+ * @brief 启用或禁用会议控制按钮
+ * @param enabled 是否启用
+ */
+void ConferenceWindow::enableConferenceControls(bool enabled)
+{
+    // 这里应该启用或禁用会议相关的UI控件
+    // 由于具体的UI控件可能在其他地方定义，这里先提供基本实现
+    qDebug() << "ConferenceWindow: 设置会议控制状态:" << enabled;
+    
+    // TODO: 实际的UI控件启用/禁用逻辑
+    // 例如：m_muteButton->setEnabled(enabled);
+    //      m_cameraButton->setEnabled(enabled);
+    //      m_shareButton->setEnabled(enabled);
+}
+
+/**
+ * @brief 显示错误消息
+ * @param message 错误消息
+ */
+void ConferenceWindow::showErrorMessage(const QString& message)
+{
+    qWarning() << "ConferenceWindow: 显示错误消息:" << message;
+    
+    // 这里可以显示一个消息框或在状态栏显示错误
+    if (m_statusLabel) {
+        m_statusLabel->setText(message);
+        m_statusLabel->setStyleSheet("color: red;");
+    }
+    
+    // 也可以使用QMessageBox显示错误
+    // QMessageBox::warning(this, tr("错误"), message);
+}
+
+/**
+ * @brief 网络诊断完成处理
+ * @param results 诊断结果
+ */
+void ConferenceWindow::onNetworkDiagnosticsCompleted(const QJsonObject& results)
+{
+    qDebug() << "ConferenceWindow: 网络诊断完成:" << results;
+    
+    // 解析诊断结果
+    QString diagnosticInfo;
+    
+    // DNS解析结果
+    if (results.contains("dns")) {
+        QJsonObject dnsResult = results["dns"].toObject();
+        bool dnsSuccess = dnsResult["success"].toBool();
+        QString dnsError = dnsResult["error"].toString();
+        
+        if (dnsSuccess) {
+            diagnosticInfo += tr("DNS解析: 成功\n");
+            if (dnsResult.contains("addresses")) {
+                QJsonArray addresses = dnsResult["addresses"].toArray();
+                diagnosticInfo += tr("解析地址: ");
+                for (const auto& addr : addresses) {
+                    diagnosticInfo += addr.toString() + " ";
+                }
+                diagnosticInfo += "\n";
+            }
+        } else {
+            diagnosticInfo += tr("DNS解析: 失败 - %1\n").arg(dnsError);
         }
     }
+    
+    // TCP连接结果
+    if (results.contains("tcp")) {
+        QJsonObject tcpResult = results["tcp"].toObject();
+        bool tcpSuccess = tcpResult["success"].toBool();
+        QString tcpError = tcpResult["error"].toString();
+        
+        if (tcpSuccess) {
+            diagnosticInfo += tr("TCP连接: 成功\n");
+        } else {
+            diagnosticInfo += tr("TCP连接: 失败 - %1\n").arg(tcpError);
+        }
+    }
+    
+    // HTTP连接结果
+    if (results.contains("http")) {
+        QJsonObject httpResult = results["http"].toObject();
+        bool httpSuccess = httpResult["success"].toBool();
+        QString httpError = httpResult["error"].toString();
+        int statusCode = httpResult["statusCode"].toInt();
+        
+        if (httpSuccess) {
+            diagnosticInfo += tr("HTTP连接: 成功 (状态码: %1)\n").arg(statusCode);
+        } else {
+            diagnosticInfo += tr("HTTP连接: 失败 - %1\n").arg(httpError);
+        }
+    }
+    
+    // 代理设置
+    if (results.contains("proxy")) {
+        QJsonObject proxyResult = results["proxy"].toObject();
+        QString proxyType = proxyResult["type"].toString();
+        QString proxyHost = proxyResult["host"].toString();
+        int proxyPort = proxyResult["port"].toInt();
+        
+        if (proxyType != "NoProxy") {
+            diagnosticInfo += tr("代理设置: %1 (%2:%3)\n").arg(proxyType, proxyHost).arg(proxyPort);
+        } else {
+            diagnosticInfo += tr("代理设置: 无代理\n");
+        }
+    }
+    
+    // 网络接口信息
+    if (results.contains("interfaces")) {
+        QJsonArray interfaces = results["interfaces"].toArray();
+        diagnosticInfo += tr("网络接口: ");
+        for (const auto& iface : interfaces) {
+            QJsonObject ifaceObj = iface.toObject();
+            QString name = ifaceObj["name"].toString();
+            bool isUp = ifaceObj["isUp"].toBool();
+            diagnosticInfo += tr("%1(%2) ").arg(name, isUp ? tr("启用") : tr("禁用"));
+        }
+        diagnosticInfo += "\n";
+    }
+    
+    // 显示诊断结果
+    QString fullMessage = tr("网络诊断结果:\n\n%1\n建议:\n").arg(diagnosticInfo);
+    
+    // 根据诊断结果提供建议
+    if (results.contains("dns") && !results["dns"].toObject()["success"].toBool()) {
+        fullMessage += tr("• 检查DNS设置，尝试使用8.8.8.8或114.114.114.114\n");
+    }
+    if (results.contains("tcp") && !results["tcp"].toObject()["success"].toBool()) {
+        fullMessage += tr("• 检查防火墙设置，确保端口443未被阻止\n");
+    }
+    if (results.contains("proxy") && results["proxy"].toObject()["type"].toString() != "NoProxy") {
+        fullMessage += tr("• 检查代理设置是否正确\n");
+    }
+    fullMessage += tr("• 检查网络连接是否正常\n");
+    fullMessage += tr("• 尝试使用其他网络或重启路由器");
+    
+    // 显示详细的诊断信息
+    QMessageBox msgBox(this);
+    msgBox.setWindowTitle(tr("网络诊断结果"));
+    msgBox.setText(fullMessage);
+    msgBox.setIcon(QMessageBox::Information);
+    msgBox.exec();
+}
+
+/**
+ * @brief 网络诊断错误处理
+ * @param error 错误信息
+ */
+void ConferenceWindow::onNetworkDiagnosticsError(const QString& error)
+{
+    qWarning() << "ConferenceWindow: 网络诊断错误:" << error;
+    
+    QString message = tr("网络诊断失败: %1\n\n请手动检查:\n• 网络连接是否正常\n• DNS设置是否正确\n• 防火墙是否阻止连接\n• 代理设置是否正确").arg(error);
+    
+    QMessageBox::warning(this, tr("网络诊断错误"), message);
 }

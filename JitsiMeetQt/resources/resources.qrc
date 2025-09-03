@@ -32,7 +32,6 @@
         <file>styles/light.qss</file>
         
         <!-- 翻译文件 -->
-        <file>translations/jitsi_zh_CN.qm</file>
-        <file>translations/jitsi_en_US.qm</file>
+        <!-- 翻译文件暂时为空，待后续添加 -->
     </qresource>
 </RCC>

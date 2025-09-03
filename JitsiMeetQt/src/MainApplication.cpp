@@ -69,23 +69,33 @@ bool MainApplication::initialize()
     
     try {
         // 初始化配置管理器
+        qDebug() << "初始化配置管理器...";
         m_configManager = ConfigurationManager::instance();// 配置管理器已通过单例模式自动初始化
+        qDebug() << "配置管理器初始化完成";
         
         // 初始化协议处理器
+        qDebug() << "初始化协议处理器...";
         m_protocolHandler = std::make_unique<ProtocolHandler>(this);
         if (!m_protocolHandler->registerProtocol()) {
             qWarning() << "协议注册失败，但应用程序将继续运行";
         }
+        qDebug() << "协议处理器初始化完成";
         
         // 连接协议处理器信号
+        qDebug() << "连接协议处理器信号...";
         connect(m_protocolHandler.get(), &ProtocolHandler::protocolUrlReceived,
                 this, &MainApplication::handleProtocolUrl);
+        qDebug() << "协议处理器信号连接完成";
         
         // 初始化翻译
+        qDebug() << "初始化翻译...";
         initializeTranslations();
+        qDebug() << "翻译初始化完成";
         
         // 初始化主题
+        qDebug() << "初始化主题...";
         initializeTheme();
+        qDebug() << "主题初始化完成";
         
         // 初始化系统托盘 - 暂时跳过以避免初始化问题
         qDebug() << "跳过系统托盘初始化";
