@@ -25,6 +25,7 @@
 #include <QWebEnginePage>
 #include <QWebEngineProfile>
 #include <QWebEngineSettings>
+#include <QWebEnginePermission>
 #include <QWebChannel>
 #include <QTimer>
 #include <QLabel>
@@ -361,9 +362,9 @@ void ConferenceWindow::initializeJavaScriptBridge()
     // 注意：javaScriptConsoleMessage是受保护的信号，无法直接连接
     // 如需处理JavaScript控制台消息，需要创建QWebEnginePage的子类
     
-    // 连接权限请求信号（用于摄像头和麦克风访问）
-    connect(m_webView->page(), &QWebEnginePage::featurePermissionRequested,
-            this, &ConferenceWindow::onFeaturePermissionRequested);
+    // 连接新的权限请求信号（推荐使用）
+    connect(m_webView->page(), &QWebEnginePage::permissionRequested,
+            this, &ConferenceWindow::onPermissionRequested);
     
     // 注册JavaScript桥接对象
     QWebChannel* channel = new QWebChannel(this);
@@ -1447,39 +1448,6 @@ void ConferenceWindow::onLoadFinished(bool success)
  * @param url 请求权限的URL
  * @param feature 请求的功能
  */
-void ConferenceWindow::onFeaturePermissionRequested(const QUrl& url, QWebEnginePage::Feature feature)
-{
-    qDebug() << "ConferenceWindow: 收到功能权限请求 - URL:" << url << "功能:" << feature;
-    
-    // 自动授权摄像头和麦克风权限
-    switch (feature) {
-    case QWebEnginePage::MediaAudioCapture:
-        qDebug() << "ConferenceWindow: 授权麦克风访问权限";
-        m_webView->page()->setFeaturePermission(url, feature, QWebEnginePage::PermissionGrantedByUser);
-        break;
-    case QWebEnginePage::MediaVideoCapture:
-        qDebug() << "ConferenceWindow: 授权摄像头访问权限";
-        m_webView->page()->setFeaturePermission(url, feature, QWebEnginePage::PermissionGrantedByUser);
-        break;
-    case QWebEnginePage::MediaAudioVideoCapture:
-        qDebug() << "ConferenceWindow: 授权音视频访问权限";
-        m_webView->page()->setFeaturePermission(url, feature, QWebEnginePage::PermissionGrantedByUser);
-        break;
-    case QWebEnginePage::DesktopVideoCapture:
-        qDebug() << "ConferenceWindow: 授权屏幕共享权限";
-        m_webView->page()->setFeaturePermission(url, feature, QWebEnginePage::PermissionGrantedByUser);
-        break;
-    case QWebEnginePage::DesktopAudioVideoCapture:
-        qDebug() << "ConferenceWindow: 授权桌面音视频捕获权限";
-        m_webView->page()->setFeaturePermission(url, feature, QWebEnginePage::PermissionGrantedByUser);
-        break;
-    default:
-        qDebug() << "ConferenceWindow: 拒绝未知功能权限请求";
-        m_webView->page()->setFeaturePermission(url, feature, QWebEnginePage::PermissionDeniedByUser);
-        break;
-    }
-}
-
 /**
  * @brief 页面标题变化处理
  * @param title 新标题
@@ -2513,4 +2481,42 @@ void ConferenceWindow::onNetworkDiagnosticsError(const QString& error)
     QString message = tr("网络诊断失败: %1\n\n请手动检查:\n• 网络连接是否正常\n• DNS设置是否正确\n• 防火墙是否阻止连接\n• 代理设置是否正确").arg(error);
     
     QMessageBox::warning(this, tr("网络诊断错误"), message);
+}
+
+/**
+ * @brief 处理新的权限请求（推荐使用的API）
+ * @param permission 权限对象
+ */
+void ConferenceWindow::onPermissionRequested(QWebEnginePermission permission)
+{
+    qDebug() << "ConferenceWindow: 收到权限请求 - 类型:" << static_cast<int>(permission.permissionType())
+             << "来源:" << permission.origin();
+    
+    // 自动授权摄像头和麦克风权限
+    switch (permission.permissionType()) {
+    case QWebEnginePermission::PermissionType::MediaAudioCapture:
+        qDebug() << "ConferenceWindow: 授权麦克风访问权限";
+        permission.grant();
+        break;
+    case QWebEnginePermission::PermissionType::MediaVideoCapture:
+        qDebug() << "ConferenceWindow: 授权摄像头访问权限";
+        permission.grant();
+        break;
+    case QWebEnginePermission::PermissionType::MediaAudioVideoCapture:
+        qDebug() << "ConferenceWindow: 授权音视频访问权限";
+        permission.grant();
+        break;
+    case QWebEnginePermission::PermissionType::DesktopVideoCapture:
+        qDebug() << "ConferenceWindow: 授权屏幕共享权限";
+        permission.grant();
+        break;
+    case QWebEnginePermission::PermissionType::DesktopAudioVideoCapture:
+        qDebug() << "ConferenceWindow: 授权桌面音视频捕获权限";
+        permission.grant();
+        break;
+    default:
+        qDebug() << "ConferenceWindow: 拒绝未知权限请求";
+        permission.deny();
+        break;
+    }
 }

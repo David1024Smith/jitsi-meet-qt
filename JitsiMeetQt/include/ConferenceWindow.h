@@ -7,6 +7,7 @@
 #include <QWebEnginePage>
 #include <QWebEngineProfile>
 #include <QWebEngineSettings>
+#include <QWebEnginePermission>
 #include <QLabel>
 #include <QWidget>
 #include <QTextEdit>
@@ -456,12 +457,8 @@ private slots:
      */
     void onNetworkDiagnosticsError(const QString& error);
     
-    /**
-     * @brief 处理功能权限请求
-     * @param url 请求URL
-     * @param feature 请求的功能
-     */
-    void onFeaturePermissionRequested(const QUrl& url, QWebEnginePage::Feature feature);
+    
+    void onPermissionRequested(QWebEnginePermission permission);
     
     // WebEngine信号处理
     // onLoadStarted、onLoadProgress、onLoadFinished、onTitleChanged和onUrlChanged方法已在前面声明，此处删除重复声明

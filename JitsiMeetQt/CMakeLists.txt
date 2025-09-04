@@ -20,7 +20,7 @@ endif()
 set(CMAKE_PREFIX_PATH "C:/Qt/6.8.3/msvc2022_64")
 
 # 查找Qt6组件
-find_package(Qt6 6.8.3 REQUIRED COMPONENTS Core Widgets WebEngineWidgets Network WebChannel WebSockets)
+find_package(Qt6  REQUIRED COMPONENTS Core Widgets WebEngineWidgets Network WebChannel WebSockets)
 
 # 启用Qt的MOC、UIC和RCC
 set(CMAKE_AUTOMOC ON)
@@ -29,11 +29,6 @@ set(CMAKE_AUTORCC ON)
 
 # 包含目录
 include_directories(include)
-include_directories(include/windows)
-include_directories(include/dialogs)
-include_directories(include/widgets)
-include_directories(include/models)
-include_directories(include/utils)
 
 # 源文件
 set(SOURCES
@@ -113,30 +108,52 @@ if(WIN32)
     # 定义Qt6 bin目录
     set(QT6_BIN_DIR "C:/Qt/6.8.3/msvc2022_64/bin")
     
-    # 定义需要复制的Qt6 DLL文件
-    set(QT6_DLLS
-        Qt6Core.dll
-        Qt6Gui.dll
-        Qt6Widgets.dll
-        Qt6Network.dll
-        Qt6WebChannel.dll
-        Qt6WebSockets.dll
-        Qt6WebEngineCore.dll
-        Qt6WebEngineWidgets.dll
-        Qt6Quick.dll
-        Qt6Qml.dll
-        Qt6QmlModels.dll
-        Qt6QmlMeta.dll
-        Qt6QmlWorkerScript.dll
-        Qt6QuickWidgets.dll
-        Qt6OpenGL.dll
-        Qt6Positioning.dll
-        Qt6PrintSupport.dll
-    )
+    # 定义需要复制的Qt6 DLL文件（根据构建类型选择Debug或Release版本）
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+        set(QT6_DLLS
+            Qt6Cored.dll
+            Qt6Guid.dll
+            Qt6Widgetsd.dll
+            Qt6Networkd.dll
+            Qt6WebChanneld.dll
+            Qt6WebSocketsd.dll
+            Qt6WebEngineCored.dll
+            Qt6WebEngineWidgetsd.dll
+            Qt6Quickd.dll
+            Qt6Qmld.dll
+            Qt6QmlModelsd.dll
+            Qt6QmlMetad.dll
+            Qt6QmlWorkerScriptd.dll
+            Qt6QuickWidgetsd.dll
+            Qt6OpenGLd.dll
+            Qt6Positioningd.dll
+            Qt6PrintSupportd.dll
+        )
+    else()
+        set(QT6_DLLS
+            Qt6Core.dll
+            Qt6Gui.dll
+            Qt6Widgets.dll
+            Qt6Network.dll
+            Qt6WebChannel.dll
+            Qt6WebSockets.dll
+            Qt6WebEngineCore.dll
+            Qt6WebEngineWidgets.dll
+            Qt6Quick.dll
+            Qt6Qml.dll
+            Qt6QmlModels.dll
+            Qt6QmlMeta.dll
+            Qt6QmlWorkerScript.dll
+            Qt6QuickWidgets.dll
+            Qt6OpenGL.dll
+            Qt6Positioning.dll
+            Qt6PrintSupport.dll
+        )
+    endif()
     
     # 添加自定义目标来复制Qt DLL文件
     add_custom_target(copy_qt_dlls ALL
-        COMMENT "复制Qt6依赖库到构建目录"
+        COMMENT "copy Qt6 dll to build"
     )
     
     # 为每个DLL文件添加复制命令
@@ -146,7 +163,7 @@ if(WIN32)
                 COMMAND ${CMAKE_COMMAND} -E copy_if_different
                     "${QT6_BIN_DIR}/${dll}"
                     "$<TARGET_FILE_DIR:JitsiMeetQt>/${dll}"
-                COMMENT "复制 ${dll} 到构建目录"
+                COMMENT "copy ${dll} build"
             )
         endif()
     endforeach()
@@ -159,7 +176,7 @@ if(WIN32)
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 "C:/Qt/6.8.3/msvc2022_64/plugins/platforms/qwindows.dll"
                 "$<TARGET_FILE_DIR:JitsiMeetQt>/platforms/qwindows.dll"
-            COMMENT "复制Qt平台插件到构建目录"
+            COMMENT "copy Qt platforms to build"
         )
     endif()
     
@@ -173,10 +190,52 @@ if(WIN32)
                 COMMAND ${CMAKE_COMMAND} -E copy_if_different
                     "C:/Qt/6.8.3/msvc2022_64/plugins/imageformats/${plugin}"
                     "$<TARGET_FILE_DIR:JitsiMeetQt>/imageformats/${plugin}"
-                COMMENT "复制图像格式插件 ${plugin} 到构建目录"
+                COMMENT "copy ${plugin} imageformats to build"
             )
         endif()
     endforeach()
+    
+    # 复制Qt WebEngine进程文件
+    if(EXISTS "${QT6_BIN_DIR}/QtWebEngineProcessd.exe")
+        add_custom_command(TARGET copy_qt_dlls POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${QT6_BIN_DIR}/QtWebEngineProcessd.exe"
+                "$<TARGET_FILE_DIR:JitsiMeetQt>/QtWebEngineProcessd.exe"
+            COMMENT "copy Qt WebEngine Process to build"
+        )
+    endif()
+    
+    # 复制Qt WebEngine资源文件
+    set(WEBENGINE_RESOURCES
+        icudtl.dat
+        qtwebengine_devtools_resources.pak
+        qtwebengine_resources.pak
+        qtwebengine_resources_100p.pak
+        qtwebengine_resources_200p.pak
+        v8_context_snapshot.bin
+    )
+    
+    foreach(resource ${WEBENGINE_RESOURCES})
+        if(EXISTS "C:/Qt/6.8.3/msvc2022_64/bin/${resource}")
+            add_custom_command(TARGET copy_qt_dlls POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "C:/Qt/6.8.3/msvc2022_64/bin/${resource}"
+                    "$<TARGET_FILE_DIR:JitsiMeetQt>/${resource}"
+                COMMENT "copy WebEngine ${resource} to build"
+            )
+        endif()
+    endforeach()
+    
+    # 复制Qt WebEngine本地化文件
+    if(EXISTS "C:/Qt/6.8.3/msvc2022_64/translations")
+        add_custom_command(TARGET copy_qt_dlls POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory
+                "$<TARGET_FILE_DIR:JitsiMeetQt>/translations"
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "C:/Qt/6.8.3/msvc2022_64/translations"
+                "$<TARGET_FILE_DIR:JitsiMeetQt>/translations"
+        )
+    endif()
     
     # 确保copy_qt_dlls在JitsiMeetQt之后执行
     add_dependencies(copy_qt_dlls JitsiMeetQt)

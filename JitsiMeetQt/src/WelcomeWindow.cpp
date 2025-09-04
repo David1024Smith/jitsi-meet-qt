@@ -1,7 +1,7 @@
 #include "WelcomeWindow.h"
 #include "ConfigurationManager.h"
 #include "ProtocolHandler.h"
-
+#include <type_traits>
 #include <QApplication>
 #include <QDesktopServices>
 #include <QMessageBox>
@@ -87,32 +87,129 @@ WelcomeWindow::WelcomeWindow(QWidget *parent)
     m_protocolHandler = nullptr;
     
     // 初始化网络管理器
-    m_networkManager = new QNetworkAccessManager(this);
+    m_networkManager = new QNetworkAccessManager();
     
     // 初始化定时器
-    m_serverCheckTimer = new QTimer(this);
+    m_serverCheckTimer = new QTimer();
     m_serverCheckTimer->setSingleShot(true);
     m_serverCheckTimer->setInterval(SERVER_CHECK_TIMEOUT);
     
-    m_urlValidationTimer = new QTimer(this);
+    m_urlValidationTimer = new QTimer();
     m_urlValidationTimer->setSingleShot(true);
     m_urlValidationTimer->setInterval(URL_VALIDATION_DELAY);
     
+    // 写入调试信息
+    FILE* debugFile = fopen("debug_startup.txt", "a");
+    if (debugFile) {
+        fprintf(debugFile, "WelcomeWindow构造函数开始\n");
+        fclose(debugFile);
+    }
+    
     // 初始化UI
+    debugFile = fopen("debug_startup.txt", "a");
+    if (debugFile) {
+        fprintf(debugFile, "开始初始化UI\n");
+        fclose(debugFile);
+    }
     initializeUI();
+    debugFile = fopen("debug_startup.txt", "a");
+    if (debugFile) {
+        fprintf(debugFile, "UI初始化完成\n");
+        fclose(debugFile);
+    }
+    
+    debugFile = fopen("debug_startup.txt", "a");
+    if (debugFile) {
+        fprintf(debugFile, "开始初始化布局\n");
+        fclose(debugFile);
+    }
     initializeLayout();
+    debugFile = fopen("debug_startup.txt", "a");
+    if (debugFile) {
+        fprintf(debugFile, "布局初始化完成\n");
+        fclose(debugFile);
+    }
+    
+    debugFile = fopen("debug_startup.txt", "a");
+    if (debugFile) {
+        fprintf(debugFile, "开始初始化自动完成\n");
+        fclose(debugFile);
+    }
     initializeAutoComplete();
+    debugFile = fopen("debug_startup.txt", "a");
+    if (debugFile) {
+        fprintf(debugFile, "自动完成初始化完成\n");
+        fclose(debugFile);
+    }
+    
+    debugFile = fopen("debug_startup.txt", "a");
+    if (debugFile) {
+        fprintf(debugFile, "开始初始化连接\n");
+        fclose(debugFile);
+    }
     initializeConnections();
+    debugFile = fopen("debug_startup.txt", "a");
+    if (debugFile) {
+        fprintf(debugFile, "连接初始化完成\n");
+        fclose(debugFile);
+    }
     
     // 加载数据
+    debugFile = fopen("debug_startup.txt", "a");
+    if (debugFile) {
+        fprintf(debugFile, "开始加载会议历史\n");
+        fclose(debugFile);
+    }
     loadMeetingHistory();
+    debugFile = fopen("debug_startup.txt", "a");
+    if (debugFile) {
+        fprintf(debugFile, "会议历史加载完成\n");
+        fclose(debugFile);
+    }
+    
+    debugFile = fopen("debug_startup.txt", "a");
+    if (debugFile) {
+        fprintf(debugFile, "开始加载服务器列表\n");
+        fclose(debugFile);
+    }
     loadServerList();
+    debugFile = fopen("debug_startup.txt", "a");
+    if (debugFile) {
+        fprintf(debugFile, "服务器列表加载完成\n");
+        fclose(debugFile);
+    }
     
     // 恢复窗口状态
+    debugFile = fopen("debug_startup.txt", "a");
+    if (debugFile) {
+        fprintf(debugFile, "开始恢复窗口状态\n");
+        fclose(debugFile);
+    }
     restoreWindowState();
+    debugFile = fopen("debug_startup.txt", "a");
+    if (debugFile) {
+        fprintf(debugFile, "窗口状态恢复完成\n");
+        fclose(debugFile);
+    }
     
     // 更新UI状态
+    debugFile = fopen("debug_startup.txt", "a");
+    if (debugFile) {
+        fprintf(debugFile, "开始更新UI状态\n");
+        fclose(debugFile);
+    }
     updateUIState();
+    debugFile = fopen("debug_startup.txt", "a");
+    if (debugFile) {
+        fprintf(debugFile, "UI状态更新完成\n");
+        fclose(debugFile);
+    }
+    
+    debugFile = fopen("debug_startup.txt", "a");
+    if (debugFile) {
+        fprintf(debugFile, "WelcomeWindow构造函数完成\n");
+        fclose(debugFile);
+    }
 }
 
 /**
@@ -234,7 +331,7 @@ void WelcomeWindow::showEvent(QShowEvent *event)
     
     // 聚焦到URL输入框
     if (m_urlEdit) {
-        m_urlEdit->setFocus();
+        m_urlEdit->setFocus(Qt::OtherFocusReason);
         m_urlEdit->selectAll();
     }
     
@@ -339,9 +436,9 @@ void WelcomeWindow::onHistoryItemDoubleClicked(QListWidgetItem* item)
     // 从项目数据中获取会议信息
     QJsonObject meetingData = item->data(Qt::UserRole).toJsonObject();
     
-    QString url = meetingData["url"].toString();
-    QString displayName = meetingData["displayName"].toString();
-    QString serverUrl = meetingData["serverUrl"].toString();
+    QString url = meetingData.value("url").toString();
+    QString displayName = meetingData.value("displayName").toString();
+    QString serverUrl = meetingData.value("serverUrl").toString();
     
     // 设置到输入框
     setMeetingUrl(url);
@@ -369,9 +466,9 @@ void WelcomeWindow::onHistorySelectionChanged()
     // 从项目数据中获取会议信息
     QJsonObject meetingData = currentItem->data(Qt::UserRole).toJsonObject();
     
-    QString url = meetingData["url"].toString();
-    QString displayName = meetingData["displayName"].toString();
-    QString serverUrl = meetingData["serverUrl"].toString();
+    QString url = meetingData.value("url").toString();
+    QString displayName = meetingData.value("displayName").toString();
+    QString serverUrl = meetingData.value("serverUrl").toString();
     
     // 设置到输入框（但不自动加入）
     setMeetingUrl(url);
@@ -469,14 +566,14 @@ void WelcomeWindow::onUrlValidationTimeout()
             QString info;
             if (!urlData.isEmpty()) {
                 info += tr("<b>会议信息:</b><br>");
-                if (urlData.contains("roomName")) {
-                    info += tr("房间名: %1<br>").arg(urlData["roomName"].toString());
+                if (urlData.contains(QStringLiteral("roomName"))) {
+                    info += tr("房间名: %1<br>").arg(urlData.value("roomName").toString());
                 }
-                if (urlData.contains("serverUrl")) {
-                    info += tr("服务器: %1<br>").arg(urlData["serverUrl"].toString());
+                if (urlData.contains(QStringLiteral("serverUrl"))) {
+                    info += tr("服务器: %1<br>").arg(urlData.value("serverUrl").toString());
                 }
-                if (urlData.contains("displayName")) {
-                    info += tr("显示名: %1<br>").arg(urlData["displayName"].toString());
+                if (urlData.contains(QStringLiteral("displayName"))) {
+                    info += tr("显示名: %1<br>").arg(urlData.value("displayName").toString());
                 }
             } else {
                 info = tr("输入会议URL或房间名");
@@ -492,74 +589,112 @@ void WelcomeWindow::onUrlValidationTimeout()
 void WelcomeWindow::initializeUI()
 {
     // 设置窗口属性
-    setWindowTitle(tr("Jitsi Meet Qt - 欢迎"));
-    setWindowIcon(QIcon(":/icons/app.png"));
-    setMinimumSize(800, 600);
+    setWindowTitle(tr("Jitsi Meet Qt"));
+    setWindowIcon(QIcon(":/icons/app.svg"));
+    setMinimumSize(QSize(800, 600));
     
     // 创建中央窗口部件
-    m_centralWidget = new QWidget(this);
+    m_centralWidget = new QWidget();
     setCentralWidget(m_centralWidget);
     
-    // 创建分割器
-    m_splitter = new QSplitter(Qt::Horizontal, this);
+    // 设置窗口背景为蓝色
+    m_centralWidget->setStyleSheet("background-color: #0056E0; background-image: url(:/images/background.png); background-position: center; background-repeat: no-repeat; background-attachment: fixed;");
     
-    // 创建左侧面板
-    m_leftPanel = new QWidget(this);
-    m_leftPanel->setMinimumWidth(400);
+    // 创建中央面板
+    m_leftPanel = new QWidget();
+    m_leftPanel->setObjectName("centralPanel");
+    m_leftPanel->setStyleSheet("#centralPanel { background-color: transparent; }");
     
-    // 创建加入会议组
-    m_joinGroup = new QGroupBox(tr("加入或创建会议"), this);
+    // 创建标题标签
+    QLabel* titleLabel = new QLabel(tr("输入会议名或链接地址"));
+    titleLabel->setStyleSheet("color: white; font-size: 16px; font-weight: bold;");
+    titleLabel->setAlignment(Qt::AlignCenter);
     
     // 创建输入控件
-    m_urlLabel = new QLabel(tr("会议URL或房间名:"), this);
-    m_urlEdit = new QLineEdit(this);
+    m_urlEdit = new QLineEdit();
     m_urlEdit->setPlaceholderText(tr("输入会议URL或房间名"));
-    
-    m_displayNameLabel = new QLabel(tr("显示名称:"), this);
-    m_displayNameEdit = new QLineEdit(this);
-    m_displayNameEdit->setPlaceholderText(tr("输入您的显示名称"));
-    
-    m_serverLabel = new QLabel(tr("服务器:"), this);
-    m_serverCombo = new QComboBox(this);
-    m_serverCombo->setEditable(true);
-    m_serverCombo->setPlaceholderText(tr("选择或输入服务器URL"));
-    
-    m_passwordLabel = new QLabel(tr("会议密码 (可选):"), this);
-    m_passwordEdit = new QLineEdit(this);
-    m_passwordEdit->setEchoMode(QLineEdit::Password);
-    m_passwordEdit->setPlaceholderText(tr("输入会议密码"));
+    m_urlEdit->setMinimumHeight(40);
+    m_urlEdit->setStyleSheet("QLineEdit { background-color: white; border-radius: 4px; padding: 8px; font-size: 14px; border: none; }");
     
     // 创建按钮
-    m_joinButton = new QPushButton(tr("加入会议"), this);
+    m_joinButton = new QPushButton(tr("开始"));
     m_joinButton->setDefault(true);
-    m_createButton = new QPushButton(tr("创建会议"), this);
+    m_joinButton->setMinimumHeight(40);
+    m_joinButton->setMinimumWidth(80);
+    m_joinButton->setStyleSheet("QPushButton { background-color: #0074E0; color: white; border-radius: 4px; font-weight: bold; font-size: 14px; border: none; }"
+                              "QPushButton:hover { background-color: #0063C0; }"
+                              "QPushButton:pressed { background-color: #0052A0; }");
     
-    m_settingsButton = new QPushButton(tr("设置"), this);
-    m_aboutButton = new QPushButton(tr("关于"), this);
-    m_exitButton = new QPushButton(tr("退出"), this);
+    // 创建最近会议标签
+    QLabel* recentLabel = new QLabel(tr("您最近加入的会议"));
+    recentLabel->setStyleSheet("color: white; font-size: 14px;");
     
-    // 创建右侧面板
-    m_rightPanel = new QWidget(this);
-    m_rightPanel->setMinimumWidth(300);
-    
-    // 创建历史记录组
-    m_historyGroup = new QGroupBox(tr("会议历史"), this);
-    m_historyList = new QListWidget(this);
-    m_clearHistoryButton = new QPushButton(tr("清除历史"), this);
-    
-    // 创建信息组
-    m_infoGroup = new QGroupBox(tr("会议信息"), this);
-    m_infoText = new QTextEdit(this);
-    m_infoText->setReadOnly(true);
-    m_infoText->setMaximumHeight(150);
+    // 创建历史记录列表
+    m_historyList = new QListWidget();
+    m_historyList->setStyleSheet("QListWidget { background-color: transparent; border: none; }"
+                               "QListWidget::item { background-color: rgba(0, 0, 0, 0.2); color: white; border-radius: 4px; padding: 0; margin: 5px; }"
+                               "QListWidget::item:hover { background-color: rgba(0, 0, 0, 0.3); }"
+                               "QListWidget::item:selected { background-color: rgba(0, 0, 0, 0.4); }");
+    m_historyList->setMaximumHeight(200);
+    m_historyList->setSpacing(5);
+    m_historyList->setUniformItemSizes(false);
+    m_historyList->setWordWrap(true);
     
     // 创建状态栏
-    m_statusLabel = new QLabel(tr("就绪"), this);
-    m_progressBar = new QProgressBar(this);
+    m_statusLabel = new QLabel(tr("就绪"));
+    m_statusLabel->setStyleSheet("color: rgba(255, 255, 255, 0.7);");
+    m_progressBar = new QProgressBar();
     m_progressBar->setVisible(false);
     
     statusBar()->addWidget(m_statusLabel, 1);
     statusBar()->addWidget(m_progressBar);
+    statusBar()->setStyleSheet("QStatusBar { background-color: #0056E0; color: white; }");
+    
+    // 创建显示名称控件（即使在简化UI中也需要创建以避免空指针）
+    m_displayNameLabel = new QLabel(tr("显示名称:"), this);
+    
+    FILE* debugFile = fopen("debug_startup.txt", "a");
+    if (debugFile) {
+        fprintf(debugFile, "开始创建m_displayNameEdit\n");
+        fclose(debugFile);
+    }
+    
+    m_displayNameEdit = new QLineEdit(this);
+    
+    debugFile = fopen("debug_startup.txt", "a");
+    if (debugFile) {
+        fprintf(debugFile, "m_displayNameEdit创建完成，指针地址: %p\n", (void*)m_displayNameEdit);
+        fclose(debugFile);
+    }
+    
+    m_displayNameEdit->setPlaceholderText(tr("输入您的显示名称"));
+    
+    debugFile = fopen("debug_startup.txt", "a");
+    if (debugFile) {
+        fprintf(debugFile, "m_displayNameEdit占位符文本设置完成\n");
+        fclose(debugFile);
+    }
+    
+    // 隐藏显示名称控件（在简化UI中不显示）
+    m_displayNameLabel->setVisible(false);
+    m_displayNameEdit->setVisible(false);
+    
+    // 隐藏其他不需要的控件
+    m_serverLabel = nullptr;
+    m_serverCombo = nullptr;
+    m_passwordLabel = nullptr;
+    m_passwordEdit = nullptr;
+    m_createButton = nullptr;
+    m_settingsButton = nullptr;
+    m_aboutButton = nullptr;
+    m_exitButton = nullptr;
+    m_rightPanel = nullptr;
+    m_historyGroup = nullptr;
+    m_clearHistoryButton = nullptr;
+    m_infoGroup = nullptr;
+    m_infoText = nullptr;
+    m_splitter = nullptr;
+    m_joinGroup = nullptr;
 }
 
 /**
@@ -569,61 +704,46 @@ void WelcomeWindow::initializeLayout()
 {
     // 主布局
     m_mainLayout = new QHBoxLayout(m_centralWidget);
-    m_mainLayout->addWidget(m_splitter);
+    m_mainLayout->setContentsMargins(20, 20, 20, 20);
+    m_mainLayout->setSpacing(20);
     
-    // 左侧面板布局
+    // 创建中央面板布局
     m_leftLayout = new QVBoxLayout(m_leftPanel);
+    m_leftLayout->setContentsMargins(0, 0, 0, 0);
+    m_leftLayout->setSpacing(15);
+    m_leftLayout->setAlignment(Qt::AlignCenter);
     
-    // 加入会议组布局
-    m_joinLayout = new QGridLayout(m_joinGroup);
-    m_joinLayout->addWidget(m_urlLabel, 0, 0);
-    m_joinLayout->addWidget(m_urlEdit, 0, 1);
-    m_joinLayout->addWidget(m_displayNameLabel, 1, 0);
-    m_joinLayout->addWidget(m_displayNameEdit, 1, 1);
-    m_joinLayout->addWidget(m_serverLabel, 2, 0);
-    m_joinLayout->addWidget(m_serverCombo, 2, 1);
-    m_joinLayout->addWidget(m_passwordLabel, 3, 0);
-    m_joinLayout->addWidget(m_passwordEdit, 3, 1);
+    // 添加标题标签
+    QLabel* titleLabel = new QLabel(tr("输入会议名或链接地址"));
+    titleLabel->setStyleSheet("color: white; font-size: 16px; font-weight: bold;");
+    titleLabel->setAlignment(Qt::AlignCenter);
+    m_leftLayout->addWidget(titleLabel);
     
-    // 按钮布局
-    m_buttonLayout = new QHBoxLayout();
-    m_buttonLayout->addWidget(m_joinButton);
-    m_buttonLayout->addWidget(m_createButton);
-    m_joinLayout->addLayout(m_buttonLayout, 4, 0, 1, 2);
+    // 创建URL输入布局
+    QHBoxLayout* urlLayout = new QHBoxLayout();
+    urlLayout->addWidget(m_urlEdit, 1);
+    urlLayout->addWidget(m_joinButton);
+    m_leftLayout->addLayout(urlLayout);
     
-    // 动作按钮布局
-    m_actionLayout = new QHBoxLayout();
-    m_actionLayout->addWidget(m_settingsButton);
-    m_actionLayout->addWidget(m_aboutButton);
-    m_actionLayout->addStretch();
-    m_actionLayout->addWidget(m_exitButton);
-    
-    // 左侧面板布局组装
-    m_leftLayout->addWidget(m_joinGroup);
-    m_leftLayout->addLayout(m_actionLayout);
+    // 添加空白区域
     m_leftLayout->addStretch();
     
-    // 右侧面板布局
-    m_rightLayout = new QVBoxLayout(m_rightPanel);
+    // 添加最近会议标签
+    QLabel* recentLabel = new QLabel(tr("您最近加入的会议"));
+    recentLabel->setStyleSheet("color: white; font-size: 14px;");
+    m_leftLayout->addWidget(recentLabel);
     
-    // 历史记录组布局
-    m_historyLayout = new QVBoxLayout(m_historyGroup);
-    m_historyLayout->addWidget(m_historyList);
-    m_historyLayout->addWidget(m_clearHistoryButton);
+    // 添加历史记录列表
+    m_leftLayout->addWidget(m_historyList);
     
-    // 信息组布局
-    m_infoLayout = new QVBoxLayout(m_infoGroup);
-    m_infoLayout->addWidget(m_infoText);
+    // 添加空白区域
+    m_leftLayout->addStretch();
     
-    // 右侧面板布局组装
-    m_rightLayout->addWidget(m_historyGroup, 1);
-    m_rightLayout->addWidget(m_infoGroup);
+    // 添加中央面板到主布局
+    m_mainLayout->addWidget(m_leftPanel, 1);
     
-    // 添加到分割器
-    m_splitter->addWidget(m_leftPanel);
-    m_splitter->addWidget(m_rightPanel);
-    m_splitter->setStretchFactor(0, 1);
-    m_splitter->setStretchFactor(1, 0);
+    // 设置窗口布局
+    m_centralWidget->setLayout(m_mainLayout);
 }
 
 /**
@@ -668,17 +788,117 @@ void WelcomeWindow::initializeConnections()
  */
 void WelcomeWindow::initializeAutoComplete()
 {
+    FILE* debugFile = fopen("debug_startup.txt", "a");
+    if (debugFile) {
+        fprintf(debugFile, "开始创建URL模型\n");
+        fclose(debugFile);
+    }
+    
     // URL自动完成
     m_urlModel = new QStringListModel(this);
+    
+    debugFile = fopen("debug_startup.txt", "a");
+    if (debugFile) {
+        fprintf(debugFile, "URL模型创建完成，开始创建URL完成器\n");
+        fclose(debugFile);
+    }
+    
     m_urlCompleter = new QCompleter(m_urlModel, this);
+    
+    debugFile = fopen("debug_startup.txt", "a");
+    if (debugFile) {
+        fprintf(debugFile, "URL完成器创建完成，设置大小写敏感性\n");
+        fclose(debugFile);
+    }
+    
     m_urlCompleter->setCaseSensitivity(Qt::CaseInsensitive);
+    
+    debugFile = fopen("debug_startup.txt", "a");
+    if (debugFile) {
+        fprintf(debugFile, "开始设置URL编辑器的完成器\n");
+        fclose(debugFile);
+    }
+    
     m_urlEdit->setCompleter(m_urlCompleter);
+    
+    debugFile = fopen("debug_startup.txt", "a");
+    if (debugFile) {
+        fprintf(debugFile, "URL完成器设置完成，开始创建名称模型\n");
+        fclose(debugFile);
+    }
     
     // 显示名称自动完成
     m_nameModel = new QStringListModel(this);
+    
+    debugFile = fopen("debug_startup.txt", "a");
+    if (debugFile) {
+        fprintf(debugFile, "名称模型创建完成，开始创建名称完成器\n");
+        fclose(debugFile);
+    }
+    
     m_nameCompleter = new QCompleter(m_nameModel, this);
+    
+    debugFile = fopen("debug_startup.txt", "a");
+    if (debugFile) {
+        fprintf(debugFile, "名称完成器创建完成，设置大小写敏感性\n");
+        fclose(debugFile);
+    }
+    
     m_nameCompleter->setCaseSensitivity(Qt::CaseInsensitive);
-    m_displayNameEdit->setCompleter(m_nameCompleter);
+    
+    debugFile = fopen("debug_startup.txt", "a");
+    if (debugFile) {
+        fprintf(debugFile, "开始设置显示名称编辑器的完成器\n");
+        fclose(debugFile);
+    }
+    
+    // 检查指针是否有效
+    if (m_displayNameEdit == nullptr) {
+        debugFile = fopen("debug_startup.txt", "a");
+        if (debugFile) {
+            fprintf(debugFile, "错误：m_displayNameEdit为空指针\n");
+            fclose(debugFile);
+        }
+        return;
+    }
+    
+    if (m_nameCompleter == nullptr) {
+        debugFile = fopen("debug_startup.txt", "a");
+        if (debugFile) {
+            fprintf(debugFile, "错误：m_nameCompleter为空指针\n");
+            fclose(debugFile);
+        }
+        return;
+    }
+    
+    debugFile = fopen("debug_startup.txt", "a");
+    if (debugFile) {
+        fprintf(debugFile, "指针检查通过，开始调用setCompleter\n");
+        fclose(debugFile);
+    }
+    
+    try {
+        m_displayNameEdit->setCompleter(m_nameCompleter);
+        
+        debugFile = fopen("debug_startup.txt", "a");
+        if (debugFile) {
+            fprintf(debugFile, "setCompleter调用成功\n");
+            fclose(debugFile);
+        }
+    } catch (...) {
+        debugFile = fopen("debug_startup.txt", "a");
+        if (debugFile) {
+            fprintf(debugFile, "setCompleter调用时发生异常\n");
+            fclose(debugFile);
+        }
+        return;
+    }
+    
+    debugFile = fopen("debug_startup.txt", "a");
+    if (debugFile) {
+        fprintf(debugFile, "自动完成初始化全部完成\n");
+        fclose(debugFile);
+    }
 }
 
 /**
@@ -693,24 +913,49 @@ void WelcomeWindow::loadMeetingHistory()
     m_historyList->clear();
     
     QJsonObject recentMeetings = m_configManager->getRecentMeetings();
-    QJsonArray history = recentMeetings["meetings"].toArray();
+    QJsonArray history = recentMeetings.value("meetings").toArray();
     for (const QJsonValue& value : history) {
         QJsonObject meeting = value.toObject();
         
-        QString url = meeting["url"].toString();
-        QString displayName = meeting["displayName"].toString();
-        QString serverUrl = meeting["serverUrl"].toString();
-        qint64 timestamp = meeting["timestamp"].toVariant().toLongLong();
+        QString url = meeting.value("url").toString();
+        QString displayName = meeting.value("displayName").toString();
+        QString serverUrl = meeting.value("serverUrl").toString();
+        qint64 timestamp = meeting.value("timestamp").toVariant().toLongLong();
         
         QDateTime dateTime = QDateTime::fromSecsSinceEpoch(timestamp);
-        QString timeStr = dateTime.toString("yyyy-MM-dd hh:mm");
+        QString timeStr = dateTime.toString("yyyy-MM-dd");
         
-        QString itemText = QString("%1\n%2\n%3").arg(url, displayName, timeStr);
+        // 创建自定义显示格式，与Electron版本一致
+        QString itemText = url;
         
-        QListWidgetItem* item = new QListWidgetItem(itemText, m_historyList);
+        QListWidgetItem* item = new QListWidgetItem(m_historyList);
         item->setData(Qt::UserRole, meeting);
+        item->setText(itemText);
+        
+        // 创建自定义小部件来显示会议信息
+    QWidget* itemWidget = new QWidget();
+    QVBoxLayout* itemLayout = new QVBoxLayout(itemWidget);
+    itemLayout->setContentsMargins(5, 5, 5, 5);
+    itemLayout->setSpacing(2);
+    
+    // 添加会议URL标签
+    QLabel* urlLabel = new QLabel(url, itemWidget);
+    urlLabel->setStyleSheet("color: white; font-weight: bold;");
+    itemLayout->addWidget(urlLabel);
+    
+    // 添加时间标签
+    QLabel* timeLabel = new QLabel(timeStr, itemWidget);
+    timeLabel->setStyleSheet("color: rgba(255, 255, 255, 0.7); font-size: 11px;");
+    itemLayout->addWidget(timeLabel);
+    
+    m_historyList->setItemWidget(item, itemWidget);
+        
+        // 设置项目高度
+        item->setSizeHint(QSize(item->sizeHint().width(), 60));
+        
+        // 设置工具提示
         item->setToolTip(QString("URL: %1\n显示名: %2\n服务器: %3\n时间: %4")
-                        .arg(url, displayName, serverUrl, timeStr));
+                        .arg(url, displayName, serverUrl, dateTime.toString("yyyy-MM-dd hh:mm")));
     }
     
     // 更新自动完成数据
