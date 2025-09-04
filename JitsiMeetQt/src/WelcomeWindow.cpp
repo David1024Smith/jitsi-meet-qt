@@ -39,6 +39,11 @@ WelcomeWindow::WelcomeWindow(QWidget *parent)
     , m_centralWidget(nullptr)
     , m_mainLayout(nullptr)
     , m_splitter(nullptr)
+    , m_sidebarPanel(nullptr)
+    , m_sidebarLayout(nullptr)
+    , m_logoLabel(nullptr)
+    , m_sidebarSettingsButton(nullptr)
+    , m_helpButton(nullptr)
     , m_leftPanel(nullptr)
     , m_leftLayout(nullptr)
     , m_joinGroup(nullptr)
@@ -424,6 +429,24 @@ void WelcomeWindow::onExit()
 }
 
 /**
+ * @brief 侧边栏设置按钮点击事件处理
+ */
+void WelcomeWindow::onSidebarSettings()
+{
+    // 调用现有的设置功能
+    onSettings();
+}
+
+/**
+ * @brief 帮助按钮点击事件处理
+ */
+void WelcomeWindow::onHelp()
+{
+    // 调用现有的关于功能
+    onAbout();
+}
+
+/**
  * @brief 会议历史项目双击处理
  * @param item 被双击的项目
  */
@@ -598,7 +621,91 @@ void WelcomeWindow::initializeUI()
     setCentralWidget(m_centralWidget);
     
     // 设置窗口背景为蓝色
-    m_centralWidget->setStyleSheet("background-color: #0056E0; background-image: url(:/images/background.png); background-position: center; background-repeat: no-repeat; background-attachment: fixed;");
+    m_centralWidget->setStyleSheet("background-color: #0056E0;");
+    
+    // 创建左侧菜单栏
+    m_sidebarPanel = new QWidget();
+    m_sidebarPanel->setObjectName("sidebarPanel");
+    m_sidebarPanel->setFixedWidth(60);
+    m_sidebarPanel->setStyleSheet("#sidebarPanel { "
+                                 "background: rgba(0, 0, 0, 0.6); "
+                                 "border-right: 1px solid rgba(255, 255, 255, 0.08); "
+                                 "}");
+    
+    // 创建左侧菜单栏布局
+    m_sidebarLayout = new QVBoxLayout(m_sidebarPanel);
+    m_sidebarLayout->setContentsMargins(10, 20, 10, 20);
+    m_sidebarLayout->setSpacing(15);
+    m_sidebarLayout->setAlignment(Qt::AlignHCenter);
+    
+    // 创建Logo标签
+    m_logoLabel = new QLabel();
+    m_logoLabel->setFixedSize(40, 40);
+    m_logoLabel->setAlignment(Qt::AlignCenter);
+    // 使用正确的资源路径
+    QPixmap logoPixmap(":/images/logo.png");
+    if (logoPixmap.isNull()) {
+        // 如果PNG加载失败，尝试SVG
+        logoPixmap = QPixmap(":/images/logo.svg");
+    }
+    if (!logoPixmap.isNull()) {
+        m_logoLabel->setPixmap(logoPixmap.scaled(32, 32, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    }
+    m_logoLabel->setStyleSheet("QLabel { "
+                              "background: transparent; "
+                              "border: none; "
+                              "}");
+    
+    // 创建设置按钮
+    m_sidebarSettingsButton = new QPushButton();
+    m_sidebarSettingsButton->setFixedSize(40, 40);
+    m_sidebarSettingsButton->setIcon(QIcon(":/icons/settings.svg"));
+    m_sidebarSettingsButton->setIconSize(QSize(24, 24));
+    m_sidebarSettingsButton->setStyleSheet("QPushButton { "
+                                          "background-color: transparent; "
+                                          "border: 1px solid rgba(255, 255, 255, 0.2); "
+                                          "border-radius: 20px; "
+                                          "} "
+                                          "QPushButton:hover { "
+                                          "background-color: rgba(255, 255, 255, 0.1); "
+                                          "border-color: rgba(255, 255, 255, 0.4); "
+                                          "} "
+                                          "QPushButton:pressed { "
+                                          "background-color: rgba(255, 255, 255, 0.15); "
+                                          "border-color: rgba(255, 255, 255, 0.6); "
+                                          "}");
+    m_sidebarSettingsButton->setToolTip(tr("设置"));
+    
+    // 创建帮助按钮
+    m_helpButton = new QPushButton();
+    m_helpButton->setFixedSize(40, 40);
+    m_helpButton->setStyleSheet("QPushButton { "
+                               "background-color: transparent; "
+                               "border: 1px solid rgba(255, 255, 255, 0.2); "
+                               "border-radius: 20px; "
+                               "color: rgba(255, 255, 255, 0.8); "
+                               "font-size: 20px; "
+                               "font-weight: bold; "
+                               "font-family: 'Segoe UI', Arial, sans-serif; "
+                               "} "
+                               "QPushButton:hover { "
+                               "background-color: rgba(255, 255, 255, 0.1); "
+                               "border-color: rgba(255, 255, 255, 0.4); "
+                               "color: white; "
+                               "} "
+                               "QPushButton:pressed { "
+                               "background-color: rgba(255, 255, 255, 0.15); "
+                               "border-color: rgba(255, 255, 255, 0.6); "
+                               "}");
+    m_helpButton->setText("?");
+    m_helpButton->setToolTip(tr("帮助"));
+    
+    // 添加组件到侧边栏布局
+    m_sidebarLayout->addWidget(m_logoLabel, 0, Qt::AlignCenter);
+    m_sidebarLayout->addStretch();
+    m_sidebarLayout->addWidget(m_sidebarSettingsButton, 0, Qt::AlignCenter);
+    m_sidebarLayout->addSpacing(10);
+    m_sidebarLayout->addWidget(m_helpButton, 0, Qt::AlignCenter);
     
     // 创建中央面板
     m_leftPanel = new QWidget();
@@ -704,12 +811,15 @@ void WelcomeWindow::initializeLayout()
 {
     // 主布局
     m_mainLayout = new QHBoxLayout(m_centralWidget);
-    m_mainLayout->setContentsMargins(20, 20, 20, 20);
-    m_mainLayout->setSpacing(20);
+    m_mainLayout->setContentsMargins(0, 0, 0, 0);
+    m_mainLayout->setSpacing(0);
+    
+    // 添加左侧菜单栏到主布局
+    m_mainLayout->addWidget(m_sidebarPanel);
     
     // 创建中央面板布局
     m_leftLayout = new QVBoxLayout(m_leftPanel);
-    m_leftLayout->setContentsMargins(0, 0, 0, 0);
+    m_leftLayout->setContentsMargins(20, 20, 20, 20);
     m_leftLayout->setSpacing(15);
     m_leftLayout->setAlignment(Qt::AlignCenter);
     
@@ -753,21 +863,37 @@ void WelcomeWindow::initializeConnections()
 {
     // 按钮连接
     connect(m_joinButton, &QPushButton::clicked, this, &WelcomeWindow::onJoinMeeting);
-    connect(m_createButton, &QPushButton::clicked, this, &WelcomeWindow::onCreateMeeting);
-    connect(m_settingsButton, &QPushButton::clicked, this, &WelcomeWindow::onSettings);
-    connect(m_aboutButton, &QPushButton::clicked, this, &WelcomeWindow::onAbout);
-    connect(m_exitButton, &QPushButton::clicked, this, &WelcomeWindow::onExit);
-    connect(m_clearHistoryButton, &QPushButton::clicked, this, [this]() {
-        if (m_configManager) {
-            m_configManager->clearMeetingHistory();
-            refreshMeetingHistory();
-        }
-    });
+    if (m_createButton) {
+        connect(m_createButton, &QPushButton::clicked, this, &WelcomeWindow::onCreateMeeting);
+    }
+    if (m_settingsButton) {
+        connect(m_settingsButton, &QPushButton::clicked, this, &WelcomeWindow::onSettings);
+    }
+    if (m_aboutButton) {
+        connect(m_aboutButton, &QPushButton::clicked, this, &WelcomeWindow::onAbout);
+    }
+    if (m_exitButton) {
+        connect(m_exitButton, &QPushButton::clicked, this, &WelcomeWindow::onExit);
+    }
+    
+    // 侧边栏按钮连接
+    connect(m_sidebarSettingsButton, &QPushButton::clicked, this, &WelcomeWindow::onSidebarSettings);
+    connect(m_helpButton, &QPushButton::clicked, this, &WelcomeWindow::onHelp);
+    if (m_clearHistoryButton) {
+        connect(m_clearHistoryButton, &QPushButton::clicked, this, [this]() {
+            if (m_configManager) {
+                m_configManager->clearMeetingHistory();
+                refreshMeetingHistory();
+            }
+        });
+    }
     
     // 输入控件连接
     connect(m_urlEdit, &QLineEdit::textChanged, this, &WelcomeWindow::onUrlChanged);
     connect(m_displayNameEdit, &QLineEdit::textChanged, this, &WelcomeWindow::onDisplayNameChanged);
-    connect(m_serverCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &WelcomeWindow::onServerChanged);
+    if (m_serverCombo) {
+        connect(m_serverCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &WelcomeWindow::onServerChanged);
+    }
     
     // 历史记录连接
     connect(m_historyList, &QListWidget::itemDoubleClicked, this, &WelcomeWindow::onHistoryItemDoubleClicked);

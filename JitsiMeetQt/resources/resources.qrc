@@ -22,9 +22,8 @@
         <file>icons/leave.svg</file>
         
         <!-- 图片资源 -->
+        <file>images/logo.svg</file>
         <file>images/logo.png</file>
-        <file>images/background.png</file>
-        <file>images/welcome.png</file>
         
         <!-- 样式表资源 -->
         <file>styles/main.qss</file>

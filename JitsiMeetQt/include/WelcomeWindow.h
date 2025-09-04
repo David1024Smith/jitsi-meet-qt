@@ -171,6 +171,16 @@ public slots:
     void onExit();
     
     /**
+     * @brief 侧边栏设置按钮点击事件处理
+     */
+    void onSidebarSettings();
+    
+    /**
+     * @brief 帮助按钮点击事件处理
+     */
+    void onHelp();
+    
+    /**
      * @brief 会议历史项目双击处理
      * @param item 被双击的项目
      */
@@ -329,9 +339,16 @@ private:
     QHBoxLayout* m_mainLayout;          ///< 主布局
     QSplitter* m_splitter;              ///< 分割器
     
-    // 左侧面板
-    QWidget* m_leftPanel;               ///< 左侧面板
-    QVBoxLayout* m_leftLayout;          ///< 左侧布局
+    // 左侧菜单栏
+    QWidget* m_sidebarPanel;            ///< 左侧菜单栏面板
+    QVBoxLayout* m_sidebarLayout;       ///< 左侧菜单栏布局
+    QLabel* m_logoLabel;                ///< Logo标签
+    QPushButton* m_sidebarSettingsButton; ///< 侧边栏设置按钮
+    QPushButton* m_helpButton;          ///< 帮助按钮
+    
+    // 主内容面板
+    QWidget* m_leftPanel;               ///< 主内容面板
+    QVBoxLayout* m_leftLayout;          ///< 主内容布局
     QGroupBox* m_joinGroup;             ///< 加入会议组
     QGridLayout* m_joinLayout;          ///< 加入会议布局
     
