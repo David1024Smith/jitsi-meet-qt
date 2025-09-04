@@ -41,6 +41,7 @@ set(SOURCES
     src/ProtocolHandler.cpp
     src/JitsiMeetAPI.cpp
     src/NetworkDiagnostics.cpp
+    src/Logger.cpp
 )
 
 # 头文件
@@ -53,6 +54,7 @@ set(HEADERS
     include/ProtocolHandler.h
     include/JitsiMeetAPI.h
     include/NetworkDiagnostics.h
+    include/Logger.h
 )
 
 # 资源文件
@@ -82,22 +84,26 @@ if(WIN32)
     )
 endif()
 
-# 编译优化设置
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    target_compile_definitions(JitsiMeetQt PRIVATE DEBUG_MODE)
-    # 调试模式下启用详细调试信息
-    if(MSVC)
-        target_compile_options(JitsiMeetQt PRIVATE /W3 /Zi /Od)
-    else()
-        target_compile_options(JitsiMeetQt PRIVATE -g -O0 -Wall)
-    endif()
+# 编译优化设置 - 使用生成器表达式支持多配置生成器
+# Debug模式配置
+target_compile_definitions(JitsiMeetQt PRIVATE 
+    $<$<CONFIG:Debug>:DEBUG_MODE>
+)
+
+if(MSVC)
+    target_compile_options(JitsiMeetQt PRIVATE 
+        $<$<CONFIG:Debug>:/W3 /Zi /Od>
+        $<$<CONFIG:Release>:/O2 /DNDEBUG>
+        $<$<CONFIG:MinSizeRel>:/O1 /DNDEBUG>
+        $<$<CONFIG:RelWithDebInfo>:/O2 /Zi /DNDEBUG>
+    )
 else()
-    # 发布模式下启用优化
-    if(MSVC)
-        target_compile_options(JitsiMeetQt PRIVATE /O2 /DNDEBUG)
-    else()
-        target_compile_options(JitsiMeetQt PRIVATE -O2 -DNDEBUG)
-    endif()
+    target_compile_options(JitsiMeetQt PRIVATE 
+        $<$<CONFIG:Debug>:-g -O0 -Wall>
+        $<$<CONFIG:Release>:-O2 -DNDEBUG>
+        $<$<CONFIG:MinSizeRel>:-Os -DNDEBUG>
+        $<$<CONFIG:RelWithDebInfo>:-O2 -g -DNDEBUG>
+    )
 endif()
 
 # 启用并行编译（Windows MSVC）
@@ -110,7 +116,7 @@ if(WIN32)
     # 定义Qt6 bin目录
     set(QT6_BIN_DIR "C:/Qt/6.8.3/msvc2022_64/bin")
     
-    # 定义Debug和Release版本的Qt DLL文件列表
+    # 定义需要复制的Qt6 DLL文件（Debug和Release版本）
     set(QT6_DEBUG_DLLS
         Qt6Cored.dll
         Qt6Guid.dll
@@ -130,6 +136,7 @@ if(WIN32)
         Qt6Positioningd.dll
         Qt6PrintSupportd.dll
         Qt6Svgd.dll
+        Qt6SvgWidgetsd.dll
     )
     
     set(QT6_RELEASE_DLLS
@@ -151,6 +158,7 @@ if(WIN32)
         Qt6Positioning.dll
         Qt6PrintSupport.dll
         Qt6Svg.dll
+        Qt6SvgWidgets.dll
     )
     
     # 添加自定义目标来复制Qt DLL文件
@@ -158,26 +166,26 @@ if(WIN32)
         COMMENT "copy Qt6 dll to build"
     )
     
-    # 为Debug版本的DLL文件添加复制命令
+    # 为Debug版本DLL文件添加复制命令
     foreach(dll ${QT6_DEBUG_DLLS})
         if(EXISTS "${QT6_BIN_DIR}/${dll}")
             add_custom_command(TARGET copy_qt_dlls POST_BUILD
                 COMMAND $<$<CONFIG:Debug>:${CMAKE_COMMAND}> $<$<CONFIG:Debug>:-E> $<$<CONFIG:Debug>:copy_if_different>
                     $<$<CONFIG:Debug>:"${QT6_BIN_DIR}/${dll}">
                     $<$<CONFIG:Debug>:"$<TARGET_FILE_DIR:JitsiMeetQt>/${dll}">
-                COMMENT "copy ${dll} build"
+                COMMENT "copy ${dll} for Debug build"
             )
         endif()
     endforeach()
     
-    # 为Release版本的DLL文件添加复制命令
+    # 为Release版本DLL文件添加复制命令
     foreach(dll ${QT6_RELEASE_DLLS})
         if(EXISTS "${QT6_BIN_DIR}/${dll}")
             add_custom_command(TARGET copy_qt_dlls POST_BUILD
                 COMMAND $<$<CONFIG:Release>:${CMAKE_COMMAND}> $<$<CONFIG:Release>:-E> $<$<CONFIG:Release>:copy_if_different>
                     $<$<CONFIG:Release>:"${QT6_BIN_DIR}/${dll}">
                     $<$<CONFIG:Release>:"$<TARGET_FILE_DIR:JitsiMeetQt>/${dll}">
-                COMMENT "copy ${dll} build"
+                COMMENT "copy ${dll} for Release build"
             )
         endif()
     endforeach()
