@@ -567,15 +567,15 @@ void WelcomeWindow::initializeUI()
     // 创建左侧菜单栏
     m_sidebarPanel = new QWidget();
     m_sidebarPanel->setObjectName("sidebarPanel");
-    m_sidebarPanel->setFixedWidth(60);
+    m_sidebarPanel->setFixedWidth(70);
     m_sidebarPanel->setStyleSheet("#sidebarPanel { "
-                                 "background: rgba(0, 0, 0, 0.6); "
+                                 "background: rgba(0, 0, 0, 0.8); "
                                  "border-right: 1px solid rgba(255, 255, 255, 0.08); "
                                  "}");
     
     // 创建左侧菜单栏布局
     m_sidebarLayout = new QVBoxLayout(m_sidebarPanel);
-    m_sidebarLayout->setContentsMargins(10, 20, 10, 20);
+    m_sidebarLayout->setContentsMargins(10, 20, 10, 20);  
     m_sidebarLayout->setSpacing(15);
     m_sidebarLayout->setAlignment(Qt::AlignHCenter);
     
@@ -648,55 +648,205 @@ void WelcomeWindow::initializeUI()
                               "}");
     
     // 创建设置按钮
+    printf("=== 开始创建设置按钮 ===\n");
+    fflush(stdout);
     m_sidebarSettingsButton = new QPushButton();
-    m_sidebarSettingsButton->setFixedSize(40, 40);
-    m_sidebarSettingsButton->setIcon(QIcon(":/icons/settings.svg"));
-    m_sidebarSettingsButton->setIconSize(QSize(24, 24));
-    m_sidebarSettingsButton->setStyleSheet("QPushButton { "
-                                          "background-color: transparent; "
-                                          "border: 1px solid rgba(255, 255, 255, 0.2); "
-                                          "border-radius: 20px; "
-                                          "} "
-                                          "QPushButton:hover { "
-                                          "background-color: rgba(255, 255, 255, 0.1); "
-                                          "border-color: rgba(255, 255, 255, 0.4); "
-                                          "} "
-                                          "QPushButton:pressed { "
-                                          "background-color: rgba(255, 255, 255, 0.15); "
-                                          "border-color: rgba(255, 255, 255, 0.6); "
-                                          "}");
+    m_sidebarSettingsButton->setFixedSize(50, 50);  // 增大按钮尺寸
+    m_sidebarSettingsButton->setVisible(true);  // 确保按钮可见
+    printf("设置按钮创建完成，尺寸: %dx%d\n", m_sidebarSettingsButton->width(), m_sidebarSettingsButton->height());
+    fflush(stdout);
+    
+    // 优先加载SVG格式的设置图标
+    QIcon settingsIcon;
+    QPixmap settingsPixmap;
+    
+    // 使用QSvgRenderer正确加载SVG文件
+    QFile settingsSvgFile(":/icons/settings.svg");
+    if (settingsSvgFile.open(QIODevice::ReadOnly)) {
+        QByteArray settingsSvgData = settingsSvgFile.readAll();
+        settingsSvgFile.close();
+        
+        QSvgRenderer settingsSvgRenderer(settingsSvgData);
+        if (settingsSvgRenderer.isValid()) {
+            // SVG加载成功，渲染为QPixmap
+            settingsPixmap = QPixmap(32, 32);
+            settingsPixmap.fill(Qt::transparent);
+            QPainter settingsPainter(&settingsPixmap);
+            settingsSvgRenderer.render(&settingsPainter);
+            settingsPainter.end();
+            
+            settingsIcon = QIcon(settingsPixmap);
+            qDebug() << "设置按钮SVG图标加载成功";
+        } else {
+            qDebug() << "设置按钮SVG渲染器无效，尝试加载PNG";
+            settingsIcon = QIcon(":/icons/settings.png");
+        }
+    } else {
+        qDebug() << "无法打开设置按钮SVG文件，尝试加载PNG";
+        settingsIcon = QIcon(":/icons/settings.png");
+    }
+    
+    if (!settingsIcon.isNull()) {
+        m_sidebarSettingsButton->setIcon(settingsIcon);
+        m_sidebarSettingsButton->setIconSize(QSize(32, 32));
+        qDebug() << "设置按钮图标设置成功";
+        // 圆形透明背景按钮
+        m_sidebarSettingsButton->setStyleSheet("QPushButton { "
+                                              "background: transparent; "
+                                              "border: none; "
+                                              "border-radius: 25px; "
+                                              "padding: 0px; "
+                                                                                 "min-width: 50px; "
+                                   "min-height: 50px; "
+                                   "max-width: 50px; "
+                                   "max-height: 50px; "
+                                              "} "
+                                              "QPushButton:hover { "
+                                              "background: rgba(255, 255, 255, 0.1); "
+                                              "border-radius: 25px; "
+                                              "} "
+                                              "QPushButton:pressed { "
+                                              "background: rgba(255, 255, 255, 0.2); "
+                                              "border-radius: 25px; "
+                                              "}");
+    } else {
+        // 如果图标加载失败，使用圆形透明样式
+        m_sidebarSettingsButton->setStyleSheet("QPushButton { "
+                                              "background: transparent; "
+                                              "border: none; "
+                                              "border-radius: 25px; "
+                                              "color: white; "
+                                              "font-size: 12px; "
+                                              "font-weight: bold; "
+                                              "padding: 0px; "
+                                                                                 "min-width: 50px; "
+                                   "min-height: 50px; "
+                                   "max-width: 50px; "
+                                   "max-height: 50px; "
+                                              "} "
+                                              "QPushButton:hover { "
+                                              "background: rgba(255, 255, 255, 0.1); "
+                                              "border-radius: 25px; "
+                                              "} "
+                                              "QPushButton:pressed { "
+                                              "background: rgba(255, 255, 255, 0.2); "
+                                              "border-radius: 25px; "
+                                              "}");
+        m_sidebarSettingsButton->setText(" ");
+        qDebug() << "设置按钮图标加载失败，使用文本显示: ⚙";
+    }
     m_sidebarSettingsButton->setToolTip(tr("设置"));
+    qDebug() << "设置按钮样式设置完成";
     
     // 创建帮助按钮
+    printf("=== 开始创建帮助按钮 ===\n");
+    fflush(stdout);
     m_helpButton = new QPushButton();
-    m_helpButton->setFixedSize(40, 40);
-    m_helpButton->setStyleSheet("QPushButton { "
-                               "background-color: transparent; "
-                               "border: 1px solid rgba(255, 255, 255, 0.2); "
-                               "border-radius: 20px; "
-                               "color: rgba(255, 255, 255, 0.8); "
-                               "font-size: 20px; "
-                               "font-weight: bold; "
-                               "font-family: 'Segoe UI', Arial, sans-serif; "
-                               "} "
-                               "QPushButton:hover { "
-                               "background-color: rgba(255, 255, 255, 0.1); "
-                               "border-color: rgba(255, 255, 255, 0.4); "
-                               "color: white; "
-                               "} "
-                               "QPushButton:pressed { "
-                               "background-color: rgba(255, 255, 255, 0.15); "
-                               "border-color: rgba(255, 255, 255, 0.6); "
-                               "}");
-    m_helpButton->setText("?");
+    m_helpButton->setFixedSize(50, 50);  // 设置为正方形以创建圆形按钮
+    m_helpButton->setVisible(true);  // 确保按钮可见
+    printf("帮助按钮创建完成，尺寸: %dx%d\n", m_helpButton->width(), m_helpButton->height());
+    fflush(stdout);
+    
+    // 优先加载SVG格式的帮助图标
+    QIcon helpIcon;
+    QPixmap helpPixmap;
+    
+    // 使用QSvgRenderer正确加载SVG文件
+    QFile helpSvgFile(":/icons/help.svg");
+    if (helpSvgFile.open(QIODevice::ReadOnly)) {
+        QByteArray helpSvgData = helpSvgFile.readAll();
+        helpSvgFile.close();
+        
+        QSvgRenderer helpSvgRenderer(helpSvgData);
+        if (helpSvgRenderer.isValid()) {
+            // SVG加载成功，渲染为QPixmap
+            helpPixmap = QPixmap(32, 32);
+            helpPixmap.fill(Qt::transparent);
+            QPainter helpPainter(&helpPixmap);
+            helpSvgRenderer.render(&helpPainter);
+            helpPainter.end();
+            
+            helpIcon = QIcon(helpPixmap);
+            qDebug() << "帮助按钮SVG图标加载成功";
+        } else {
+            qDebug() << "帮助按钮SVG渲染器无效，使用文本显示";
+        }
+    } else {
+        qDebug() << "无法打开帮助按钮SVG文件，使用文本显示";
+    }
+    
+    if (!helpIcon.isNull()) {
+        m_helpButton->setIcon(helpIcon);
+        qDebug() << "帮助按钮图标设置成功";
+        m_helpButton->setIconSize(QSize(32, 32));
+        // 圆形透明背景按钮
+        m_helpButton->setStyleSheet("QPushButton { "
+                                   "background: transparent; "
+                                   "border: none; "
+                                   "border-radius: 25px; "
+                                   "padding: 0px; "
+                                   "min-width: 50px; "
+                                   "min-height: 50px; "
+                                   "max-width: 50px; "
+                                   "max-height: 50px; "
+                                   "} "
+                                   "QPushButton:hover { "
+                                   "background: rgba(255, 255, 255, 0.1); "
+                                   "border-radius: 25px; "
+                                   "} "
+                                   "QPushButton:pressed { "
+                                   "background: rgba(255, 255, 255, 0.2); "
+                                    "border-radius: 25px; "
+                                    "}");
+    } else {
+        // 如果没有图标文件，使用圆形透明样式
+        m_helpButton->setStyleSheet("QPushButton { "
+                                   "background: transparent; "
+                                   "border: none; "
+                                   "border-radius: 25px; "
+                                   "color: white; "
+                                   "font-size: 12px; "
+                                   "font-weight: bold; "
+                                   "padding: 0px; "
+                                   "min-width: 50px; "
+                                   "min-height: 50px; "
+                                   "max-width: 50px; "
+                                   "max-height: 50px; "
+                                   "} "
+                                   "QPushButton:hover { "
+                                   "background: rgba(255, 255, 255, 0.1); "
+                                   "border-radius: 25px; "
+                                   "} "
+                                   "QPushButton:pressed { "
+                                   "background: rgba(255, 255, 255, 0.2); "
+                                   "border-radius: 25px; "
+                                   "}");
+        m_helpButton->setText(" ");
+        qDebug() << "帮助按钮使用文本显示: ?";
+    }
     m_helpButton->setToolTip(tr("帮助"));
+    qDebug() << "帮助按钮样式设置完成";
     
     // 添加组件到侧边栏布局
+    printf("=== 开始添加组件到侧边栏布局 ===\n");
+    fflush(stdout);
     m_sidebarLayout->addWidget(m_logoLabel, 0, Qt::AlignCenter);
+    printf("Logo标签已添加到布局\n");
+    fflush(stdout);
     m_sidebarLayout->addStretch();
+    printf("弹性空间已添加到布局\n");
+    fflush(stdout);
     m_sidebarLayout->addWidget(m_sidebarSettingsButton, 0, Qt::AlignCenter);
+    printf("设置按钮已添加到布局，按钮可见性: %s\n", m_sidebarSettingsButton->isVisible() ? "true" : "false");
+    fflush(stdout);
     m_sidebarLayout->addSpacing(10);
+    printf("间距已添加到布局\n");
+    fflush(stdout);
     m_sidebarLayout->addWidget(m_helpButton, 0, Qt::AlignCenter);
+    printf("帮助按钮已添加到布局，按钮可见性: %s\n", m_helpButton->isVisible() ? "true" : "false");
+    fflush(stdout);
+    printf("侧边栏布局组件添加完成，总组件数: %d\n", m_sidebarLayout->count());
+    fflush(stdout);
     
     // 创建中央面板
     m_leftPanel = new QWidget();
@@ -788,13 +938,20 @@ void WelcomeWindow::initializeUI()
  */
 void WelcomeWindow::initializeLayout()
 {
+    // 创建分割器来管理侧边栏和主内容区域
+    m_splitter = new QSplitter(Qt::Horizontal, m_centralWidget);
+    m_splitter->setChildrenCollapsible(false);
+    
+    // 添加侧边栏到分割器
+    m_splitter->addWidget(m_sidebarPanel);
+    
     // 主布局
     m_mainLayout = new QHBoxLayout(m_centralWidget);
     m_mainLayout->setContentsMargins(0, 0, 0, 0);
     m_mainLayout->setSpacing(0);
     
-    // 添加左侧菜单栏到主布局
-    m_mainLayout->addWidget(m_sidebarPanel);
+    // 添加分割器到主布局
+    m_mainLayout->addWidget(m_splitter);
     
     // 创建中央面板布局
     m_leftLayout = new QVBoxLayout(m_leftPanel);
@@ -828,11 +985,19 @@ void WelcomeWindow::initializeLayout()
     // 添加空白区域
     m_leftLayout->addStretch();
     
-    // 添加中央面板到主布局
-    m_mainLayout->addWidget(m_leftPanel, 1);
+    // 添加中央面板到分割器
+    m_splitter->addWidget(m_leftPanel);
+    
+    // 设置分割器的比例，侧边栏固定70像素，主内容区域占剩余空间
+    m_splitter->setSizes({70, 800});
     
     // 设置窗口布局
     m_centralWidget->setLayout(m_mainLayout);
+    
+    // 确保侧边栏在最前面显示，避免被其他组件遮挡
+    m_sidebarPanel->raise();
+    printf("侧边栏面板已提升到最前层\n");
+    fflush(stdout);
 }
 
 /**
