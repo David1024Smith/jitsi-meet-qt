@@ -6,6 +6,8 @@
 #include <QStandardPaths>
 #include <QLoggingCategory>
 #include <cstdio>
+#include <fstream>
+#include <iostream>
 
 /**
  * @brief 设置日志输出格式
@@ -92,7 +94,7 @@ bool handleCommandLineArguments(MainApplication* app)
     }
     
     // 添加调试输出
-    FILE* debugFile = fopen("debug_startup.txt", "a");
+    FILE* debugFile = fopen("D:\\CustomerCases\\jitsi-meet-qt\\JitsiMeetQt\\build\\Debug\\debug_startup.txt", "a");
     if (debugFile) {
         fprintf(debugFile, "命令行参数处理函数即将返回false（继续执行程序）\n");
         fclose(debugFile);
@@ -109,10 +111,11 @@ bool handleCommandLineArguments(MainApplication* app)
  */
 int main(int argc, char *argv[])
 {
-    // 立即写入文件以确认程序启动
-    FILE* debugFile = fopen("debug_startup.txt", "w");
+    // 立即写入文件以确认程序启动 - 使用绝对路径
+    FILE* debugFile = fopen("D:\\CustomerCases\\jitsi-meet-qt\\JitsiMeetQt\\build\\Debug\\debug_startup.txt", "w");
     if (debugFile) {
         fprintf(debugFile, "程序启动 - main函数开始执行\n");
+        fflush(debugFile);
         fclose(debugFile);
     }
     
@@ -150,7 +153,7 @@ int main(int argc, char *argv[])
     
     try {
         // 添加文件调试输出
-        debugFile = fopen("debug_startup.txt", "a");
+        debugFile = fopen("D:\\CustomerCases\\jitsi-meet-qt\\JitsiMeetQt\\build\\Debug\\debug_startup.txt", "a");
         if (debugFile) {
             fprintf(debugFile, "进入try块\n");
             fclose(debugFile);
@@ -255,13 +258,13 @@ int main(int argc, char *argv[])
         qDebug() << "欢迎窗口已显示，进入事件循环...";
         
         // 进入事件循环
-        debugFile = fopen("debug_startup.txt", "a");
+        debugFile = fopen("D:\\CustomerCases\\jitsi-meet-qt\\JitsiMeetQt\\build\\Debug\\debug_startup.txt", "a");
         if (debugFile) {
             fprintf(debugFile, "进入事件循环\n");
             fclose(debugFile);
         }
         int result = app.exec();
-        debugFile = fopen("debug_startup.txt", "a");
+        debugFile = fopen("D:\\CustomerCases\\jitsi-meet-qt\\JitsiMeetQt\\build\\Debug\\debug_startup.txt", "a");
         if (debugFile) {
             fprintf(debugFile, "事件循环结束，退出代码: %d\n", result);
             fclose(debugFile);

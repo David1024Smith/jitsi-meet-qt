@@ -29,6 +29,9 @@
 #include <QFont>
 #include <QFontMetrics>
 #include <QScreen>
+#include <QSvgRenderer>
+#include <QFile>
+#include <QIODevice>
 
 /**
  * @brief WelcomeWindow构造函数
@@ -86,6 +89,12 @@ WelcomeWindow::WelcomeWindow(QWidget *parent)
     , m_isValidatingUrl(false)
     , m_isCheckingServer(false)
 {
+    // 添加构造函数开始的调试输出
+    debugFile = fopen("debug_startup.txt", "w");
+    if (debugFile) {
+        fprintf(debugFile, "WelcomeWindow构造函数开始\n");
+        fclose(debugFile);
+    }
     // 获取配置管理器和协议处理器实例
     m_configManager = ConfigurationManager::instance();
     // ProtocolHandler需要MainApplication实例，暂时设为nullptr
@@ -104,7 +113,7 @@ WelcomeWindow::WelcomeWindow(QWidget *parent)
     m_urlValidationTimer->setInterval(URL_VALIDATION_DELAY);
     
     // 写入调试信息
-    FILE* debugFile = fopen("debug_startup.txt", "a");
+    debugFile = fopen("debug_startup.txt", "a");
     if (debugFile) {
         fprintf(debugFile, "WelcomeWindow构造函数开始\n");
         fclose(debugFile);
@@ -611,10 +620,22 @@ void WelcomeWindow::onUrlValidationTimeout()
  */
 void WelcomeWindow::initializeUI()
 {
+    FILE* debugFile = fopen("debug_startup.txt", "a");
+    if (debugFile) {
+        fprintf(debugFile, "initializeUI函数开始执行\n");
+        fclose(debugFile);
+    }
+    
     // 设置窗口属性
     setWindowTitle(tr("Jitsi Meet Qt"));
     setWindowIcon(QIcon(":/icons/app.svg"));
     setMinimumSize(QSize(800, 600));
+    
+    debugFile = fopen("debug_startup.txt", "a");
+    if (debugFile) {
+        fprintf(debugFile, "窗口属性设置完成\n");
+        fclose(debugFile);
+    }
     
     // 创建中央窗口部件
     m_centralWidget = new QWidget();
@@ -622,6 +643,12 @@ void WelcomeWindow::initializeUI()
     
     // 设置窗口背景为蓝色
     m_centralWidget->setStyleSheet("background-color: #0056E0;");
+    
+    debugFile = fopen("debug_startup.txt", "a");
+    if (debugFile) {
+        fprintf(debugFile, "中央窗口部件创建完成\n");
+        fclose(debugFile);
+    }
     
     // 创建左侧菜单栏
     m_sidebarPanel = new QWidget();
@@ -638,18 +665,116 @@ void WelcomeWindow::initializeUI()
     m_sidebarLayout->setSpacing(15);
     m_sidebarLayout->setAlignment(Qt::AlignHCenter);
     
+    debugFile = fopen("debug_startup.txt", "a");
+    if (debugFile) {
+        fprintf(debugFile, "左侧菜单栏创建完成，准备创建Logo\n");
+        fclose(debugFile);
+    }
+    
     // 创建Logo标签
+    debugFile = fopen("debug_startup.txt", "a");
+    if (debugFile) {
+        fprintf(debugFile, "准备创建Logo标签\n");
+        fclose(debugFile);
+    }
+    
     m_logoLabel = new QLabel();
+    debugFile = fopen("debug_startup.txt", "a");
+    if (debugFile) {
+        fprintf(debugFile, "Logo标签创建成功\n");
+        fclose(debugFile);
+    }
+    
     m_logoLabel->setFixedSize(40, 40);
     m_logoLabel->setAlignment(Qt::AlignCenter);
-    // 使用正确的资源路径
-    QPixmap logoPixmap(":/images/logo.png");
-    if (logoPixmap.isNull()) {
-        // 如果PNG加载失败，尝试SVG
-        logoPixmap = QPixmap(":/images/logo.svg");
+    
+    debugFile = fopen("debug_startup.txt", "a");
+    if (debugFile) {
+        fprintf(debugFile, "Logo标签属性设置完成\n");
+        fclose(debugFile);
+    }
+    
+    // 优先使用SVG格式的logo
+    qDebug() << "开始加载Logo图片";
+    // 添加文件调试输出
+    debugFile = fopen("debug_startup.txt", "a");
+    if (debugFile) {
+        fprintf(debugFile, "开始加载Logo图片\n");
+        fclose(debugFile);
+    }
+    
+    QPixmap logoPixmap;
+    // 使用QSvgRenderer正确加载SVG文件
+    QFile svgFile(":/images/logo.svg");
+    if (svgFile.open(QIODevice::ReadOnly)) {
+        QByteArray svgData = svgFile.readAll();
+        svgFile.close();
+        
+        QSvgRenderer svgRenderer(svgData);
+        if (svgRenderer.isValid()) {
+            // SVG加载成功，渲染为QPixmap
+            logoPixmap = QPixmap(40, 40);
+            logoPixmap.fill(Qt::transparent);
+            QPainter painter(&logoPixmap);
+            svgRenderer.render(&painter);
+            painter.end();
+            
+            qDebug() << "SVG Logo加载成功，尺寸:" << logoPixmap.size();
+            debugFile = fopen("debug_startup.txt", "a");
+            if (debugFile) {
+                fprintf(debugFile, "SVG Logo加载成功，尺寸: %dx%d\n", logoPixmap.width(), logoPixmap.height());
+                fclose(debugFile);
+            }
+        } else {
+            qDebug() << "SVG渲染器无效，尝试加载PNG";
+            debugFile = fopen("debug_startup.txt", "a");
+            if (debugFile) {
+                fprintf(debugFile, "SVG渲染器无效，尝试加载PNG\n");
+                fclose(debugFile);
+            }
+            // SVG渲染失败，尝试PNG
+            logoPixmap = QPixmap(":/images/logo.png");
+        }
+    } else {
+        qDebug() << "无法打开SVG文件，错误:" << svgFile.errorString();
+        debugFile = fopen("debug_startup.txt", "a");
+        if (debugFile) {
+            fprintf(debugFile, "无法打开SVG文件，错误: %s\n", svgFile.errorString().toUtf8().constData());
+            fclose(debugFile);
+        }
+        // SVG加载失败，尝试PNG
+        logoPixmap = QPixmap(":/images/logo.png");
+        if (logoPixmap.isNull()) {
+            qDebug() << "PNG Logo也加载失败";
+            debugFile = fopen("debug_startup.txt", "a");
+            if (debugFile) {
+                fprintf(debugFile, "PNG Logo也加载失败\n");
+                fclose(debugFile);
+            }
+        } else {
+            qDebug() << "PNG Logo加载成功，尺寸:" << logoPixmap.size();
+            debugFile = fopen("debug_startup.txt", "a");
+            if (debugFile) {
+                fprintf(debugFile, "PNG Logo加载成功，尺寸: %dx%d\n", logoPixmap.width(), logoPixmap.height());
+                fclose(debugFile);
+            }
+        }
     }
     if (!logoPixmap.isNull()) {
         m_logoLabel->setPixmap(logoPixmap.scaled(32, 32, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+        qDebug() << "Logo设置到标签完成";
+        debugFile = fopen("debug_startup.txt", "a");
+        if (debugFile) {
+            fprintf(debugFile, "Logo设置到标签完成\n");
+            fclose(debugFile);
+        }
+    } else {
+        qDebug() << "Logo加载完全失败，无法设置到标签";
+        debugFile = fopen("debug_startup.txt", "a");
+        if (debugFile) {
+            fprintf(debugFile, "Logo加载完全失败，无法设置到标签\n");
+            fclose(debugFile);
+        }
     }
     m_logoLabel->setStyleSheet("QLabel { "
                               "background: transparent; "
@@ -760,7 +885,7 @@ void WelcomeWindow::initializeUI()
     // 创建显示名称控件（即使在简化UI中也需要创建以避免空指针）
     m_displayNameLabel = new QLabel(tr("显示名称:"), this);
     
-    FILE* debugFile = fopen("debug_startup.txt", "a");
+    debugFile = fopen("debug_startup.txt", "a");
     if (debugFile) {
         fprintf(debugFile, "开始创建m_displayNameEdit\n");
         fclose(debugFile);
@@ -914,7 +1039,7 @@ void WelcomeWindow::initializeConnections()
  */
 void WelcomeWindow::initializeAutoComplete()
 {
-    FILE* debugFile = fopen("debug_startup.txt", "a");
+    debugFile = fopen("debug_startup.txt", "a");
     if (debugFile) {
         fprintf(debugFile, "开始创建URL模型\n");
         fclose(debugFile);

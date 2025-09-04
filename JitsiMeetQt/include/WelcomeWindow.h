@@ -1,6 +1,7 @@
 #ifndef WELCOMEWINDOW_H
 #define WELCOMEWINDOW_H
 
+#include <cstdio>
 #include <QMainWindow>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -28,6 +29,7 @@
 #include <QNetworkReply>
 #include <QCompleter>
 #include <QStringListModel>
+#include <QSvgRenderer>
 
 QT_BEGIN_NAMESPACE
 class QVBoxLayout;
@@ -408,6 +410,7 @@ private:
     bool m_isCheckingServer;            ///< 是否正在检查服务器
     QString m_lastValidatedUrl;         ///< 最后验证的URL
     QString m_lastCheckedServer;        ///< 最后检查的服务器
+    FILE* debugFile;                    ///< 调试文件指针
     
     // 常量
     static const int SERVER_CHECK_TIMEOUT = 5000;  ///< 服务器检查超时（毫秒）

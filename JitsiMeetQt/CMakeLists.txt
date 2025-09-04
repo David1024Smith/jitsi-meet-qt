@@ -20,7 +20,7 @@ endif()
 set(CMAKE_PREFIX_PATH "C:/Qt/6.8.3/msvc2022_64")
 
 # 查找Qt6组件
-find_package(Qt6  REQUIRED COMPONENTS Core Widgets WebEngineWidgets Network WebChannel WebSockets)
+find_package(Qt6 6.8.3 REQUIRED COMPONENTS Core Widgets WebEngineWidgets Network WebChannel WebSockets Svg SvgWidgets)
 
 # 启用Qt的MOC、UIC和RCC
 set(CMAKE_AUTOMOC ON)
@@ -71,6 +71,8 @@ target_link_libraries(JitsiMeetQt
     Qt6::Network
     Qt6::WebChannel
     Qt6::WebSockets
+    Qt6::Svg
+    Qt6::SvgWidgets
 )
 
 # Windows特定设置
@@ -195,14 +197,25 @@ if(WIN32)
         endif()
     endforeach()
     
-    # 复制Qt WebEngine进程文件
-    if(EXISTS "${QT6_BIN_DIR}/QtWebEngineProcessd.exe")
-        add_custom_command(TARGET copy_qt_dlls POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${QT6_BIN_DIR}/QtWebEngineProcessd.exe"
-                "$<TARGET_FILE_DIR:JitsiMeetQt>/QtWebEngineProcessd.exe"
-            COMMENT "copy Qt WebEngine Process to build"
-        )
+    # 复制Qt WebEngine进程文件（根据构建类型选择Debug或Release版本）
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+        if(EXISTS "${QT6_BIN_DIR}/QtWebEngineProcessd.exe")
+            add_custom_command(TARGET copy_qt_dlls POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${QT6_BIN_DIR}/QtWebEngineProcessd.exe"
+                    "$<TARGET_FILE_DIR:JitsiMeetQt>/QtWebEngineProcessd.exe"
+                COMMENT "copy Qt WebEngine Process (Debug) to build"
+            )
+        endif()
+    else()
+        if(EXISTS "${QT6_BIN_DIR}/QtWebEngineProcess.exe")
+            add_custom_command(TARGET copy_qt_dlls POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${QT6_BIN_DIR}/QtWebEngineProcess.exe"
+                    "$<TARGET_FILE_DIR:JitsiMeetQt>/QtWebEngineProcess.exe"
+                COMMENT "copy Qt WebEngine Process (Release) to build"
+            )
+        endif()
     endif()
     
     # 复制Qt WebEngine资源文件
@@ -225,6 +238,16 @@ if(WIN32)
             )
         endif()
     endforeach()
+    
+    # 复制Qt WebEngine resources目录
+    if(EXISTS "C:/Qt/6.8.3/msvc2022_64/resources")
+        add_custom_command(TARGET copy_qt_dlls POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "C:/Qt/6.8.3/msvc2022_64/resources"
+                "$<TARGET_FILE_DIR:JitsiMeetQt>/resources"
+            COMMENT "copy Qt WebEngine resources directory to build"
+        )
+    endif()
     
     # 复制Qt WebEngine本地化文件
     if(EXISTS "C:/Qt/6.8.3/msvc2022_64/translations")
