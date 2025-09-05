@@ -226,11 +226,49 @@ QListWidget::item:pressed {
 .meeting-history-item {
     background-color: transparent;
     border: none;
-    padding: 16px;
+    padding: 8px;
 }
 
 .meeting-history-item:hover {
     background-color: transparent;
+}
+
+/* Meeting History Content Container - 圆角矩形背景 */
+.meeting-history-content {
+    background-color: #1754A9;
+    border: none;
+    border-radius: 8px;
+    padding: 0;
+    margin: 0;
+}
+
+.meeting-history-content:hover {
+    background-color: #1e5bb8;
+}
+
+/* Delete History Button - 删除按钮样式 */
+.delete-history-button {
+    background-color: rgba(255, 255, 255, 0.2);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: bold;
+    padding: 0;
+    margin: 4px;
+    min-width: 24px;
+    min-height: 24px;
+    max-width: 24px;
+    max-height: 24px;
+}
+
+.delete-history-button:hover {
+    background-color: rgba(255, 255, 255, 0.3);
+    color: #ff4444;
+}
+
+.delete-history-button:pressed {
+    background-color: rgba(255, 255, 255, 0.4);
 }
 
 /* Meeting History Labels - 按照原始设计的字体规范 */

@@ -94,17 +94,7 @@ public:
      */
     QString currentLanguage() const;
     
-    /**
-     * @brief 设置主题
-     * @param theme 主题名称 ("light", "dark")
-     */
-    void setTheme(const QString &theme);
-    
-    /**
-     * @brief 获取当前主题
-     * @return 当前主题名称
-     */
-    QString currentTheme() const;
+    // 主题相关方法已移除，现在只使用单一的main.qss样式文件
     
     /**
      * @brief 检查应用程序是否已初始化
@@ -155,7 +145,7 @@ private:
     void initializeSystemTray();
     
     /**
-     * @brief 初始化翻译
+     * @brief 初始化翻译系统
      */
     void initializeTranslations();
     
@@ -169,6 +159,8 @@ private:
      * @param themeName 主题名称
      */
     void loadStyleSheet(const QString &themeName);
+    
+    // 主题初始化方法已移除
     
     /**
      * @brief 创建托盘菜单
@@ -202,7 +194,7 @@ private:
     
     QTranslator* m_translator;          ///< 翻译器
     QString m_currentLanguage;          ///< 当前语言
-    QString m_currentTheme;             ///< 当前主题
+    // 主题相关成员变量已移除
     
     bool m_initialized;                 ///< 是否已初始化
 };

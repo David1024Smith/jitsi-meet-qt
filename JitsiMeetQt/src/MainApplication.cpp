@@ -29,7 +29,6 @@ MainApplication::MainApplication(int &argc, char **argv)
     , m_quitAction(nullptr)
     , m_translator(nullptr)
     , m_currentLanguage("zh_CN")
-    , m_currentTheme("light")
     , m_initialized(false)
 {
     // 设置单例实例
@@ -266,27 +265,9 @@ QString MainApplication::currentLanguage() const
     return m_currentLanguage;
 }
 
-void MainApplication::setTheme(const QString &theme)
-{
-    qDebug() << "设置主题:" << theme;
-    
-    if (m_currentTheme == theme) {
-        return;
-    }
-    
-    m_currentTheme = theme;
-    loadStyleSheet(theme);
-    
-    // 保存到配置
-    if (m_configManager) {
-        m_configManager->setCurrentTheme(theme);
-    }
-}
+// 主题设置方法已移除，现在只使用单一的main.qss样式文件
 
-QString MainApplication::currentTheme() const
-{
-    return m_currentTheme;
-}
+// currentTheme方法已移除
 
 bool MainApplication::isInitialized() const
 {
@@ -406,33 +387,17 @@ void MainApplication::initializeTheme()
 {
     qDebug() << "初始化主题";
     
-    // 从配置中读取主题设置
-    if (m_configManager) {
-        QString savedTheme = m_configManager->getCurrentTheme();
-        if (!savedTheme.isEmpty()) {
-            setTheme(savedTheme);
-            return;
-        }
-    }
-    
-    // 使用默认主题
-    setTheme("light");
+    // 直接加载main.qss样式文件
+    loadStyleSheet("main");
 }
 
 void MainApplication::loadStyleSheet(const QString &themeName)
 {
     qDebug() << "加载样式表:" << themeName;
     
-    // 首先尝试加载指定主题的样式文件
-    QString styleFile = QString(":/styles/%1.qss").arg(themeName);
+    // 直接加载main.qss样式文件
+    QString styleFile = ":/styles/main.qss";
     QFile file(styleFile);
-    
-    // 如果指定主题文件不存在，则加载默认的main.qss
-    if (!file.exists()) {
-        qDebug() << "主题文件不存在:" << styleFile << "，尝试加载默认样式";
-        styleFile = ":/styles/main.qss";
-        file.setFileName(styleFile);
-    }
     
     if (file.open(QFile::ReadOnly | QFile::Text)) {
         QTextStream stream(&file);

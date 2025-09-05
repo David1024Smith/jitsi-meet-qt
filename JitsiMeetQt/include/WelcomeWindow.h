@@ -217,6 +217,12 @@ public slots:
      * @param serverUrl 服务器URL
      */
     void onServerAvailabilityChecked(bool available, const QString& serverUrl);
+    
+    /**
+     * @brief 删除历史会议记录
+     * @param item 要删除的历史记录项
+     */
+    void onDeleteHistoryItem(QListWidgetItem* item);
 
 signals:
     /**

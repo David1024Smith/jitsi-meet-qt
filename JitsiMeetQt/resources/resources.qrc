@@ -20,8 +20,6 @@
         
         <!-- 样式表资源 -->
         <file>styles/main.qss</file>
-        <file>styles/dark.qss</file>
-        <file>styles/light.qss</file>
         
         <!-- 翻译文件 -->
         <!-- 翻译文件暂时为空，待后续添加 -->

@@ -1300,9 +1300,42 @@ void WelcomeWindow::loadMeetingHistory()
 
         // 创建自定义小部件来显示会议信息（仿照jitsi-meet-electron的ConferenceCard）
         QWidget *itemWidget = new QWidget();
-        QVBoxLayout *itemLayout = new QVBoxLayout(itemWidget);
+        
+        // 创建主容器布局（水平布局，包含内容和删除按钮）
+        QHBoxLayout *mainLayout = new QHBoxLayout(itemWidget);
+        mainLayout->setContentsMargins(0, 0, 0, 0);
+        mainLayout->setSpacing(0);
+        
+        // 创建内容容器（带圆角矩形背景）
+        QWidget *contentWidget = new QWidget();
+        contentWidget->setObjectName("meetingHistoryContent");
+        contentWidget->setStyleSheet("QWidget#meetingHistoryContent { background-color: #1754A9; border: none; border-radius: 8px; padding: 0; margin: 0; }");
+        
+        QVBoxLayout *itemLayout = new QVBoxLayout(contentWidget);
         itemLayout->setContentsMargins(12, 10, 12, 10);
         itemLayout->setSpacing(4);
+        
+        // 创建删除按钮
+        QPushButton *deleteButton = new QPushButton("×");
+        deleteButton->setObjectName("deleteHistoryButton");
+        deleteButton->setFixedSize(24, 24);
+        deleteButton->setToolTip("删除此会议记录");
+        deleteButton->setStyleSheet("QPushButton#deleteHistoryButton { background-color: rgba(255, 255, 255, 0.2); color: white; border: none; border-radius: 12px; font-size: 16px; font-weight: bold; padding: 0; margin: 4px; } QPushButton#deleteHistoryButton:hover { background-color: rgba(255, 255, 255, 0.3); color: #ff4444; } QPushButton#deleteHistoryButton:pressed { background-color: rgba(255, 255, 255, 0.4); }");
+        
+        // 连接删除按钮的点击事件
+        connect(deleteButton, &QPushButton::clicked, [this, deleteButton]() {
+            // 通过删除按钮找到对应的列表项
+            QWidget *itemWidget = deleteButton->parentWidget();
+            if (itemWidget) {
+                for (int i = 0; i < m_historyList->count(); ++i) {
+                    QListWidgetItem *listItem = m_historyList->item(i);
+                    if (listItem && m_historyList->itemWidget(listItem) == itemWidget) {
+                        onDeleteHistoryItem(listItem);
+                        break;
+                    }
+                }
+            }
+        });
 
         // 第一行：会议名称（房间名）
         QLabel *roomLabel = new QLabel(roomName, itemWidget);
@@ -1346,6 +1379,10 @@ void WelcomeWindow::loadMeetingHistory()
         relativeTimeLabel->setProperty("class", "meeting-relative-time");
         itemLayout->addWidget(relativeTimeLabel);
 
+        // 将内容容器和删除按钮添加到主布局
+        mainLayout->addWidget(contentWidget, 1); // 内容占据大部分空间
+        mainLayout->addWidget(deleteButton, 0, Qt::AlignTop | Qt::AlignRight); // 删除按钮右上角对齐
+        
         // 设置小部件样式（使用CSS类名）
         itemWidget->setObjectName("meetingHistoryItem");
         itemWidget->setProperty("class", "meeting-history-item");
@@ -1843,6 +1880,39 @@ QString WelcomeWindow::extractRoomName(const QString &url) const
     }
     
     return roomName.isEmpty() ? url : roomName;
+}
+
+/**
+ * 删除指定的历史会议记录
+ * @param item 要删除的列表项
+ */
+void WelcomeWindow::onDeleteHistoryItem(QListWidgetItem *item)
+{
+    if (!item || !m_configManager) {
+        return;
+    }
+    
+    // 获取会议历史记录
+    QJsonObject recentMeetings = m_configManager->getRecentMeetings();
+    QJsonArray meetings = recentMeetings["meetings"].toArray();
+    
+    // 找到对应的历史记录项并删除
+    int row = m_historyList->row(item);
+    if (row >= 0 && row < meetings.size()) {
+        meetings.removeAt(row);
+        
+        // 重新构建会议历史记录对象
+        QJsonObject updatedMeetings;
+        updatedMeetings["meetings"] = meetings;
+        
+        // 保存更新后的历史记录
+        m_configManager->setValue("recent_meetings", updatedMeetings);
+        
+        // 从列表中移除项目
+        delete m_historyList->takeItem(row);
+        
+        Logger::instance().info("删除历史会议记录，行号: " + QString::number(row));
+    }
 }
 
 /**
