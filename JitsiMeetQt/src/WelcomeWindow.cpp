@@ -92,7 +92,7 @@ WelcomeWindow::WelcomeWindow(QWidget *parent)
     , m_isCheckingServer(false)
 {
     // 添加构造函数开始的调试输出
-    Logger::instance().info("WelcomeWindow构造函数开始");
+    //Logger::instance().info("WelcomeWindow构造函数开始");
     // 获取配置管理器和协议处理器实例
     m_configManager = ConfigurationManager::instance();
     // ProtocolHandler需要MainApplication实例，暂时设为nullptr
@@ -111,45 +111,45 @@ WelcomeWindow::WelcomeWindow(QWidget *parent)
     m_urlValidationTimer->setInterval(URL_VALIDATION_DELAY);
     
     // 写入调试信息
-    Logger::instance().info("initializeUI函数开始执行");
+    //Logger::instance().info("initializeUI函数开始执行");
     
     // 初始化UI
-    Logger::instance().info("开始初始化UI");
+    //Logger::instance().info("开始初始化UI");
     initializeUI();
-    Logger::instance().info("UI初始化完成");
+    //Logger::instance().info("UI初始化完成");
     
-    Logger::instance().info("开始初始化布局");
+    //Logger::instance().info("开始初始化布局");
     initializeLayout();
-    Logger::instance().info("布局初始化完成");
+    //Logger::instance().info("布局初始化完成");
     
-    Logger::instance().info("开始初始化自动完成");
+    //Logger::instance().info("开始初始化自动完成");
     initializeAutoComplete();
-    Logger::instance().info("自动完成初始化完成");
+    //Logger::instance().info("自动完成初始化完成");
     
-    Logger::instance().info("开始初始化连接");
+    //Logger::instance().info("开始初始化连接");
     initializeConnections();
-    Logger::instance().info("连接初始化完成");
+    //Logger::instance().info("连接初始化完成");
     
     // 加载数据
-    Logger::instance().info("开始加载会议历史");
+    //Logger::instance().info("开始加载会议历史");
     loadMeetingHistory();
-    Logger::instance().info("会议历史加载完成");
+    //Logger::instance().info("会议历史加载完成");
     
-    Logger::instance().info("开始加载服务器列表");
+    //Logger::instance().info("开始加载服务器列表");
     loadServerList();
-    Logger::instance().info("服务器列表加载完成");
+    //Logger::instance().info("服务器列表加载完成");
     
     // 恢复窗口状态
-    Logger::instance().info("开始恢复窗口状态");
+    //Logger::instance().info("开始恢复窗口状态");
     restoreWindowState();
-    Logger::instance().info("窗口状态恢复完成");
+    //Logger::instance().info("窗口状态恢复完成");
     
     // 更新UI状态
-    Logger::instance().info("开始更新UI状态");
+    //Logger::instance().info("开始更新UI状态");
     updateUIState();
-    Logger::instance().info("UI状态更新完成");
+    //Logger::instance().info("UI状态更新完成");
     
-    Logger::instance().info("WelcomeWindow构造函数完成");
+    //Logger::instance().info("WelcomeWindow构造函数完成");
 }
 
 /**
@@ -546,14 +546,14 @@ void WelcomeWindow::onUrlValidationTimeout()
  */
 void WelcomeWindow::initializeUI()
 {
-    Logger::instance().info("WelcomeWindow构造函数开始");
+    //Logger::instance().info("WelcomeWindow构造函数开始");
     
     // 设置窗口属性
     setWindowTitle(tr("Jitsi Meet Qt"));
     setWindowIcon(QIcon(":/icons/app.svg"));
     setMinimumSize(QSize(800, 600));
     
-    Logger::instance().info("窗口属性设置完成");
+    //Logger::instance().info("窗口属性设置完成");
     
     // 创建中央窗口部件
     m_centralWidget = new QWidget();
@@ -562,7 +562,7 @@ void WelcomeWindow::initializeUI()
     // 设置窗口背景为蓝色
     m_centralWidget->setStyleSheet("background-color: #0056E0;");
     
-    Logger::instance().info("中央窗口部件创建完成");
+    //Logger::instance().info("中央窗口部件创建完成");
     
     // 创建左侧菜单栏
     m_sidebarPanel = new QWidget();
@@ -579,23 +579,23 @@ void WelcomeWindow::initializeUI()
     m_sidebarLayout->setSpacing(15);
     m_sidebarLayout->setAlignment(Qt::AlignHCenter);
     
-    Logger::instance().info("左侧菜单栏创建完成，准备创建Logo");
+    //Logger::instance().info("左侧菜单栏创建完成，准备创建Logo");
     
     // 创建Logo标签
-    Logger::instance().info("准备创建Logo标签");
+    //Logger::instance().info("准备创建Logo标签");
     
     m_logoLabel = new QLabel();
-    Logger::instance().info("Logo标签创建成功");
+    //Logger::instance().info("Logo标签创建成功");
     
     m_logoLabel->setFixedSize(40, 40);
     m_logoLabel->setAlignment(Qt::AlignCenter);
     
-    Logger::instance().info("Logo标签属性设置完成");
+    //Logger::instance().info("Logo标签属性设置完成");
     
     // 优先使用SVG格式的logo
     qDebug() << "开始加载Logo图片";
     // 添加文件调试输出
-    Logger::instance().info("开始加载Logo图片");
+    //Logger::instance().info("开始加载Logo图片");
     
     QPixmap logoPixmap;
     // 使用QSvgRenderer正确加载SVG文件
@@ -614,22 +614,22 @@ void WelcomeWindow::initializeUI()
             painter.end();
             
             qDebug() << "SVG Logo加载成功，尺寸:" << logoPixmap.size();
-            Logger::instance().info(QString("SVG Logo加载成功，尺寸: %1x%2").arg(logoPixmap.width()).arg(logoPixmap.height()));
+            //Logger::instance().info(QString("SVG Logo加载成功，尺寸: %1x%2").arg(logoPixmap.width()).arg(logoPixmap.height()));
         } else {
             qDebug() << "SVG渲染器无效";
-            Logger::instance().warning("SVG渲染器无效");
+            //Logger::instance().warning("SVG渲染器无效");
         }
     } else {
         qDebug() << "无法打开SVG文件，错误:" << svgFile.errorString();
-        Logger::instance().warning(QString("无法打开SVG文件，错误: %1").arg(svgFile.errorString()));
+        //Logger::instance().warning(QString("无法打开SVG文件，错误: %1").arg(svgFile.errorString()));
     }
     if (!logoPixmap.isNull()) {
         m_logoLabel->setPixmap(logoPixmap.scaled(32, 32, Qt::KeepAspectRatio, Qt::SmoothTransformation));
         qDebug() << "Logo设置到标签完成";
-        Logger::instance().info("Logo设置到标签完成");
+        //Logger::instance().info("Logo设置到标签完成");
     } else {
         qDebug() << "Logo加载完全失败，无法设置到标签";
-        Logger::instance().error("Logo加载完全失败，无法设置到标签");
+        //Logger::instance().error("Logo加载完全失败，无法设置到标签");
     }
     m_logoLabel->setStyleSheet("QLabel { "
                               "background: transparent; "
@@ -668,12 +668,12 @@ void WelcomeWindow::initializeUI()
             qDebug() << "设置按钮SVG图标加载成功";
         } else {
             qDebug() << "设置按钮SVG渲染器无效";
-            Logger::instance().warning("设置按钮SVG渲染器无效");
+            //Logger::instance().warning("设置按钮SVG渲染器无效");
             settingsIcon = QIcon(":/icons/settings.svg");
         }
     } else {
         qDebug() << "无法打开设置按钮SVG文件";
-        Logger::instance().warning("无法打开设置按钮SVG文件");
+        //Logger::instance().warning("无法打开设置按钮SVG文件");
         settingsIcon = QIcon(":/icons/settings.svg");
     }
     
@@ -892,15 +892,15 @@ void WelcomeWindow::initializeUI()
     // 创建显示名称控件（即使在简化UI中也需要创建以避免空指针）
     m_displayNameLabel = new QLabel(tr("显示名称:"), this);
     
-    Logger::instance().info("开始创建m_displayNameEdit");
+    //Logger::instance().info("开始创建m_displayNameEdit");
     
     m_displayNameEdit = new QLineEdit(this);
     
-    Logger::instance().info(QString("m_displayNameEdit创建完成，指针地址: %1").arg(QString::number(reinterpret_cast<quintptr>(m_displayNameEdit), 16)));
+    //Logger::instance().info(QString("m_displayNameEdit创建完成，指针地址: %1").arg(QString::number(reinterpret_cast<quintptr>(m_displayNameEdit), 16)));
     
     m_displayNameEdit->setPlaceholderText(tr("输入您的显示名称"));
     
-    Logger::instance().info("m_displayNameEdit占位符文本设置完成");
+    //Logger::instance().info("m_displayNameEdit占位符文本设置完成");
     
     // 隐藏显示名称控件（在简化UI中不显示）
     m_displayNameLabel->setVisible(false);
@@ -1049,61 +1049,61 @@ void WelcomeWindow::initializeConnections()
  */
 void WelcomeWindow::initializeAutoComplete()
 {
-    Logger::instance().info("开始创建URL模型");
+    //Logger::instance().info("开始创建URL模型");
     
     // URL自动完成
     m_urlModel = new QStringListModel(this);
     
-    Logger::instance().info("URL模型创建完成，开始创建URL完成器");
+    //Logger::instance().info("URL模型创建完成，开始创建URL完成器");
     
     m_urlCompleter = new QCompleter(m_urlModel, this);
     
-    Logger::instance().info("URL完成器创建完成，设置大小写敏感性");
+    //Logger::instance().info("URL完成器创建完成，设置大小写敏感性");
     
     m_urlCompleter->setCaseSensitivity(Qt::CaseInsensitive);
     
-    Logger::instance().info("开始设置URL编辑器的完成器");
+    //Logger::instance().info("开始设置URL编辑器的完成器");
     
     m_urlEdit->setCompleter(m_urlCompleter);
     
-    Logger::instance().info("URL完成器设置完成，开始创建名称模型");
+    //Logger::instance().info("URL完成器设置完成，开始创建名称模型");
     
     // 显示名称自动完成
     m_nameModel = new QStringListModel(this);
     
-    Logger::instance().info("名称模型创建完成，开始创建名称完成器");
+    //Logger::instance().info("名称模型创建完成，开始创建名称完成器");
     
     m_nameCompleter = new QCompleter(m_nameModel, this);
     
-    Logger::instance().info("名称完成器创建完成，设置大小写敏感性");
+    //Logger::instance().info("名称完成器创建完成，设置大小写敏感性");
     
     m_nameCompleter->setCaseSensitivity(Qt::CaseInsensitive);
     
-    Logger::instance().info("开始设置显示名称编辑器的完成器");
+    //Logger::instance().info("开始设置显示名称编辑器的完成器");
     
     // 检查指针是否有效
     if (m_displayNameEdit == nullptr) {
-        Logger::instance().error("错误：m_displayNameEdit为空指针");
+        //Logger::instance().error("错误：m_displayNameEdit为空指针");
         return;
     }
     
     if (m_nameCompleter == nullptr) {
-        Logger::instance().error("错误：m_nameCompleter为空指针");
+        //Logger::instance().error("错误：m_nameCompleter为空指针");
         return;
     }
     
-    Logger::instance().info("指针检查通过，开始调用setCompleter");
+    //Logger::instance().info("指针检查通过，开始调用setCompleter");
     
     try {
         m_displayNameEdit->setCompleter(m_nameCompleter);
         
-        Logger::instance().info("setCompleter调用成功");
+        //Logger::instance().info("setCompleter调用成功");
     } catch (...) {
-        Logger::instance().error("setCompleter调用时发生异常");
+        //Logger::instance().error("setCompleter调用时发生异常");
         return;
     }
     
-    Logger::instance().info("自动完成初始化全部完成");
+    //Logger::instance().info("自动完成初始化全部完成");
 }
 
 /**
