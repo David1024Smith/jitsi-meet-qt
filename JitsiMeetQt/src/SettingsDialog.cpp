@@ -113,7 +113,7 @@ SettingsDialog::SettingsDialog(QWidget *parent)
     
     // 设置窗口属性
     setWindowTitle(tr("设置"));
-    setWindowIcon(QIcon(":/icons/settings.png"));
+    setWindowIcon(QIcon(":/icons/settings.svg"));
     setModal(true);
     resize(600, 500);
     

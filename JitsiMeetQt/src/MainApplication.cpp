@@ -42,7 +42,7 @@ MainApplication::MainApplication(int &argc, char **argv)
     setOrganizationDomain("jitsi.org");
     
     // 设置应用程序图标
-    setWindowIcon(QIcon(":/icons/app.png"));
+    setWindowIcon(QIcon(":/icons/app.svg"));
     
     qDebug() << "MainApplication 构造函数完成";
 }
@@ -373,7 +373,7 @@ void MainApplication::initializeSystemTray()
     qDebug() << "初始化系统托盘";
     
     m_trayIcon = new QSystemTrayIcon(this);
-    m_trayIcon->setIcon(QIcon(":/icons/app.png"));
+    m_trayIcon->setIcon(QIcon(":/icons/app.svg"));
     m_trayIcon->setToolTip(tr("Jitsi Meet Qt"));
     
     createTrayMenu();

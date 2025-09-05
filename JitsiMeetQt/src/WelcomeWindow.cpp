@@ -616,23 +616,12 @@ void WelcomeWindow::initializeUI()
             qDebug() << "SVG Logo加载成功，尺寸:" << logoPixmap.size();
             Logger::instance().info(QString("SVG Logo加载成功，尺寸: %1x%2").arg(logoPixmap.width()).arg(logoPixmap.height()));
         } else {
-            qDebug() << "SVG渲染器无效，尝试加载PNG";
-            Logger::instance().warning("SVG渲染器无效，尝试加载PNG");
-            // SVG渲染失败，尝试PNG
-            logoPixmap = QPixmap(":/images/logo.png");
+            qDebug() << "SVG渲染器无效";
+            Logger::instance().warning("SVG渲染器无效");
         }
     } else {
         qDebug() << "无法打开SVG文件，错误:" << svgFile.errorString();
         Logger::instance().warning(QString("无法打开SVG文件，错误: %1").arg(svgFile.errorString()));
-        // SVG加载失败，尝试PNG
-        logoPixmap = QPixmap(":/images/logo.png");
-        if (logoPixmap.isNull()) {
-            qDebug() << "PNG Logo也加载失败";
-            Logger::instance().warning("PNG Logo也加载失败");
-        } else {
-            qDebug() << "PNG Logo加载成功，尺寸:" << logoPixmap.size();
-            Logger::instance().info(QString("PNG Logo加载成功，尺寸: %1x%2").arg(logoPixmap.width()).arg(logoPixmap.height()));
-        }
     }
     if (!logoPixmap.isNull()) {
         m_logoLabel->setPixmap(logoPixmap.scaled(32, 32, Qt::KeepAspectRatio, Qt::SmoothTransformation));
@@ -678,12 +667,14 @@ void WelcomeWindow::initializeUI()
             settingsIcon = QIcon(settingsPixmap);
             qDebug() << "设置按钮SVG图标加载成功";
         } else {
-            qDebug() << "设置按钮SVG渲染器无效，尝试加载PNG";
-            settingsIcon = QIcon(":/icons/settings.png");
+            qDebug() << "设置按钮SVG渲染器无效";
+            Logger::instance().warning("设置按钮SVG渲染器无效");
+            settingsIcon = QIcon(":/icons/settings.svg");
         }
     } else {
-        qDebug() << "无法打开设置按钮SVG文件，尝试加载PNG";
-        settingsIcon = QIcon(":/icons/settings.png");
+        qDebug() << "无法打开设置按钮SVG文件";
+        Logger::instance().warning("无法打开设置按钮SVG文件");
+        settingsIcon = QIcon(":/icons/settings.svg");
     }
     
     if (!settingsIcon.isNull()) {
