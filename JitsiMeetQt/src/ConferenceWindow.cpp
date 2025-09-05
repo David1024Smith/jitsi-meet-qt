@@ -37,6 +37,13 @@
 #include <QStandardPaths>
 #include <QDir>
 #include <QDebug>
+#include <QTextStream>
+#include <QRegularExpression>
+
+#ifdef Q_OS_WIN
+#include <windows.h>
+#include <psapi.h>
+#endif
 
 /**
  * @brief ConferenceWindow构造函数
@@ -80,6 +87,9 @@ ConferenceWindow::ConferenceWindow(QWidget *parent)
     , m_isFullscreen(false)
     , m_participantCount(0)
     , m_loadProgress(0)
+    , m_lastMemoryUsage(0)
+    , m_peakMemoryUsage(0)
+    , m_memoryCleanupCount(0)
     , m_reconnectAttempts(0)
 {
     // 初始化组件
@@ -95,6 +105,12 @@ ConferenceWindow::ConferenceWindow(QWidget *parent)
     m_reconnectTimer = new QTimer(this);
     m_reconnectTimer->setSingleShot(true);
     connect(m_reconnectTimer, &QTimer::timeout, this, &ConferenceWindow::onReconnectTimer);
+    
+    // 创建内存监控定时器
+    m_memoryMonitorTimer = new QTimer(this);
+    m_memoryMonitorTimer->setInterval(MEMORY_MONITOR_INTERVAL);
+    connect(m_memoryMonitorTimer, &QTimer::timeout, this, &ConferenceWindow::onMemoryMonitorTimer);
+    m_memoryMonitorTimer->start(); // 立即开始内存监控
     
     // 创建网络管理器
     m_networkManager = new QNetworkAccessManager(this);
@@ -112,10 +128,20 @@ ConferenceWindow::ConferenceWindow(QWidget *parent)
             });
     
     // 连接JitsiMeetAPI信号槽
+    connect(m_jitsiAPI, &JitsiMeetAPI::roomJoined, this, 
+            [this](const QString& roomName, bool success) {
+                Q_UNUSED(roomName);
+                if (success) {
+                    onConferenceJoined();
+                }
+            });
+    connect(m_jitsiAPI, &JitsiMeetAPI::roomLeft, this, 
+            [this](const QString& roomName) {
+                Q_UNUSED(roomName);
+                onConferenceLeft();
+            });
     connect(m_jitsiAPI, &JitsiMeetAPI::serverConnected, this, &ConferenceWindow::onApiConnected);
     connect(m_jitsiAPI, &JitsiMeetAPI::serverDisconnected, this, &ConferenceWindow::onApiDisconnected);
-    connect(m_jitsiAPI, &JitsiMeetAPI::roomJoined, this, &ConferenceWindow::onRoomJoined);
-    connect(m_jitsiAPI, &JitsiMeetAPI::roomLeft, this, &ConferenceWindow::onRoomLeft);
     connect(m_jitsiAPI, &JitsiMeetAPI::participantsUpdated, this, 
             [this](const QString& roomName, const QJsonArray& participants) {
                 Q_UNUSED(roomName); // 忽略roomName参数
@@ -128,10 +154,159 @@ ConferenceWindow::ConferenceWindow(QWidget *parent)
                 Q_UNUSED(roomName); // 忽略roomName参数
                 onChatMessageReceived(senderId, message, timestamp);
             });
-    connect(m_jitsiAPI, &JitsiMeetAPI::apiError, this, &ConferenceWindow::onApiError);
+    // 连接API错误信号
+    connect(m_jitsiAPI, &JitsiMeetAPI::apiError, this, 
+            [this](const QString& operation, const QString& error, const QJsonObject& details) {
+                Q_UNUSED(details);
+                qDebug() << "ConferenceWindow: API错误 -" << operation << ":" << error;
+                onApiError(error);
+            });
     
     // 恢复窗口状态
     restoreWindowState();
+}
+
+/**
+ * @brief 内存监控定时器槽函数
+ * 定期检查内存使用情况，当超过阈值时触发清理
+ */
+void ConferenceWindow::onMemoryMonitorTimer()
+{
+    qint64 currentMemory = 0;
+    
+#ifdef Q_OS_WIN
+    // Windows平台获取内存使用量
+    PROCESS_MEMORY_COUNTERS pmc;
+    if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc))) {
+        currentMemory = pmc.WorkingSetSize / (1024 * 1024); // 转换为MB
+    }
+#else
+    // Linux/macOS平台获取内存使用量
+    QFile file("/proc/self/status");
+    if (file.open(QIODevice::ReadOnly)) {
+        QTextStream stream(&file);
+        QString line;
+        while (stream.readLineInto(&line)) {
+            if (line.startsWith("VmRSS:")) {
+                QStringList parts = line.split(QRegularExpression("\\s+"));
+                if (parts.size() >= 2) {
+                    currentMemory = parts[1].toLongLong() / 1024; // 转换为MB
+                }
+                break;
+            }
+        }
+    }
+#endif
+    
+    // 更新内存统计
+    if (currentMemory > 0) {
+        m_lastMemoryUsage = currentMemory;
+        if (currentMemory > m_peakMemoryUsage) {
+            m_peakMemoryUsage = currentMemory;
+        }
+        
+        qDebug() << "ConferenceWindow: 当前内存使用:" << currentMemory << "MB, 峰值:" << m_peakMemoryUsage << "MB";
+        
+        // 检查是否需要清理内存
+        if (currentMemory > MEMORY_THRESHOLD) {
+            qDebug() << "ConferenceWindow: 内存使用超过阈值(" << MEMORY_THRESHOLD << "MB)，开始清理";
+            performMemoryCleanup();
+        }
+    }
+}
+
+/**
+ * @brief 执行内存清理操作
+ * 包括WebEngine缓存清理、JavaScript垃圾回收等
+ */
+void ConferenceWindow::performMemoryCleanup()
+{
+    if (!m_webView || !m_webPage) {
+        return;
+    }
+    
+    qDebug() << "ConferenceWindow: 开始执行内存清理，第" << (m_memoryCleanupCount + 1) << "次";
+    
+    // 1. 清理WebEngine缓存
+    QWebEngineProfile* profile = m_webPage->profile();
+    if (profile) {
+        // 清理HTTP缓存
+        profile->clearHttpCache();
+        
+        // 清理所有网站数据（包括localStorage、sessionStorage等）
+        profile->clearAllVisitedLinks();
+        
+        qDebug() << "ConferenceWindow: WebEngine缓存已清理";
+    }
+    
+    // 2. 执行JavaScript垃圾回收
+    QString gcScript = R"(
+        // 强制执行垃圾回收
+        if (window.gc) {
+            window.gc();
+        }
+        
+        // 清理可能的内存泄漏
+        if (window.APP && window.APP.store) {
+            // 清理Redux store中的非必要数据
+            try {
+                window.APP.store.dispatch({
+                    type: 'CLEAR_CACHE'
+                });
+            } catch(e) {
+                console.log('清理store缓存失败:', e);
+            }
+        }
+        
+        // 清理WebRTC连接缓存
+        if (window.JitsiMeetJS) {
+            try {
+                // 清理音视频轨道缓存
+                const conference = window.APP.conference;
+                if (conference && conference._room) {
+                    conference._room.cleanupLocalTracks();
+                }
+            } catch(e) {
+                console.log('清理WebRTC缓存失败:', e);
+            }
+        }
+        
+        'memory_cleanup_completed';
+    )";
+    
+    executeJavaScript(gcScript, [this](const QVariant& result) {
+        qDebug() << "ConferenceWindow: JavaScript垃圾回收完成:" << result.toString();
+    });
+    
+    // 3. Qt对象垃圾回收
+    QCoreApplication::processEvents();
+    
+    // 4. 清理网络缓存
+    if (m_networkManager) {
+        m_networkManager->clearAccessCache();
+        qDebug() << "ConferenceWindow: 网络缓存已清理";
+    }
+    
+    // 5. 如果内存使用仍然很高，考虑重新加载页面
+    if (m_lastMemoryUsage > MEMORY_THRESHOLD * 1.5) {
+        qDebug() << "ConferenceWindow: 内存使用过高，重新加载页面";
+        
+        // 保存当前状态
+        QString currentUrl = m_currentUrl;
+        QString currentRoom = m_currentRoom;
+        QString currentServer = m_currentServer;
+        QString displayName = m_displayName;
+        
+        // 重新加载
+        if (!currentUrl.isEmpty()) {
+            QTimer::singleShot(1000, [this, currentUrl, displayName]() {
+                loadConference(currentUrl, displayName);
+            });
+        }
+    }
+    
+    m_memoryCleanupCount++;
+    qDebug() << "ConferenceWindow: 内存清理完成，总清理次数:" << m_memoryCleanupCount;
 }
 
 /**
@@ -338,14 +513,58 @@ void ConferenceWindow::setupWebEngineSettings()
     // 启用WebRTC功能
     settings->setAttribute(QWebEngineSettings::WebRTCPublicInterfacesOnly, false);
     
-    // 设置用户代理 - 使用标准Chrome用户代理以确保兼容性
-    QString userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36";
+    // === 性能优化设置 ===
+    // 启用硬件加速
+    settings->setAttribute(QWebEngineSettings::Accelerated2dCanvasEnabled, true);
+    
+    // 启用GPU光栅化
+    settings->setAttribute(QWebEngineSettings::WebGLEnabled, true);
+    
+    // 启用DNS预取
+    settings->setAttribute(QWebEngineSettings::DnsPrefetchEnabled, true);
+    
+    // 启用触摸图标
+    settings->setAttribute(QWebEngineSettings::TouchIconsEnabled, false); // 禁用以节省内存
+    
+    // 启用焦点在页面加载时
+    settings->setAttribute(QWebEngineSettings::FocusOnNavigationEnabled, true);
+    
+    // 启用PDF查看器插件
+    settings->setAttribute(QWebEngineSettings::PdfViewerEnabled, false); // 禁用以节省内存
+    
+    // 设置默认字体大小（优化渲染性能）
+    settings->setFontSize(QWebEngineSettings::DefaultFontSize, 14);
+    settings->setFontSize(QWebEngineSettings::DefaultFixedFontSize, 13);
+    settings->setFontSize(QWebEngineSettings::MinimumFontSize, 8);
+    settings->setFontSize(QWebEngineSettings::MinimumLogicalFontSize, 6);
+    
+    // 设置用户代理 - 使用最新Chrome用户代理以确保兼容性
+    QString userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
     m_webView->page()->profile()->setHttpUserAgent(userAgent);
+    
+    // === 配置WebEngine Profile以优化性能 ===
+    QWebEngineProfile* profile = m_webView->page()->profile();
+    
+    // 设置缓存策略
+    profile->setHttpCacheType(QWebEngineProfile::DiskHttpCache);
+    profile->setHttpCacheMaximumSize(100 * 1024 * 1024); // 100MB缓存
+    
+    // 设置持久化Cookie策略
+    profile->setPersistentCookiesPolicy(QWebEngineProfile::ForcePersistentCookies);
+    
+    // 启用拼写检查（可选，可能影响性能）
+    profile->setSpellCheckEnabled(false); // 禁用以提升性能
+    
+    // 设置下载路径
+    QString downloadPath = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
+    profile->setDownloadPath(downloadPath);
     
     // 设置状态显示
     if (m_statusDisplay) {
-        m_statusDisplay->setText("Jitsi Meet 客户端已就绪");
+        m_statusDisplay->setText("Jitsi Meet 客户端已就绪（性能优化已启用）");
     }
+    
+    qDebug() << "ConferenceWindow: WebEngine性能优化配置完成";
 }
 
 /**

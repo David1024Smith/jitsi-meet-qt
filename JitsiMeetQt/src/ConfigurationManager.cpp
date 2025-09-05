@@ -135,6 +135,11 @@ void ConfigurationManager::initializeDefaults()
         m_settings->setValue(KEY_DEFAULT_VIDEO_DISABLED, false);
     }
     
+    // 设置默认显示名称
+    if (!m_settings->contains(KEY_DEFAULT_DISPLAY_NAME)) {
+        m_settings->setValue(KEY_DEFAULT_DISPLAY_NAME, tr("用户"));
+    }
+    
     m_settings->sync();
 }
 

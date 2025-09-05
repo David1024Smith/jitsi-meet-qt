@@ -1407,6 +1407,10 @@ void WelcomeWindow::restoreWindowState()
  * @brief 验证输入
  * @return 输入是否有效
  */
+/**
+ * @brief 验证输入，如果显示名称为空则自动使用默认显示名称
+ * @return 验证是否通过
+ */
 bool WelcomeWindow::validateInput()
 {
     QString url = getMeetingUrl();
@@ -1419,11 +1423,33 @@ bool WelcomeWindow::validateInput()
         return false;
     }
 
+    // 如果显示名称为空，尝试使用默认显示名称
     if (displayName.isEmpty())
     {
-        QMessageBox::warning(this, tr("输入错误"), tr("请输入显示名称"));
-        m_displayNameEdit->setFocus();
-        return false;
+        if (m_configManager)
+        {
+            QString defaultName = m_configManager->getDefaultDisplayName();
+            if (!defaultName.isEmpty())
+            {
+                // 使用默认显示名称
+                setDisplayName(defaultName);
+                displayName = defaultName;
+            }
+            else
+            {
+                // 如果没有默认显示名称，使用"用户"作为默认值
+                QString fallbackName = tr("用户");
+                setDisplayName(fallbackName);
+                displayName = fallbackName;
+            }
+        }
+        else
+        {
+            // 如果配置管理器不可用，使用"用户"作为默认值
+            QString fallbackName = tr("用户");
+            setDisplayName(fallbackName);
+            displayName = fallbackName;
+        }
     }
 
     return true;

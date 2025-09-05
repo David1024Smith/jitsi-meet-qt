@@ -130,6 +130,28 @@ int main(int argc, char *argv[])
     // 立即写入文件以确认程序启动 - 使用绝对路径
     // Logger::instance().info("程序启动 - main函数开始执行");
 
+    // 设置硬件加速和GPU渲染优化的命令行参数
+    // 这些参数必须在QApplication创建之前设置
+    QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling, true);
+    QCoreApplication::setAttribute(Qt::AA_UseHighDpiPixmaps, true);
+    QCoreApplication::setAttribute(Qt::AA_ShareOpenGLContexts, true);
+    
+    // 设置WebEngine的硬件加速参数
+    qputenv("QTWEBENGINE_CHROMIUM_FLAGS", 
+            "--enable-gpu-rasterization "
+            "--enable-zero-copy "
+            "--enable-gpu-memory-buffer-compositor-resources "
+            "--enable-gpu-memory-buffer-video-frames "
+            "--enable-native-gpu-memory-buffers "
+            "--enable-oop-rasterization "
+            "--enable-hardware-overlays "
+            "--enable-features=VaapiVideoDecoder,VaapiVideoEncoder "
+            "--disable-software-rasterizer "
+            "--disable-background-timer-throttling "
+            "--disable-renderer-backgrounding "
+            "--disable-backgrounding-occluded-windows "
+            "--max_old_space_size=4096");
+    
     // 创建应用程序实例
     MainApplication app(argc, argv);
 

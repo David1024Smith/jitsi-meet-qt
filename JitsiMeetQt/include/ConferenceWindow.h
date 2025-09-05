@@ -452,11 +452,20 @@ private slots:
     void onNetworkDiagnosticsCompleted(bool success, const QString& summary);
     
     /**
-     * @brief 网络诊断错误槽函数
+     * @brief 处理网络诊断错误槽函数
      * @param error 错误信息
      */
     void onNetworkDiagnosticsError(const QString& error);
     
+    /**
+     * @brief 内存监控定时器槽函数
+     */
+    void onMemoryMonitorTimer();
+    
+    /**
+     * @brief 执行内存清理
+     */
+    void performMemoryCleanup();
     
     void onPermissionRequested(QWebEnginePermission permission);
     
@@ -589,6 +598,7 @@ private:
     // 定时器
     QTimer* m_connectionTimer;          ///< 连接超时定时器
     QTimer* m_reconnectTimer;           ///< 重连定时器
+    QTimer* m_memoryMonitorTimer;       ///< 内存监控定时器
     
     // 网络管理
     QNetworkAccessManager* m_networkManager; ///< 网络访问管理器
@@ -612,6 +622,13 @@ private:
     bool m_isFullscreen;                ///< 是否全屏
     int m_participantCount;             ///< 参与者数量
     int m_loadProgress;                 ///< 加载进度
+    
+    // 内存监控相关
+    qint64 m_lastMemoryUsage;           ///< 上次内存使用量（字节）
+    qint64 m_peakMemoryUsage;           ///< 峰值内存使用量（字节）
+    int m_memoryCleanupCount;           ///< 内存清理次数
+    static const qint64 MEMORY_THRESHOLD = 512 * 1024 * 1024; ///< 内存阈值（512MB）
+    static const int MEMORY_MONITOR_INTERVAL = 10000; ///< 内存监控间隔（毫秒）
     
     // 重连相关
     int m_reconnectAttempts;            ///< 重连尝试次数
