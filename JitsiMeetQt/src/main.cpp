@@ -16,10 +16,10 @@
  */
 void setupLogging()
 {
-#ifdef _DEBUG
+#ifdef DEBUG_MODE
     // Debug版本：启用文件日志和控制台输出
-    // Logger::instance().initialize(true, "jitsi_meet_qt_debug.log");
-    // Logger::instance().setMinLogLevel(//Logger::Debug);
+    Logger::instance().initialize(true, "jitsi_meet_qt_debug.log");
+    Logger::instance().setMinLogLevel(Logger::Debug);
 
     // 保持Qt原生日志格式用于兼容性
     qSetMessagePattern("[%{time yyyy-MM-dd hh:mm:ss.zzz}] [%{type}] %{message}");
@@ -128,7 +128,7 @@ bool handleCommandLineArguments(MainApplication *app)
 int main(int argc, char *argv[])
 {
     // 立即写入文件以确认程序启动 - 使用绝对路径
-    // Logger::instance().info("程序启动 - main函数开始执行");
+    Logger::instance().info("程序启动 - main函数开始执行");
 
     // 设置硬件加速和GPU渲染优化的命令行参数
     // 这些参数必须在QApplication创建之前设置
@@ -159,24 +159,24 @@ int main(int argc, char *argv[])
     app.setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
 
     // 再次写入文件确认应用程序实例创建成功
-    // Logger::instance().info("MainApplication实例创建成功");
+    Logger::instance().info("MainApplication实例创建成功");
 
     // 设置日志
     setupLogging();
 
     // 添加文件调试输出
-    // Logger::instance().info("日志设置完成");
+    Logger::instance().info("日志设置完成");
 
     qDebug() << "程序启动，开始执行main函数...";
     qDebug() << "应用程序实例创建成功，日志设置完成";
 
     // 添加文件调试输出
-    // Logger::instance().info("qDebug输出完成");
+    Logger::instance().info("qDebug输出完成");
 
     try
     {
         // 检查单实例
-        // Logger::instance().info("进入try块");
+        Logger::instance().info("进入try块");
 
         if (checkSingleInstance())
         {

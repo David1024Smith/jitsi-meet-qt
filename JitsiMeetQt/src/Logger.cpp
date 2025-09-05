@@ -19,7 +19,7 @@ void Logger::initialize(bool enableFileLogging, const QString& logFileName)
 {
     QMutexLocker locker(&m_mutex);
     
-#ifdef DEBUG
+#ifdef DEBUG_MODE
     // Debug版本启用日志记录
     m_loggingEnabled = true;
     m_fileLoggingEnabled = enableFileLogging;
@@ -60,10 +60,10 @@ void Logger::initialize(bool enableFileLogging, const QString& logFileName)
         }
     }
     
-    // 输出初始化信息
-    info(QString("日志系统初始化完成 - 文件日志: %1, 日志文件: %2")
-         .arg(m_fileLoggingEnabled ? "启用" : "禁用")
-         .arg(m_fileLoggingEnabled ? m_logFileName : "无"), "Logger");
+    // 输出初始化信息到控制台（避免递归调用）
+    std::cout << "[Logger] 日志系统初始化完成 - 文件日志: " 
+              << (m_fileLoggingEnabled ? "启用" : "禁用") << ", 日志文件: "
+              << (m_fileLoggingEnabled ? m_logFileName.toStdString() : "无") << std::endl;
 }
 
 void Logger::setMinLogLevel(LogLevel level)
@@ -119,7 +119,7 @@ void Logger::shutdown()
 void Logger::log(LogLevel level, const QString& message, const QString& category)
 {
     // Release版本直接返回，不输出任何日志
-#ifndef _DEBUG
+#ifndef DEBUG_MODE
     Q_UNUSED(level)
     Q_UNUSED(message)
     Q_UNUSED(category)

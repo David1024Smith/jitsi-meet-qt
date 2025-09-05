@@ -20,7 +20,7 @@ endif()
 set(CMAKE_PREFIX_PATH "C:/Qt/6.8.3/msvc2022_64")
 
 # 查找Qt6组件
-find_package(Qt6 6.8.3 REQUIRED COMPONENTS Core Widgets WebEngineWidgets Network WebChannel WebSockets Svg SvgWidgets)
+find_package(Qt6 6.8.3 REQUIRED COMPONENTS Core Widgets WebEngineWidgets Network WebChannel WebSockets Svg SvgWidgets Sql)
 
 # 启用Qt的MOC、UIC和RCC
 set(CMAKE_AUTOMOC ON)
@@ -38,6 +38,7 @@ set(SOURCES
     src/WelcomeWindow.cpp
     src/SettingsDialog.cpp
     src/ConfigurationManager.cpp
+    src/DatabaseManager.cpp
     src/ProtocolHandler.cpp
     src/JitsiMeetAPI.cpp
     src/NetworkDiagnostics.cpp
@@ -51,6 +52,7 @@ set(HEADERS
     include/WelcomeWindow.h
     include/SettingsDialog.h
     include/ConfigurationManager.h
+    include/DatabaseManager.h
     include/ProtocolHandler.h
     include/JitsiMeetAPI.h
     include/NetworkDiagnostics.h
@@ -75,6 +77,7 @@ target_link_libraries(JitsiMeetQt
     Qt6::WebSockets
     Qt6::Svg
     Qt6::SvgWidgets
+    Qt6::Sql
 )
 
 # Windows特定设置
@@ -140,6 +143,7 @@ if(WIN32)
         Qt6PrintSupportd.dll
         Qt6Svgd.dll
         Qt6SvgWidgetsd.dll
+        Qt6Sqld.dll
     )
     
     set(QT6_RELEASE_DLLS
@@ -162,6 +166,7 @@ if(WIN32)
         Qt6PrintSupport.dll
         Qt6Svg.dll
         Qt6SvgWidgets.dll
+        Qt6Sql.dll
     )
     
     # 添加自定义目标来复制Qt DLL文件

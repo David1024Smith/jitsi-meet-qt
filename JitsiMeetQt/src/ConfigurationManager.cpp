@@ -1,4 +1,5 @@
 #include "ConfigurationManager.h"
+#include "DatabaseManager.h"
 #include <QApplication>
 #include <QStandardPaths>
 #include <QDir>
@@ -58,7 +59,7 @@ ConfigurationManager* ConfigurationManager::instance()
  * @brief 私有构造函数
  */
 ConfigurationManager::ConfigurationManager(QObject *parent)
-    : QObject(parent)
+    : QObject(parent), m_databaseManager(nullptr)
 {
     // 设置配置文件路径
     QString configPath = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
@@ -71,6 +72,23 @@ ConfigurationManager::ConfigurationManager(QObject *parent)
     m_settings = std::make_unique<QSettings>(settingsFile, QSettings::IniFormat);
     
     qDebug() << "配置文件路径:" << settingsFile;
+    
+    // 初始化数据库管理器
+    qDebug() << "开始初始化数据库管理器...";
+    m_databaseManager = DatabaseManager::instance();
+    qDebug() << "数据库管理器实例获取成功";
+    
+    // 初始化数据库
+    if (m_databaseManager) {
+        qDebug() << "开始初始化数据库...";
+        if (!m_databaseManager->initialize()) {
+            qCritical() << "数据库初始化失败，这可能导致应用程序不稳定";
+        } else {
+            qDebug() << "数据库初始化成功";
+        }
+    } else {
+        qCritical() << "无法获取数据库管理器实例";
+    }
     
     // 初始化默认配置
     initializeDefaults();
@@ -87,6 +105,8 @@ ConfigurationManager::~ConfigurationManager()
     if (m_settings) {
         m_settings->sync();
     }
+    // DatabaseManager是单例，不需要手动删除
+    m_databaseManager = nullptr;
 }
 
 /**
@@ -367,23 +387,16 @@ void ConfigurationManager::setCurrentLanguage(const QString& language)
  */
 QJsonObject ConfigurationManager::getRecentMeetings(int maxCount) const
 {
-    QJsonObject result;
-    QJsonArray meetings;
-    
-    QString meetingsData = m_settings->value(KEY_RECENT_MEETINGS).toString();
-    if (!meetingsData.isEmpty()) {
-        QJsonDocument doc = QJsonDocument::fromJson(meetingsData.toUtf8());
-        if (doc.isArray()) {
-            QJsonArray allMeetings = doc.array();
-            int count = qMin(maxCount, allMeetings.size());
-            for (int i = 0; i < count; ++i) {
-                meetings.append(allMeetings.at(i));
-            }
-        }
+    if (m_databaseManager) {
+        // 直接从SQLite数据库获取会议记录
+        return m_databaseManager->getRecentMeetings(maxCount);
     }
     
+    // 如果数据库管理器不可用，返回空结果
+    QJsonObject result;
+    QJsonArray meetings;
     result["meetings"] = meetings;
-    result["count"] = meetings.size();
+    result["count"] = 0;
     return result;
 }
 
@@ -392,46 +405,18 @@ QJsonObject ConfigurationManager::getRecentMeetings(int maxCount) const
  */
 void ConfigurationManager::addMeetingRecord(const QString& roomName, const QString& serverUrl, const QString& displayName)
 {
-    QJsonObject meeting;
-    meeting["roomName"] = roomName;
-    meeting["serverUrl"] = serverUrl;
-    meeting["displayName"] = displayName;
-    meeting["timestamp"] = QDateTime::currentDateTime().toString(Qt::ISODate);
-    meeting["fullUrl"] = serverUrl + "/" + roomName;
-    
-    // 获取现有记录
-    QString meetingsData = m_settings->value(KEY_RECENT_MEETINGS).toString();
-    QJsonArray meetings;
-    
-    if (!meetingsData.isEmpty()) {
-        QJsonDocument doc = QJsonDocument::fromJson(meetingsData.toUtf8());
-        if (doc.isArray()) {
-            meetings = doc.array();
+    if (m_databaseManager) {
+        // 添加到SQLite数据库
+        bool success = m_databaseManager->addMeetingRecord(roomName, serverUrl, displayName);
+        
+        if (success) {
+            qDebug() << "会议记录已添加到数据库:" << roomName << "@" << serverUrl;
+            // 发出信号通知记录已更新
+            emit valueChanged(KEY_RECENT_MEETINGS, QVariant());
+        } else {
+            qWarning() << "添加会议记录到数据库失败:" << roomName << "@" << serverUrl;
         }
     }
-    
-    // 检查是否已存在相同的会议记录
-    for (int i = 0; i < meetings.size(); ++i) {
-        QJsonObject existingMeeting = meetings.at(i).toObject();
-        if (existingMeeting["roomName"].toString() == roomName && 
-            existingMeeting["serverUrl"].toString() == serverUrl) {
-            meetings.removeAt(i);
-            break;
-        }
-    }
-    
-    // 添加新记录到开头
-    meetings.prepend(meeting);
-    
-    // 限制记录数量（最多保留50条）
-    while (meetings.size() > 50) {
-        meetings.removeLast();
-    }
-    
-    // 保存更新后的记录
-    QJsonDocument doc(meetings);
-    m_settings->setValue(KEY_RECENT_MEETINGS, QString::fromUtf8(doc.toJson(QJsonDocument::Compact)));
-    emit valueChanged(KEY_RECENT_MEETINGS, meetings);
 }
 
 /**
@@ -439,8 +424,33 @@ void ConfigurationManager::addMeetingRecord(const QString& roomName, const QStri
  */
 void ConfigurationManager::clearMeetingHistory()
 {
-    m_settings->remove(KEY_RECENT_MEETINGS);
-    emit valueChanged(KEY_RECENT_MEETINGS, QJsonArray());
+    if (m_databaseManager) {
+        bool success = m_databaseManager->clearMeetingHistory();
+        if (success) {
+            qDebug() << "所有会议历史记录已从数据库清除";
+            emit valueChanged(KEY_RECENT_MEETINGS, QJsonArray());
+        } else {
+            qWarning() << "清除会议历史记录失败";
+        }
+    }
+}
+
+/**
+ * @brief 删除指定的会议记录
+ */
+bool ConfigurationManager::deleteMeetingRecord(const QString& roomName, const QString& serverUrl)
+{
+    if (m_databaseManager) {
+        bool success = m_databaseManager->deleteMeetingRecord(roomName, serverUrl);
+        if (success) {
+            qDebug() << "会议记录已从数据库删除:" << roomName << "@" << serverUrl;
+            emit valueChanged(KEY_RECENT_MEETINGS, QVariant());
+            return true;
+        } else {
+            qWarning() << "删除会议记录失败:" << roomName << "@" << serverUrl;
+        }
+    }
+    return false;
 }
 
 // ========== 用户偏好设置 ==========

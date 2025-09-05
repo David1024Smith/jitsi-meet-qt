@@ -183,8 +183,8 @@ public slots:
     void onHelp();
     
     /**
-     * @brief 会议历史项目双击处理
-     * @param item 被双击的项目
+     * @brief 会议历史项目单击处理
+     * @param item 被单击的项目
      */
     void onHistoryItemDoubleClicked(QListWidgetItem* item);
     

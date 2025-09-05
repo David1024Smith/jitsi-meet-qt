@@ -412,8 +412,8 @@ void WelcomeWindow::onHelp()
 }
 
 /**
- * @brief 会议历史项目双击处理
- * @param item 被双击的项目
+ * @brief 会议历史项目单击处理
+ * @param item 被单击的项目
  */
 void WelcomeWindow::onHistoryItemDoubleClicked(QListWidgetItem *item)
 {
@@ -1169,7 +1169,7 @@ void WelcomeWindow::initializeConnections()
     }
 
     // 历史记录连接
-    connect(m_historyList, &QListWidget::itemDoubleClicked, this, &WelcomeWindow::onHistoryItemDoubleClicked);
+    connect(m_historyList, &QListWidget::itemClicked, this, &WelcomeWindow::onHistoryItemDoubleClicked);
     connect(m_historyList, &QListWidget::itemSelectionChanged, this, &WelcomeWindow::onHistorySelectionChanged);
 
     // 定时器连接

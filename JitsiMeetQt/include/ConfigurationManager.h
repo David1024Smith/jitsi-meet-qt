@@ -14,6 +14,9 @@
 #include <QMutex>
 #include <memory>
 
+// 前向声明
+class DatabaseManager;
+
 /**
  * @brief 配置管理器类 - 负责应用程序配置的读取、写入和管理
  * 
@@ -167,6 +170,14 @@ public:
      * @brief 清除会议历史记录
      */
     void clearMeetingHistory();
+    
+    /**
+     * @brief 删除指定的会议记录
+     * @param roomName 房间名称
+     * @param serverUrl 服务器URL
+     * @return 删除是否成功
+     */
+    bool deleteMeetingRecord(const QString& roomName, const QString& serverUrl);
     
     // ========== 用户偏好设置 ==========
     
@@ -340,6 +351,7 @@ private:
     static QMutex m_mutex; ///< 线程安全互斥锁
     
     std::unique_ptr<QSettings> m_settings; ///< Qt设置对象
+    DatabaseManager* m_databaseManager; ///< 数据库管理器
     
     // 配置键常量
     static const QString KEY_DEFAULT_SERVER_URL;
