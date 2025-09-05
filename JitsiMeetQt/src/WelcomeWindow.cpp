@@ -92,7 +92,7 @@ WelcomeWindow::WelcomeWindow(QWidget *parent)
     , m_isCheckingServer(false)
 {
     // 添加构造函数开始的调试输出
-    // Logger::instance().info("WelcomeWindow构造函数开始");
+    Logger::instance().info("WelcomeWindow构造函数开始");
     // 获取配置管理器和协议处理器实例
     m_configManager = ConfigurationManager::instance();
     // ProtocolHandler需要MainApplication实例，暂时设为nullptr
@@ -111,45 +111,45 @@ WelcomeWindow::WelcomeWindow(QWidget *parent)
     m_urlValidationTimer->setInterval(URL_VALIDATION_DELAY);
 
     // 写入调试信息
-    // Logger::instance().info("initializeUI函数开始执行");
+    Logger::instance().info("initializeUI函数开始执行");
 
     // 初始化UI
-    // Logger::instance().info("开始初始化UI");
+    Logger::instance().info("开始初始化UI");
     initializeUI();
-    // Logger::instance().info("UI初始化完成");
+    Logger::instance().info("UI初始化完成");
 
-    // Logger::instance().info("开始初始化布局");
+    Logger::instance().info("开始初始化布局");
     initializeLayout();
-    // Logger::instance().info("布局初始化完成");
+    Logger::instance().info("布局初始化完成");
 
-    // Logger::instance().info("开始初始化自动完成");
+    Logger::instance().info("开始初始化自动完成");
     initializeAutoComplete();
-    // Logger::instance().info("自动完成初始化完成");
+    Logger::instance().info("自动完成初始化完成");
 
-    // Logger::instance().info("开始初始化连接");
+    Logger::instance().info("开始初始化连接");
     initializeConnections();
-    // Logger::instance().info("连接初始化完成");
+    Logger::instance().info("连接初始化完成");
 
     // 加载数据
-    // Logger::instance().info("开始加载会议历史");
+    Logger::instance().info("开始加载会议历史");
     loadMeetingHistory();
-    // Logger::instance().info("会议历史加载完成");
+    Logger::instance().info("会议历史加载完成");
 
-    // Logger::instance().info("开始加载服务器列表");
+    Logger::instance().info("开始加载服务器列表");
     loadServerList();
-    // Logger::instance().info("服务器列表加载完成");
+    Logger::instance().info("服务器列表加载完成");
 
     // 恢复窗口状态
-    // Logger::instance().info("开始恢复窗口状态");
+    Logger::instance().info("开始恢复窗口状态");
     restoreWindowState();
-    // Logger::instance().info("窗口状态恢复完成");
+    Logger::instance().info("窗口状态恢复完成");
 
     // 更新UI状态
-    // Logger::instance().info("开始更新UI状态");
+    Logger::instance().info("开始更新UI状态");
     updateUIState();
-    // Logger::instance().info("UI状态更新完成");
+    Logger::instance().info("UI状态更新完成");
 
-    // Logger::instance().info("WelcomeWindow构造函数完成");
+    Logger::instance().info("WelcomeWindow构造函数完成");
 }
 
 /**
@@ -615,56 +615,51 @@ void WelcomeWindow::onUrlValidationTimeout()
  */
 void WelcomeWindow::initializeUI()
 {
-    // Logger::instance().info("WelcomeWindow构造函数开始");
+    Logger::instance().info("WelcomeWindow构造函数开始");
 
     // 设置窗口属性
     setWindowTitle(tr("Jitsi Meet Qt"));
     setWindowIcon(QIcon(":/icons/app.svg"));
     setMinimumSize(QSize(800, 600));
 
-    // Logger::instance().info("窗口属性设置完成");
+    Logger::instance().info("窗口属性设置完成");
 
     // 创建中央窗口部件
     m_centralWidget = new QWidget();
     setCentralWidget(m_centralWidget);
 
-    // 设置窗口背景为蓝色
-    m_centralWidget->setStyleSheet("background-color: #0056E0;");
+    // 设置窗口背景为蓝色，但允许子组件覆盖背景色
+    m_centralWidget->setObjectName("centralWidget");
 
-    // Logger::instance().info("中央窗口部件创建完成");
+    Logger::instance().info("中央窗口部件创建完成");
 
     // 创建左侧菜单栏
     m_sidebarPanel = new QWidget();
     m_sidebarPanel->setObjectName("sidebarPanel");
     m_sidebarPanel->setFixedWidth(70);
-    m_sidebarPanel->setStyleSheet("#sidebarPanel { "
-                                  "background: rgba(0, 0, 0, 0.8); "
-                                  "border-right: 1px solid rgba(255, 255, 255, 0.08); "
-                                  "}");
-
     // 创建左侧菜单栏布局
     m_sidebarLayout = new QVBoxLayout(m_sidebarPanel);
     m_sidebarLayout->setContentsMargins(10, 20, 10, 20);
     m_sidebarLayout->setSpacing(15);
     m_sidebarLayout->setAlignment(Qt::AlignHCenter);
 
-    // Logger::instance().info("左侧菜单栏创建完成，准备创建Logo");
+    Logger::instance().info("左侧菜单栏创建完成，准备创建Logo");
 
     // 创建Logo标签
-    // Logger::instance().info("准备创建Logo标签");
+    Logger::instance().info("准备创建Logo标签");
 
     m_logoLabel = new QLabel();
-    // Logger::instance().info("Logo标签创建成功");
+    Logger::instance().info("Logo标签创建成功");
 
     m_logoLabel->setFixedSize(40, 40);
     m_logoLabel->setAlignment(Qt::AlignCenter);
 
-    // Logger::instance().info("Logo标签属性设置完成");
+    Logger::instance().info("Logo标签属性设置完成");
 
     // 优先使用SVG格式的logo
     qDebug() << "开始加载Logo图片";
     // 添加文件调试输出
-    // Logger::instance().info("开始加载Logo图片");
+    Logger::instance().info("开始加载Logo图片");
 
     QPixmap logoPixmap;
     // 使用Qt高DPI最佳实践：根据设备像素比例渲染高分辨率图标
@@ -698,34 +693,31 @@ void WelcomeWindow::initializeUI()
                             .arg(devicePixelRatio)
                             .arg(actualIconSize)
                             .arg(actualIconSize);
-            // Logger::instance().info(QString("SVG Logo加载成功，尺寸: %1x%2").arg(logoPixmap.width()).arg(logoPixmap.height()));
+            Logger::instance().info(QString("SVG Logo加载成功，尺寸: %1x%2").arg(logoPixmap.width()).arg(logoPixmap.height()));
         }
         else
         {
             qDebug() << "SVG渲染器无效";
-            // Logger::instance().warning("SVG渲染器无效");
+            Logger::instance().warning("SVG渲染器无效");
         }
     }
     else
     {
         qDebug() << "无法打开SVG文件，错误:" << svgFile.errorString();
-        // Logger::instance().warning(QString("无法打开SVG文件，错误: %1").arg(svgFile.errorString()));
+        Logger::instance().warning(QString("无法打开SVG文件，错误: %1").arg(svgFile.errorString()));
     }
     if (!logoPixmap.isNull())
     {
         m_logoLabel->setPixmap(logoPixmap);
         qDebug() << "Logo设置到标签完成";
-        // Logger::instance().info("Logo设置到标签完成");
+        Logger::instance().info("Logo设置到标签完成");
     }
     else
     {
         qDebug() << "Logo加载完全失败，无法设置到标签";
-        // Logger::instance().error("Logo加载完全失败，无法设置到标签");
+        Logger::instance().error("Logo加载完全失败，无法设置到标签");
     }
-    m_logoLabel->setStyleSheet("QLabel { "
-                               "background: transparent; "
-                               "border: none; "
-                               "}");
+    m_logoLabel->setObjectName("logoLabel");
 
     // 创建设置按钮
     printf("=== 开始创建设置按钮 ===\n");
@@ -790,50 +782,13 @@ void WelcomeWindow::initializeUI()
         m_sidebarSettingsButton->setIcon(settingsIcon);
         m_sidebarSettingsButton->setIconSize(QSize(32, 32));
         qDebug() << "设置按钮图标设置成功";
-        // 圆形透明背景按钮
-        m_sidebarSettingsButton->setStyleSheet("QPushButton { "
-                                               "background: transparent; "
-                                               "border: none; "
-                                               "border-radius: 25px; "
-                                               "padding: 0px; "
-                                               "min-width: 50px; "
-                                               "min-height: 50px; "
-                                               "max-width: 50px; "
-                                               "max-height: 50px; "
-                                               "} "
-                                               "QPushButton:hover { "
-                                               "background: rgba(255, 255, 255, 0.1); "
-                                               "border-radius: 25px; "
-                                               "} "
-                                               "QPushButton:pressed { "
-                                               "background: rgba(255, 255, 255, 0.2); "
-                                               "border-radius: 25px; "
-                                               "}");
+        m_sidebarSettingsButton->setObjectName("sidebarSettingsButton");
     }
     else
     {
-        // 如果图标加载失败，使用圆形透明样式
-        m_sidebarSettingsButton->setStyleSheet("QPushButton { "
-                                               "background: transparent; "
-                                               "border: none; "
-                                               "border-radius: 25px; "
-                                               "color: white; "
-                                               "font-size: 12px; "
-                                               "font-weight: bold; "
-                                               "padding: 0px; "
-                                               "min-width: 50px; "
-                                               "min-height: 50px; "
-                                               "max-width: 50px; "
-                                               "max-height: 50px; "
-                                               "} "
-                                               "QPushButton:hover { "
-                                               "background: rgba(255, 255, 255, 0.1); "
-                                               "border-radius: 25px; "
-                                               "} "
-                                               "QPushButton:pressed { "
-                                               "background: rgba(255, 255, 255, 0.2); "
-                                               "border-radius: 25px; "
-                                               "}");
+        // 如果图标加载失败，使用圆形透明样式已移动到外部CSS文件
+        m_sidebarSettingsButton->setObjectName("sidebarSettingsButton");
+        m_sidebarSettingsButton->setProperty("noIcon", true);
         m_sidebarSettingsButton->setText(" ");
         qDebug() << "设置按钮图标加载失败，使用文本显示: ⚙";
     }
@@ -901,52 +856,14 @@ void WelcomeWindow::initializeUI()
         m_helpButton->setIcon(helpIcon);
         qDebug() << "帮助按钮图标设置成功";
         m_helpButton->setIconSize(QSize(32, 32));
-        // 圆形透明背景按钮
-        m_helpButton->setStyleSheet("QPushButton { "
-                                    "background: transparent; "
-                                    "border: none; "
-                                    "border-radius: 25px; "
-                                    "padding: 0px; "
-                                    "min-width: 50px; "
-                                    "min-height: 50px; "
-                                    "max-width: 50px; "
-                                    "max-height: 50px; "
-                                    "} "
-                                    "QPushButton:hover { "
-                                    "background: rgba(255, 255, 255, 0.1); "
-                                    "border-radius: 25px; "
-                                    "} "
-                                    "QPushButton:pressed { "
-                                    "background: rgba(255, 255, 255, 0.2); "
-                                    "border-radius: 25px; "
-                                    "}");
+        // 圆形透明背景按钮样式已移动到外部CSS文件
+        m_helpButton->setObjectName("helpButton");
     }
     else
     {
-        // 如果没有图标文件，使用圆形透明样式
-        m_helpButton->setStyleSheet("QPushButton { "
-                                    "background: transparent; "
-                                    "border: none; "
-                                    "border-radius: 25px; "
-                                    "color: white; "
-                                    "font-size: 12px; "
-                                    "font-weight: bold; "
-                                    "padding: 0px; "
-                                    "min-width: 50px; "
-                                    "min-height: 50px; "
-                                    "max-width: 50px; "
-                                    "max-height: 50px; "
-                                    "} "
-                                    "QPushButton:hover { "
-                                    "background: rgba(255, 255, 255, 0.1); "
-                                    "border-radius: 25px; "
-                                    "} "
-                                    "QPushButton:pressed { "
-                                    "background: rgba(255, 255, 255, 0.2); "
-                                    "border-radius: 25px; "
-                                    "}");
-        m_helpButton->setText(" ");
-        qDebug() << "帮助按钮使用文本显示: ?";
+        // 如果没有图标文件，仅设置对象名应用样式
+        m_helpButton->setObjectName("helpButton");
+        qDebug() << "帮助按钮图标加载失败，使用透明背景";
     }
     m_helpButton->setToolTip(tr("帮助"));
     qDebug() << "帮助按钮样式设置完成";
@@ -975,36 +892,33 @@ void WelcomeWindow::initializeUI()
     // 创建中央面板
     m_leftPanel = new QWidget();
     m_leftPanel->setObjectName("centralPanel");
-    m_leftPanel->setStyleSheet("#centralPanel { background-color: transparent; }");
+    // 样式已移动到外部CSS文件
 
     // 创建标题标签
     QLabel *titleLabel = new QLabel(tr("输入会议名或链接地址"));
-    titleLabel->setStyleSheet("color: white; font-size: 16px; font-weight: bold;");
+    titleLabel->setObjectName("titleLabel");
     titleLabel->setAlignment(Qt::AlignCenter);
 
     // 创建输入控件
     m_urlEdit = new QLineEdit();
+    m_urlEdit->setObjectName("urlEdit");
     m_urlEdit->setPlaceholderText(tr("输入会议URL或房间名"));
     m_urlEdit->setMinimumHeight(40);
-    m_urlEdit->setStyleSheet("QLineEdit { background-color: white; border-radius: 4px; padding: 8px; font-size: 14px; border: none; }");
 
     // 创建按钮
     m_joinButton = new QPushButton(tr("开始"));
+    m_joinButton->setObjectName("joinButton");
     m_joinButton->setDefault(true);
     m_joinButton->setMinimumHeight(40);
     m_joinButton->setMinimumWidth(80);
-    m_joinButton->setStyleSheet("QPushButton { background-color: #0074E0; color: white; border-radius: 4px; font-weight: bold; font-size: 14px; border: none; }"
-                                "QPushButton:hover { background-color: #0063C0; }"
-                                "QPushButton:pressed { background-color: #0052A0; }");
 
     // 创建最近会议标签
     QLabel *recentLabel = new QLabel(tr("您最近加入的会议"));
-    recentLabel->setStyleSheet("color: white; font-size: 14px;");
+    recentLabel->setObjectName("recentLabel");
 
     // 创建历史记录列表
     m_historyList = new QListWidget();
     m_historyList->setObjectName("meetingHistoryList");
-    m_historyList->setMaximumHeight(200);
     m_historyList->setSpacing(5);
     m_historyList->setUniformItemSizes(false);
     m_historyList->setWordWrap(true);
@@ -1013,26 +927,27 @@ void WelcomeWindow::initializeUI()
 
     // 创建状态栏
     m_statusLabel = new QLabel(tr("就绪"));
-    m_statusLabel->setStyleSheet("color: rgba(255, 255, 255, 0.7);");
+    m_statusLabel->setObjectName("statusLabel");
     m_progressBar = new QProgressBar();
+    m_progressBar->setObjectName("progressBar");
     m_progressBar->setVisible(false);
 
     statusBar()->addWidget(m_statusLabel, 1);
     statusBar()->addWidget(m_progressBar);
-    statusBar()->setStyleSheet("QStatusBar { background-color: #0056E0; color: white; }");
+    statusBar()->setObjectName("statusBar");
 
     // 创建显示名称控件（即使在简化UI中也需要创建以避免空指针）
     m_displayNameLabel = new QLabel(tr("显示名称:"), this);
 
-    // Logger::instance().info("开始创建m_displayNameEdit");
+    Logger::instance().info("开始创建m_displayNameEdit");
 
     m_displayNameEdit = new QLineEdit(this);
 
-    // Logger::instance().info(QString("m_displayNameEdit创建完成，指针地址: %1").arg(QString::number(reinterpret_cast<quintptr>(m_displayNameEdit), 16)));
+    Logger::instance().info(QString("m_displayNameEdit创建完成，指针地址: %1").arg(QString::number(reinterpret_cast<quintptr>(m_displayNameEdit), 16)));
 
     m_displayNameEdit->setPlaceholderText(tr("输入您的显示名称"));
 
-    // Logger::instance().info("m_displayNameEdit占位符文本设置完成");
+    Logger::instance().info("m_displayNameEdit占位符文本设置完成");
 
     // 隐藏显示名称控件（在简化UI中不显示）
     m_displayNameLabel->setVisible(false);
@@ -1084,7 +999,7 @@ void WelcomeWindow::initializeLayout()
 
     // 添加标题标签
     QLabel *titleLabel = new QLabel(tr("输入会议名或链接地址"));
-    titleLabel->setStyleSheet("color: white; font-size: 16px; font-weight: bold;");
+    titleLabel->setObjectName("titleLabel");
     titleLabel->setAlignment(Qt::AlignCenter);
     m_leftLayout->addWidget(titleLabel);
 
@@ -1099,14 +1014,13 @@ void WelcomeWindow::initializeLayout()
 
     // 添加最近会议标签
     QLabel *recentLabel = new QLabel(tr("您最近加入的会议"));
-    recentLabel->setStyleSheet("color: white; font-size: 14px;");
+    recentLabel->setObjectName("recentLabel");
     m_leftLayout->addWidget(recentLabel);
 
-    // 添加历史记录列表
-    m_leftLayout->addWidget(m_historyList);
+    // 添加历史记录列表（设置拉伸因子让其占据剩余空间）
+    m_leftLayout->addWidget(m_historyList, 1);
 
-    // 添加空白区域
-    m_leftLayout->addStretch();
+
 
     // 添加中央面板到分割器
     m_splitter->addWidget(m_leftPanel);
@@ -1187,66 +1101,66 @@ void WelcomeWindow::initializeConnections()
  */
 void WelcomeWindow::initializeAutoComplete()
 {
-    // Logger::instance().info("开始创建URL模型");
+    Logger::instance().info("开始创建URL模型");
 
     // URL自动完成
     m_urlModel = new QStringListModel(this);
 
-    // Logger::instance().info("URL模型创建完成，开始创建URL完成器");
+    Logger::instance().info("URL模型创建完成，开始创建URL完成器");
 
     m_urlCompleter = new QCompleter(m_urlModel, this);
 
-    // Logger::instance().info("URL完成器创建完成，设置大小写敏感性");
+    Logger::instance().info("URL完成器创建完成，设置大小写敏感性");
 
     m_urlCompleter->setCaseSensitivity(Qt::CaseInsensitive);
 
-    // Logger::instance().info("开始设置URL编辑器的完成器");
+    Logger::instance().info("开始设置URL编辑器的完成器");
 
     m_urlEdit->setCompleter(m_urlCompleter);
 
-    // Logger::instance().info("URL完成器设置完成，开始创建名称模型");
+    Logger::instance().info("URL完成器设置完成，开始创建名称模型");
 
     // 显示名称自动完成
     m_nameModel = new QStringListModel(this);
 
-    // Logger::instance().info("名称模型创建完成，开始创建名称完成器");
+    Logger::instance().info("名称模型创建完成，开始创建名称完成器");
 
     m_nameCompleter = new QCompleter(m_nameModel, this);
 
-    // Logger::instance().info("名称完成器创建完成，设置大小写敏感性");
+    Logger::instance().info("名称完成器创建完成，设置大小写敏感性");
 
     m_nameCompleter->setCaseSensitivity(Qt::CaseInsensitive);
 
-    // Logger::instance().info("开始设置显示名称编辑器的完成器");
+    Logger::instance().info("开始设置显示名称编辑器的完成器");
 
     // 检查指针是否有效
     if (m_displayNameEdit == nullptr)
     {
-        // Logger::instance().error("错误：m_displayNameEdit为空指针");
+        Logger::instance().error("错误：m_displayNameEdit为空指针");
         return;
     }
 
     if (m_nameCompleter == nullptr)
     {
-        // Logger::instance().error("错误：m_nameCompleter为空指针");
+        Logger::instance().error("错误：m_nameCompleter为空指针");
         return;
     }
 
-    // Logger::instance().info("指针检查通过，开始调用setCompleter");
+    Logger::instance().info("指针检查通过，开始调用setCompleter");
 
     try
     {
         m_displayNameEdit->setCompleter(m_nameCompleter);
 
-        // Logger::instance().info("setCompleter调用成功");
+        Logger::instance().info("setCompleter调用成功");
     }
     catch (...)
     {
-        // Logger::instance().error("setCompleter调用时发生异常");
+        Logger::instance().error("setCompleter调用时发生异常");
         return;
     }
 
-    // Logger::instance().info("自动完成初始化全部完成");
+    Logger::instance().info("自动完成初始化全部完成");
 }
 
 /**
@@ -1309,18 +1223,37 @@ void WelcomeWindow::loadMeetingHistory()
         // 创建内容容器（带圆角矩形背景）
         QWidget *contentWidget = new QWidget();
         contentWidget->setObjectName("meetingHistoryContent");
-        contentWidget->setStyleSheet("QWidget#meetingHistoryContent { background-color: #1754A9; border: none; border-radius: 8px; padding: 0; margin: 0; }");
-        
-        QVBoxLayout *itemLayout = new QVBoxLayout(contentWidget);
-        itemLayout->setContentsMargins(12, 10, 12, 10);
-        itemLayout->setSpacing(4);
+        // 样式已移动到外部CSS文件
         
         // 创建删除按钮
         QPushButton *deleteButton = new QPushButton("×");
         deleteButton->setObjectName("deleteHistoryButton");
         deleteButton->setFixedSize(24, 24);
         deleteButton->setToolTip("删除此会议记录");
-        deleteButton->setStyleSheet("QPushButton#deleteHistoryButton { background-color: rgba(255, 255, 255, 0.2); color: white; border: none; border-radius: 12px; font-size: 16px; font-weight: bold; padding: 0; margin: 4px; } QPushButton#deleteHistoryButton:hover { background-color: rgba(255, 255, 255, 0.3); color: #ff4444; } QPushButton#deleteHistoryButton:pressed { background-color: rgba(255, 255, 255, 0.4); }");
+        // 样式已移动到外部CSS文件
+        
+        // 创建内容容器的主布局（水平布局）
+        QHBoxLayout *contentLayout = new QHBoxLayout(contentWidget);
+        contentLayout->setContentsMargins(0, 0, 0, 0);
+        contentLayout->setSpacing(0);
+        
+        // 创建左侧内容区域
+        QWidget *leftContentWidget = new QWidget();
+        QVBoxLayout *itemLayout = new QVBoxLayout(leftContentWidget);
+        itemLayout->setContentsMargins(12, 10, 12, 10);
+        itemLayout->setSpacing(4);
+        
+        // 创建右侧按钮区域
+        QWidget *rightButtonWidget = new QWidget();
+        rightButtonWidget->setFixedWidth(30);
+        QVBoxLayout *buttonLayout = new QVBoxLayout(rightButtonWidget);
+        buttonLayout->setContentsMargins(6, 6, 6, 0);
+        buttonLayout->addWidget(deleteButton, 0, Qt::AlignTop | Qt::AlignRight);
+        buttonLayout->addStretch();
+        
+        // 将左侧内容和右侧按钮添加到内容布局
+        contentLayout->addWidget(leftContentWidget, 1);
+        contentLayout->addWidget(rightButtonWidget, 0);
         
         // 连接删除按钮的点击事件
         connect(deleteButton, &QPushButton::clicked, [this, deleteButton]() {
@@ -1379,9 +1312,8 @@ void WelcomeWindow::loadMeetingHistory()
         relativeTimeLabel->setProperty("class", "meeting-relative-time");
         itemLayout->addWidget(relativeTimeLabel);
 
-        // 将内容容器和删除按钮添加到主布局
-        mainLayout->addWidget(contentWidget, 1); // 内容占据大部分空间
-        mainLayout->addWidget(deleteButton, 0, Qt::AlignTop | Qt::AlignRight); // 删除按钮右上角对齐
+
+        mainLayout->addWidget(contentWidget, 1); // 内容占据全部空间
         
         // 设置小部件样式（使用CSS类名）
         itemWidget->setObjectName("meetingHistoryItem");
@@ -1899,6 +1831,20 @@ void WelcomeWindow::onDeleteHistoryItem(QListWidgetItem *item)
     // 找到对应的历史记录项并删除
     int row = m_historyList->row(item);
     if (row >= 0 && row < meetings.size()) {
+        // 获取要删除的会议记录信息
+        QJsonObject meetingRecord = meetings[row].toObject();
+        QString roomName = meetingRecord["roomName"].toString();
+        QString serverUrl = meetingRecord["serverUrl"].toString();
+        
+        // 从数据库中删除记录
+        bool dbDeleted = m_configManager->deleteMeetingRecord(roomName, serverUrl);
+        if (dbDeleted) {
+            Logger::instance().info("成功从数据库删除会议记录: " + roomName + "@" + serverUrl);
+        } else {
+            Logger::instance().warning("从数据库删除会议记录失败: " + roomName + "@" + serverUrl);
+        }
+        
+        // 从内存中的会议列表移除
         meetings.removeAt(row);
         
         // 重新构建会议历史记录对象
@@ -1908,8 +1854,11 @@ void WelcomeWindow::onDeleteHistoryItem(QListWidgetItem *item)
         // 保存更新后的历史记录
         m_configManager->setValue("recent_meetings", updatedMeetings);
         
-        // 从列表中移除项目
+        // 从界面列表中移除项目
         delete m_historyList->takeItem(row);
+        
+        // 刷新整个会议历史列表以确保UI与数据库同步
+        refreshMeetingHistory();
         
         Logger::instance().info("删除历史会议记录，行号: " + QString::number(row));
     }

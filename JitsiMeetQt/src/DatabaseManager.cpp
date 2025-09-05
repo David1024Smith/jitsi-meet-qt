@@ -69,11 +69,26 @@ bool DatabaseManager::initialize(const QString& dbPath)
         }
     }
     
+    // 检查可用的SQL驱动
+    QStringList availableDrivers = QSqlDatabase::drivers();
+    Logger::instance().info("可用的SQL驱动: " + availableDrivers.join(", "));
+    
+    if (!availableDrivers.contains("QSQLITE")) {
+        Logger::instance().error("QSQLITE驱动不可用！可用驱动: " + availableDrivers.join(", "));
+        return false;
+    }
+    
     // 创建数据库连接
     Logger::instance().info("正在创建数据库连接...");
     m_database = QSqlDatabase::addDatabase("QSQLITE", DATABASE_NAME);
     m_database.setDatabaseName(m_databasePath);
     Logger::instance().info("数据库名称已设置: " + m_databasePath);
+    
+    // 检查数据库对象是否有效
+    if (!m_database.isValid()) {
+        Logger::instance().error("数据库对象无效: " + m_database.lastError().text());
+        return false;
+    }
     
     if (!m_database.open()) {
         Logger::instance().error("无法打开数据库: " + m_database.lastError().text());

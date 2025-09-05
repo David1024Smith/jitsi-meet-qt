@@ -67,7 +67,6 @@ ConferenceWindow::ConferenceWindow(QWidget *parent)
     , m_settingsAction(nullptr)
     , m_statusLabel(nullptr)
     , m_progressBar(nullptr)
-    , m_participantCountLabel(nullptr)
     , m_connectionTimer(nullptr)
     , m_reconnectTimer(nullptr)
     , m_networkManager(nullptr)
@@ -368,9 +367,6 @@ void ConferenceWindow::initializeUI()
     m_progressBar->setMaximumWidth(200);
     statusBar->addPermanentWidget(m_progressBar);
     
-    // 创建参与者数量标签
-    m_participantCountLabel = new QLabel(tr("参与者: 0"), this);
-    statusBar->addPermanentWidget(m_participantCountLabel);
 }
 
 /**
@@ -1431,7 +1427,6 @@ void ConferenceWindow::leaveConference()
     
     // 更新UI
     m_statusLabel->setText(tr("已离开会议"));
-    m_participantCountLabel->setText(tr("参与者: 0"));
 }
 
 /**
@@ -1725,7 +1720,6 @@ void ConferenceWindow::onConferenceLeft()
     updateWindowTitle();
     
     m_statusLabel->setText(tr("已离开会议"));
-    m_participantCountLabel->setText(tr("参与者: 0"));
     
     emit conferenceLeft(m_currentRoom);
 }
@@ -1745,7 +1739,6 @@ void ConferenceWindow::onConferenceFailed(const QString& error)
     updateWindowTitle();
     
     m_statusLabel->setText(tr("会议连接失败"));
-    m_participantCountLabel->setText(tr("参与者: 0"));
     
     // 显示错误消息
     QMessageBox::warning(this, tr("会议连接失败"), tr("无法加入会议: %1").arg(error));
@@ -1780,7 +1773,6 @@ void ConferenceWindow::onParticipantJoined(const QString& participantId, const Q
     qDebug() << "ConferenceWindow: 参与者加入:" << participantId << displayName;
     
     m_participantCount++;
-    m_participantCountLabel->setText(tr("参与者: %1").arg(m_participantCount));
     
     emit participantCountChanged(m_participantCount);
 }
@@ -1796,7 +1788,6 @@ void ConferenceWindow::onParticipantLeft(const QString& participantId)
     if (m_participantCount > 0) {
         m_participantCount--;
     }
-    m_participantCountLabel->setText(tr("参与者: %1").arg(m_participantCount));
     
     emit participantCountChanged(m_participantCount);
 }
@@ -1891,9 +1882,6 @@ void ConferenceWindow::onConferenceStateUpdated(const QJsonObject& state)
     if (state.contains("participantCount")) {
         int count = state["participantCount"].toInt();
         m_participantCount = count;
-        if (m_participantCountLabel) {
-            m_participantCountLabel->setText(QString("参与者: %1").arg(count));
-        }
         emit participantCountChanged(count);
     }
     

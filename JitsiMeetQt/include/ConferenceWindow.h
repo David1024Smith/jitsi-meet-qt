@@ -593,7 +593,6 @@ private:
     // 状态指示器
     QLabel* m_statusLabel;              ///< 状态标签
     QProgressBar* m_progressBar;        ///< 进度条
-    QLabel* m_participantCountLabel;    ///< 参与者数量标签
     
     // 定时器
     QTimer* m_connectionTimer;          ///< 连接超时定时器

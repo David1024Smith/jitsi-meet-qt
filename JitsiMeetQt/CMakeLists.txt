@@ -225,6 +225,34 @@ if(WIN32)
         endif()
     endforeach()
     
+    # 复制Qt SQL驱动插件（Debug和Release版本）
+    # 创建sqldrivers目录
+    add_custom_command(TARGET copy_qt_dlls POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+            "$<TARGET_FILE_DIR:JitsiMeetQt>/sqldrivers"
+        COMMENT "create sqldrivers directory"
+    )
+    
+    # 复制Debug版本的SQLite驱动
+    if(EXISTS "${QT6_PLUGINS_DIR}/sqldrivers/qsqlited.dll")
+        add_custom_command(TARGET copy_qt_dlls POST_BUILD
+            COMMAND $<$<CONFIG:Debug>:${CMAKE_COMMAND}> $<$<CONFIG:Debug>:-E> $<$<CONFIG:Debug>:copy_if_different>
+                $<$<CONFIG:Debug>:"${QT6_PLUGINS_DIR}/sqldrivers/qsqlited.dll">
+                $<$<CONFIG:Debug>:"$<TARGET_FILE_DIR:JitsiMeetQt>/sqldrivers/qsqlited.dll">
+            COMMENT "copy qsqlited.dll for Debug build"
+        )
+    endif()
+    
+    # 复制Release版本的SQLite驱动
+    if(EXISTS "${QT6_PLUGINS_DIR}/sqldrivers/qsqlite.dll")
+        add_custom_command(TARGET copy_qt_dlls POST_BUILD
+            COMMAND $<$<CONFIG:Release>:${CMAKE_COMMAND}> $<$<CONFIG:Release>:-E> $<$<CONFIG:Release>:copy_if_different>
+                $<$<CONFIG:Release>:"${QT6_PLUGINS_DIR}/sqldrivers/qsqlite.dll">
+                $<$<CONFIG:Release>:"$<TARGET_FILE_DIR:JitsiMeetQt>/sqldrivers/qsqlite.dll">
+            COMMENT "copy qsqlite.dll for Release build"
+        )
+    endif()
+    
     # 复制Qt WebEngine进程文件（支持Debug和Release版本）
     # Debug版本
     if(EXISTS "${QT6_BIN_DIR}/QtWebEngineProcessd.exe")
