@@ -334,6 +334,34 @@ private:
      * @param serverUrl 服务器URL
      */
     void addToHistory(const QString& url, const QString& displayName, const QString& serverUrl);
+    
+    /**
+     * @brief 格式化会议时间显示
+     * @param timestamp 时间戳（秒）
+     * @return 格式化的时间字符串
+     */
+    QString formatMeetingTime(qint64 timestamp) const;
+    
+    /**
+     * @brief 计算相对时间差
+     * @param timestamp 时间戳（秒）
+     * @return 相对时间字符串（如"2小时前"、"昨天"等）
+     */
+    QString getRelativeTime(qint64 timestamp) const;
+    
+    /**
+     * @brief 提取房间名称（去除URL参数）
+     * @param url 完整的会议URL
+     * @return 清理后的房间名称
+     */
+    QString extractRoomName(const QString& url) const;
+    
+    /**
+     * @brief 格式化服务器URL显示
+     * @param serverUrl 服务器URL
+     * @return 格式化的服务器地址（去除协议前缀）
+     */
+    QString formatServerUrl(const QString& serverUrl) const;
 
 private:
     // UI组件

@@ -190,3 +190,107 @@ QGroupBox::title {
     background-color: transparent;
     font-weight: 700;
 }
+
+/* Meeting History List Styles - 匹配jitsi-meet-electron原始设计 */
+QListWidget {
+    background-color: transparent;
+    border: none;
+    outline: none;
+    selection-background-color: transparent;
+}
+
+QListWidget::item {
+    background-color: #1754A9;
+    border: none;
+    border-radius: 8px;
+    margin: 8px 0;
+    padding: 0;
+    min-height: 120px;
+    max-height: 120px;
+}
+
+QListWidget::item:hover {
+    background-color: #1e5bb8;
+    cursor: pointer;
+}
+
+QListWidget::item:selected {
+    background-color: #1e5bb8;
+}
+
+QListWidget::item:pressed {
+    background-color: #144a96;
+}
+
+/* Meeting History Item Widget Styles - 匹配原始ConferenceCard设计 */
+.meeting-history-item {
+    background-color: transparent;
+    border: none;
+    padding: 16px;
+}
+
+.meeting-history-item:hover {
+    background-color: transparent;
+}
+
+/* Meeting History Labels - 按照原始设计的字体规范 */
+.meeting-room-name {
+    color: #ffffff;
+    font-weight: bold;
+    font-size: 16px;
+    margin-bottom: 4px;
+}
+
+.meeting-server-url {
+    color: #ffffff;
+    font-weight: normal;
+    font-size: 14px;
+    margin-bottom: 4px;
+    text-overflow: ellipsis;
+    overflow: hidden;
+}
+
+.meeting-time {
+    color: #ffffff;
+    font-weight: normal;
+    font-size: 14px;
+    margin-bottom: 4px;
+}
+
+.meeting-relative-time {
+    color: #ffffff;
+    font-weight: normal;
+    font-size: 14px;
+    margin-bottom: 0;
+}
+
+/* Scrollbar for History List */
+QListWidget QScrollBar:vertical {
+    background-color: rgba(255, 255, 255, 0.1);
+    width: 8px;
+    border-radius: 4px;
+    margin: 0;
+}
+
+QListWidget QScrollBar::handle:vertical {
+    background-color: rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+    min-height: 20px;
+    margin: 2px;
+}
+
+QListWidget QScrollBar::handle:vertical:hover {
+    background-color: rgba(255, 255, 255, 0.5);
+}
+
+QListWidget QScrollBar::add-line:vertical,
+QListWidget QScrollBar::sub-line:vertical {
+    border: none;
+    background: none;
+    height: 0;
+}
+
+QListWidget QScrollBar::add-page:vertical,
+QListWidget QScrollBar::sub-page:vertical {
+    background: none;
+}

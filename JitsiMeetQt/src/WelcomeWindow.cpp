@@ -316,9 +316,18 @@ void WelcomeWindow::onJoinMeeting()
     QString url = getMeetingUrl();
     QString displayName = getDisplayName();
     QString password = m_passwordEdit ? m_passwordEdit->text().trimmed() : QString();
+    QString serverUrl = getServerUrl();
+    
+    // 确保服务器URL不为空，使用默认服务器
+    if (serverUrl.isEmpty() && m_configManager) {
+        serverUrl = m_configManager->getDefaultServerUrl();
+    }
+    if (serverUrl.isEmpty()) {
+        serverUrl = "https://meet.jit.si";
+    }
 
     // 添加到历史记录
-    addToHistory(url, displayName, getServerUrl());
+    addToHistory(url, displayName, serverUrl);
 
     // 发射加入会议信号
     emit joinMeetingRequested(url, displayName, password);
@@ -338,6 +347,14 @@ void WelcomeWindow::onCreateMeeting()
     QString serverUrl = getServerUrl();
     QString displayName = getDisplayName();
     QString password = m_passwordEdit ? m_passwordEdit->text().trimmed() : QString();
+    
+    // 确保服务器URL不为空，使用默认服务器
+    if (serverUrl.isEmpty() && m_configManager) {
+        serverUrl = m_configManager->getDefaultServerUrl();
+    }
+    if (serverUrl.isEmpty()) {
+        serverUrl = "https://meet.jit.si";
+    }
 
     // 添加到历史记录
     addToHistory(roomName, displayName, serverUrl);
@@ -408,14 +425,35 @@ void WelcomeWindow::onHistoryItemDoubleClicked(QListWidgetItem *item)
     // 从项目数据中获取会议信息
     QJsonObject meetingData = item->data(Qt::UserRole).toJsonObject();
 
-    QString url = meetingData.value("url").toString();
+    // 获取会议数据，使用正确的字段名
+    QString roomName = meetingData.value("roomName").toString();
     QString displayName = meetingData.value("displayName").toString();
     QString serverUrl = meetingData.value("serverUrl").toString();
+    QString fullUrl = meetingData.value("fullUrl").toString();
+
+    // 优先使用fullUrl，如果没有则构建URL
+    QString meetingUrl = fullUrl;
+    if (meetingUrl.isEmpty() && !roomName.isEmpty() && !serverUrl.isEmpty())
+    {
+        meetingUrl = serverUrl + "/" + roomName;
+    }
+    
+    // 如果仍然没有URL，使用roomName作为URL
+    if (meetingUrl.isEmpty())
+    {
+        meetingUrl = roomName;
+    }
 
     // 设置到输入框
-    setMeetingUrl(url);
-    setDisplayName(displayName);
-    setServerUrl(serverUrl);
+    setMeetingUrl(meetingUrl);
+    if (!displayName.isEmpty())
+    {
+        setDisplayName(displayName);
+    }
+    if (!serverUrl.isEmpty())
+    {
+        setServerUrl(serverUrl);
+    }
 
     // 自动加入会议
     onJoinMeeting();
@@ -965,14 +1003,13 @@ void WelcomeWindow::initializeUI()
 
     // 创建历史记录列表
     m_historyList = new QListWidget();
-    m_historyList->setStyleSheet("QListWidget { background-color: transparent; border: none; }"
-                                 "QListWidget::item { background-color: rgba(0, 0, 0, 0.2); color: white; border-radius: 4px; padding: 0; margin: 5px; }"
-                                 "QListWidget::item:hover { background-color: rgba(0, 0, 0, 0.3); }"
-                                 "QListWidget::item:selected { background-color: rgba(0, 0, 0, 0.4); }");
+    m_historyList->setObjectName("meetingHistoryList");
     m_historyList->setMaximumHeight(200);
     m_historyList->setSpacing(5);
     m_historyList->setUniformItemSizes(false);
     m_historyList->setWordWrap(true);
+    m_historyList->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
+    m_historyList->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 
     // 创建状态栏
     m_statusLabel = new QLabel(tr("就绪"));
@@ -1215,6 +1252,10 @@ void WelcomeWindow::initializeAutoComplete()
 /**
  * @brief 加载会议历史
  */
+/**
+ * @brief 加载会议历史记录
+ * 按照jitsi-meet-electron的格式显示会议信息，包含房间名、服务器地址、会议时间和时间差
+ */
 void WelcomeWindow::loadMeetingHistory()
 {
     if (!m_configManager || !m_historyList)
@@ -1226,49 +1267,98 @@ void WelcomeWindow::loadMeetingHistory()
 
     QJsonObject recentMeetings = m_configManager->getRecentMeetings();
     QJsonArray history = recentMeetings.value("meetings").toArray();
+    
     for (const QJsonValue &value : history)
     {
         QJsonObject meeting = value.toObject();
 
-        QString url = meeting.value("url").toString();
+        QString fullUrl = meeting.value("fullUrl").toString();
+        QString roomName = meeting.value("roomName").toString();
         QString displayName = meeting.value("displayName").toString();
         QString serverUrl = meeting.value("serverUrl").toString();
-        qint64 timestamp = meeting.value("timestamp").toVariant().toLongLong();
-
-        QDateTime dateTime = QDateTime::fromSecsSinceEpoch(timestamp);
-        QString timeStr = dateTime.toString("yyyy-MM-dd");
-
-        // 创建自定义显示格式，与Electron版本一致
-        QString itemText = url;
+        QString timestampStr = meeting.value("timestamp").toString();
+        
+        // 解析时间戳
+        QDateTime dateTime = QDateTime::fromString(timestampStr, Qt::ISODate);
+        qint64 timestamp = dateTime.toSecsSinceEpoch();
+        
+        // 如果没有房间名，从URL中提取
+        if (roomName.isEmpty() && !fullUrl.isEmpty())
+        {
+            roomName = extractRoomName(fullUrl);
+        }
+        
+        // 如果仍然没有房间名，使用完整URL
+        if (roomName.isEmpty())
+        {
+            roomName = fullUrl.isEmpty() ? meeting.value("url").toString() : fullUrl;
+        }
 
         QListWidgetItem *item = new QListWidgetItem(m_historyList);
         item->setData(Qt::UserRole, meeting);
-        item->setText(itemText);
+        item->setText(roomName); // 设置基本文本为房间名
 
-        // 创建自定义小部件来显示会议信息
+        // 创建自定义小部件来显示会议信息（仿照jitsi-meet-electron的ConferenceCard）
         QWidget *itemWidget = new QWidget();
         QVBoxLayout *itemLayout = new QVBoxLayout(itemWidget);
-        itemLayout->setContentsMargins(5, 5, 5, 5);
-        itemLayout->setSpacing(2);
+        itemLayout->setContentsMargins(12, 10, 12, 10);
+        itemLayout->setSpacing(4);
 
-        // 添加会议URL标签
-        QLabel *urlLabel = new QLabel(url, itemWidget);
-        urlLabel->setStyleSheet("color: white; font-weight: bold;");
-        itemLayout->addWidget(urlLabel);
+        // 第一行：会议名称（房间名）
+        QLabel *roomLabel = new QLabel(roomName, itemWidget);
+        roomLabel->setObjectName("meetingRoomName");
+        roomLabel->setProperty("class", "meeting-room-name");
+        roomLabel->setWordWrap(true);
+        itemLayout->addWidget(roomLabel);
 
-        // 添加时间标签
-        QLabel *timeLabel = new QLabel(timeStr, itemWidget);
-        timeLabel->setStyleSheet("color: rgba(255, 255, 255, 0.7); font-size: 11px;");
+        // 第二行：服务器地址
+        QString formattedServerUrl = serverUrl;
+        if (formattedServerUrl.isEmpty())
+        {
+            formattedServerUrl = "未知服务器";
+        }
+        else
+        {
+            formattedServerUrl = formatServerUrl(serverUrl);
+            if (formattedServerUrl.isEmpty())
+            {
+                formattedServerUrl = serverUrl; // 如果格式化后为空，使用原始URL
+            }
+        }
+        
+        QLabel *serverLabel = new QLabel(formattedServerUrl, itemWidget);
+        serverLabel->setObjectName("meetingServerUrl");
+        serverLabel->setProperty("class", "meeting-server-url");
+        serverLabel->setWordWrap(true);
+        itemLayout->addWidget(serverLabel);
+
+        // 第三行：会议时间
+        QString formattedTime = formatMeetingTime(timestamp);
+        QLabel *timeLabel = new QLabel(formattedTime, itemWidget);
+        timeLabel->setObjectName("meetingTime");
+        timeLabel->setProperty("class", "meeting-time");
         itemLayout->addWidget(timeLabel);
+
+        // 第四行：距离当前时间的时间差
+        QString relativeTime = getRelativeTime(timestamp);
+        QLabel *relativeTimeLabel = new QLabel(relativeTime, itemWidget);
+        relativeTimeLabel->setObjectName("meetingRelativeTime");
+        relativeTimeLabel->setProperty("class", "meeting-relative-time");
+        itemLayout->addWidget(relativeTimeLabel);
+
+        // 设置小部件样式（使用CSS类名）
+        itemWidget->setObjectName("meetingHistoryItem");
+        itemWidget->setProperty("class", "meeting-history-item");
 
         m_historyList->setItemWidget(item, itemWidget);
 
-        // 设置项目高度
-        item->setSizeHint(QSize(item->sizeHint().width(), 60));
+        // 设置项目高度（增加高度以容纳四行信息）
+        item->setSizeHint(QSize(item->sizeHint().width(), 100));
 
-        // 设置工具提示
-        item->setToolTip(QString("URL: %1\n显示名: %2\n服务器: %3\n时间: %4")
-                             .arg(url, displayName, serverUrl, dateTime.toString("yyyy-MM-dd hh:mm")));
+        // 设置详细的工具提示
+        item->setToolTip(QString("会议名称: %1\n服务器地址: %2\n显示名称: %3\n会议时间: %4\n时间差: %5")
+                             .arg(roomName, formattedServerUrl, displayName, 
+                                  dateTime.toString("yyyy-MM-dd hh:mm:ss"), relativeTime));
     }
 
     // 更新自动完成数据
@@ -1276,7 +1366,10 @@ void WelcomeWindow::loadMeetingHistory()
     for (const QJsonValue &value : history)
     {
         QJsonObject meeting = value.toObject();
-        QString url = meeting["url"].toString();
+        QString url = meeting["fullUrl"].toString();
+        if (url.isEmpty()) {
+            url = meeting["url"].toString();
+        }
         QString displayName = meeting["displayName"].toString();
 
         if (!url.isEmpty() && !urls.contains(url))
@@ -1628,4 +1721,154 @@ void WelcomeWindow::addToHistory(const QString &url, const QString &displayName,
     }
 
     m_configManager->addMeetingRecord(roomName, serverUrl, displayName);
+}
+
+/**
+ * @brief 格式化会议时间显示
+ * @param timestamp 时间戳（秒）
+ * @return 格式化的时间字符串
+ */
+QString WelcomeWindow::formatMeetingTime(qint64 timestamp) const
+{
+    QDateTime dateTime = QDateTime::fromSecsSinceEpoch(timestamp);
+    QDateTime now = QDateTime::currentDateTime();
+    
+    // 如果是今天，显示时间
+    if (dateTime.date() == now.date())
+    {
+        return dateTime.toString("今天 hh:mm");
+    }
+    // 如果是昨天
+    else if (dateTime.date() == now.date().addDays(-1))
+    {
+        return dateTime.toString("昨天 hh:mm");
+    }
+    // 如果是本周内
+    else if (dateTime.date() >= now.date().addDays(-7))
+    {
+        QStringList weekDays = {"周日", "周一", "周二", "周三", "周四", "周五", "周六"};
+        return weekDays[dateTime.date().dayOfWeek() % 7] + " " + dateTime.toString("hh:mm");
+    }
+    // 其他情况显示完整日期
+    else
+    {
+        return dateTime.toString("yyyy-MM-dd hh:mm");
+    }
+}
+
+/**
+ * @brief 计算相对时间差
+ * @param timestamp 时间戳（秒）
+ * @return 相对时间字符串（如"2小时前"、"昨天"等）
+ */
+QString WelcomeWindow::getRelativeTime(qint64 timestamp) const
+{
+    QDateTime dateTime = QDateTime::fromSecsSinceEpoch(timestamp);
+    QDateTime now = QDateTime::currentDateTime();
+    
+    qint64 diffSeconds = dateTime.secsTo(now);
+    
+    if (diffSeconds < 60)
+    {
+        return "刚刚";
+    }
+    else if (diffSeconds < 3600) // 小于1小时
+    {
+        int minutes = diffSeconds / 60;
+        return QString("%1分钟前").arg(minutes);
+    }
+    else if (diffSeconds < 86400) // 小于1天
+    {
+        int hours = diffSeconds / 3600;
+        return QString("%1小时前").arg(hours);
+    }
+    else if (diffSeconds < 604800) // 小于1周
+    {
+        int days = diffSeconds / 86400;
+        return QString("%1天前").arg(days);
+    }
+    else if (diffSeconds < 2592000) // 小于1月
+    {
+        int weeks = diffSeconds / 604800;
+        return QString("%1周前").arg(weeks);
+    }
+    else if (diffSeconds < 31536000) // 小于1年
+    {
+        int months = diffSeconds / 2592000;
+        return QString("%1个月前").arg(months);
+    }
+    else
+    {
+        int years = diffSeconds / 31536000;
+        return QString("%1年前").arg(years);
+    }
+}
+
+/**
+ * @brief 提取房间名称（去除URL参数）
+ * @param url 完整的会议URL
+ * @return 清理后的房间名称
+ */
+QString WelcomeWindow::extractRoomName(const QString &url) const
+{
+    QString roomName = url;
+    
+    // 去除协议前缀
+    if (roomName.startsWith("http://") || roomName.startsWith("https://"))
+    {
+        QUrl parsedUrl(roomName);
+        roomName = parsedUrl.path();
+        if (roomName.startsWith("/"))
+        {
+            roomName = roomName.mid(1);
+        }
+    }
+    
+    // 去除查询参数
+    if (roomName.contains("?"))
+    {
+        roomName = roomName.split("?").first();
+    }
+    
+    // 去除锚点
+    if (roomName.contains("#"))
+    {
+        roomName = roomName.split("#").first();
+    }
+    
+    // 如果包含路径分隔符，取最后一部分
+    if (roomName.contains("/"))
+    {
+        roomName = roomName.split("/").last();
+    }
+    
+    return roomName.isEmpty() ? url : roomName;
+}
+
+/**
+ * @brief 格式化服务器URL显示
+ * @param serverUrl 服务器URL
+ * @return 格式化的服务器地址（去除协议前缀）
+ */
+QString WelcomeWindow::formatServerUrl(const QString &serverUrl) const
+{
+    QString formatted = serverUrl;
+    
+    // 去除协议前缀
+    if (formatted.startsWith("https://"))
+    {
+        formatted = formatted.mid(8);
+    }
+    else if (formatted.startsWith("http://"))
+    {
+        formatted = formatted.mid(7);
+    }
+    
+    // 去除尾部的斜杠
+    if (formatted.endsWith("/"))
+    {
+        formatted = formatted.left(formatted.length() - 1);
+    }
+    
+    return formatted;
 }
