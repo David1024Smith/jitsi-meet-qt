@@ -121,6 +121,12 @@ public:
     void leaveConference();
     
     /**
+     * @brief 隐藏会议窗口但保留资源
+     * 当检测到跳转到close3.html时调用，隐藏窗口但不销毁会议资源
+     */
+    void hideConferenceWindow();
+    
+    /**
      * @brief 加入会议
      * @param roomName 房间名称
      * @param serverUrl 服务器URL
@@ -375,12 +381,18 @@ signals:
     void participantCountChanged(int count);
     
     /**
-     * @brief 聊天消息信号
+     * @brief 聊天消息接收信号
      * @param senderId 发送者ID
      * @param message 消息内容
      * @param timestamp 时间戳
      */
     void chatMessageReceived(const QString& senderId, const QString& message, qint64 timestamp);
+    
+    /**
+     * @brief 会议窗口已隐藏但资源保留信号
+     * 当检测到跳转到close3.html时发出此信号
+     */
+    void conferenceWindowHidden();
 
 private slots:
     

@@ -367,7 +367,7 @@ void WelcomeWindow::onAbout()
 {
     QMessageBox::about(this, tr("关于 Jitsi Meet Qt"),
                        tr("<h3>Jitsi Meet Qt</h3>"
-                          "<p>版本: 2.2.0</p>"
+                          "<p>版本: 2.2.5</p>"
                           "<p>基于Qt的Jitsi Meet桌面客户端</p>"
                           "<p>Copyright © 2025</p>"
                           "<p>使用Qt %1构建</p>")

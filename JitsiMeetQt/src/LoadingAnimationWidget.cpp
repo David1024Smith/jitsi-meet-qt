@@ -534,8 +534,8 @@ void LoadingAnimationWidget::drawLoadingIndicator(QPainter* painter)
     
     painter->save();
     
-    // 计算中心位置
-    QPointF center(width() / 2.0, height() / 2.0 + 20);
+    // 计算中心位置 - 将动画移到界面下方1/4高度位置
+    QPointF center(width() / 2.0, height() * 0.75);
     
     // 应用脉冲缩放
     painter->translate(center);

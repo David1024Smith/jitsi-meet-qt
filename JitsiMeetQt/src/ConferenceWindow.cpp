@@ -1961,6 +1961,13 @@ void ConferenceWindow::onUrlChanged(const QUrl& url)
     
     m_currentUrl = url.toString();
     
+    // 检测是否跳转到close3.html页面
+    if (m_currentUrl.contains("close3.html")) {
+        qDebug() << "ConferenceWindow: 检测到跳转到close3.html，隐藏会议窗口但保留资源";
+        hideConferenceWindow();
+        return;
+    }
+    
     // 解析新的URL信息
     QJsonObject urlInfo = parseConferenceUrl(m_currentUrl);
     m_currentRoom = urlInfo["room"].toString();
@@ -3166,4 +3173,24 @@ void ConferenceWindow::onRenderProcessTerminated(QWebEnginePage::RenderProcessTe
         m_isLoading = false;
         m_webEngineInitialized = false;
     }
+}
+
+/**
+ * @brief 隐藏会议窗口但保留资源
+ * 当检测到跳转到close3.html时调用，隐藏窗口但不销毁会议资源
+ */
+void ConferenceWindow::hideConferenceWindow()
+{
+    qDebug() << "ConferenceWindow: 隐藏会议窗口但保留所有资源";
+    
+    // 保存当前窗口状态
+    saveWindowState();
+    
+    // 隐藏窗口但不关闭
+    hide();
+    
+    // 发出信号通知窗口已隐藏但资源保留
+    emit conferenceWindowHidden();
+    
+    qDebug() << "ConferenceWindow: 窗口已隐藏，会议资源已保留";
 }
