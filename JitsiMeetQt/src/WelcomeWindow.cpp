@@ -22,7 +22,7 @@
 #include <QScrollBar>
 #include <QToolTip>
 #include <QWhatsThis>
-#include <QStatusBar>
+// QStatusBar已移除
 #include <QMenuBar>
 #include <QMenu>
 #include <QAction>
@@ -79,8 +79,7 @@ WelcomeWindow::WelcomeWindow(QWidget *parent)
     , m_infoGroup(nullptr)
     , m_infoLayout(nullptr)
     , m_infoText(nullptr)
-    , m_statusLabel(nullptr)
-    , m_progressBar(nullptr)
+    // 状态标签和进度条已移除
     , m_serverCheckTimer(nullptr)
     , m_urlValidationTimer(nullptr)
     , m_networkManager(nullptr)
@@ -368,7 +367,7 @@ void WelcomeWindow::onAbout()
 {
     QMessageBox::about(this, tr("关于 Jitsi Meet Qt"),
                        tr("<h3>Jitsi Meet Qt</h3>"
-                          "<p>版本: 2.1.0</p>"
+                          "<p>版本: 2.2.0</p>"
                           "<p>基于Qt的Jitsi Meet桌面客户端</p>"
                           "<p>Copyright © 2025</p>"
                           "<p>使用Qt %1构建</p>")
@@ -529,17 +528,7 @@ void WelcomeWindow::onDisplayNameChanged(const QString &text)
  */
 void WelcomeWindow::onServerAvailabilityChecked(bool available, const QString &serverUrl)
 {
-    if (m_statusLabel)
-    {
-        if (available)
-        {
-            m_statusLabel->setText(tr("服务器 %1 可用").arg(serverUrl));
-        }
-        else
-        {
-            m_statusLabel->setText(tr("服务器 %1 不可用").arg(serverUrl));
-        }
-    }
+    // 状态标签已移除
 
     m_isCheckingServer = false;
     updateUIState();
@@ -551,10 +540,7 @@ void WelcomeWindow::onServerAvailabilityChecked(bool available, const QString &s
 void WelcomeWindow::onServerCheckTimeout()
 {
     m_isCheckingServer = false;
-    if (m_statusLabel)
-    {
-        m_statusLabel->setText(tr("服务器检查超时"));
-    }
+    // 状态标签已移除
     updateUIState();
 }
 
@@ -609,7 +595,7 @@ void WelcomeWindow::initializeUI()
 
     // 设置窗口属性
     setWindowTitle(tr("Jitsi Meet Qt"));
-    setWindowIcon(QIcon(":/icons/app.svg"));
+    // 窗口图标已移除
     setMinimumSize(QSize(800, 600));
 
     Logger::instance().info("窗口属性设置完成");
@@ -921,15 +907,9 @@ void WelcomeWindow::initializeUI()
     m_loadingAnimation->setVisible(false); // 初始隐藏
     
     // 创建状态栏
-    m_statusLabel = new QLabel(tr("就绪"));
-    m_statusLabel->setObjectName("statusLabel");
-    m_progressBar = new QProgressBar();
-    m_progressBar->setObjectName("progressBar");
-    m_progressBar->setVisible(false);
+    // 状态标签和进度条已移除
 
-    statusBar()->addWidget(m_statusLabel, 1);
-    statusBar()->addWidget(m_progressBar);
-    statusBar()->setObjectName("statusBar");
+    // 状态栏已移除
 
     // 创建显示名称控件（即使在简化UI中也需要创建以避免空指针）
     m_displayNameLabel = new QLabel(tr("显示名称:"), this);
@@ -1588,16 +1568,7 @@ void WelcomeWindow::checkServerAvailability(const QString &serverUrl)
     m_isCheckingServer = true;
     m_lastCheckedServer = serverUrl;
 
-    if (m_statusLabel)
-    {
-        m_statusLabel->setText(tr("检查服务器 %1...").arg(serverUrl));
-    }
-
-    if (m_progressBar)
-    {
-        m_progressBar->setVisible(true);
-        m_progressBar->setRange(0, 0); // 无限进度条
-    }
+    // 状态标签和进度条已移除
 
     // 启动超时定时器
     if (m_serverCheckTimer)
@@ -1632,9 +1603,7 @@ void WelcomeWindow::checkServerAvailability(const QString &serverUrl)
             m_serverCheckTimer->stop();
         }
         
-        if (m_progressBar) {
-            m_progressBar->setVisible(false);
-        }
+        // 进度条已移除
         
         bool available = (reply->error() == QNetworkReply::NoError);
         onServerAvailabilityChecked(available, serverUrl); });

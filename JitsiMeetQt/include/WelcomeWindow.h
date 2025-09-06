@@ -437,9 +437,7 @@ private:
     QVBoxLayout* m_infoLayout;          ///< 信息布局
     QTextEdit* m_infoText;              ///< 信息文本
     
-    // 状态栏组件
-    QLabel* m_statusLabel;              ///< 状态标签
-    QProgressBar* m_progressBar;        ///< 进度条
+    // 状态栏组件已移除
     
     // 定时器
     QTimer* m_serverCheckTimer;         ///< 服务器检查定时器

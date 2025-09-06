@@ -52,8 +52,8 @@ LoadingAnimationWidget::LoadingAnimationWidget(QWidget *parent)
     initializeUI();
     initializeAnimations();
     
-    // 设置默认Logo
-    setLogo(":/icons/app.svg");
+    // 默认Logo已移除
+    // setLogo("");
     
     qDebug() << "LoadingAnimationWidget: 启动动画组件初始化完成";
 }

@@ -6,7 +6,7 @@
 #include <QApplication>
 #include <QDesktopServices>
 #include <QMessageBox>
-#include <QStatusBar>
+// QStatusBar已移除
 #include <QSplitter>
 #include <QTextEdit>
 #include <QLineEdit>
@@ -58,8 +58,7 @@ ConferenceWindow::ConferenceWindow(QWidget *parent)
     , m_webPage(nullptr)
     , m_statusDisplay(nullptr)
     , m_webContainer(nullptr)
-    , m_statusLabel(nullptr)
-    , m_progressBar(nullptr)
+
     , m_connectionTimer(nullptr)
     , m_reconnectTimer(nullptr)
     , m_networkManager(nullptr)
@@ -366,7 +365,7 @@ void ConferenceWindow::onLoadingAnimationCancelled()
     }
     
     // 更新状态
-    m_statusLabel->setText(tr("已取消加载"));
+    // 状态标签已移除
     showLoadingIndicator(false);
     
     // 发送取消信号
@@ -400,7 +399,7 @@ void ConferenceWindow::initializeUI()
     
     // 设置窗口属性
     setWindowTitle(tr("Jitsi Meet Qt"));
-    setWindowIcon(QIcon(":/icons/app.svg"));
+    // 窗口图标已移除
     setMinimumSize(800, 600);
     resize(1200, 800);
     
@@ -419,18 +418,7 @@ void ConferenceWindow::initializeUI()
     m_mainLayout->setContentsMargins(0, 0, 0, 0);
     m_mainLayout->setSpacing(0);
     
-    // 创建状态栏
-    QStatusBar* statusBar = this->statusBar();
-    
-    // 创建状态标签
-    m_statusLabel = new QLabel(tr("就绪"), this);
-    statusBar->addWidget(m_statusLabel);
-    
-    // 创建进度条
-    m_progressBar = new QProgressBar(this);
-    m_progressBar->setVisible(false);
-    m_progressBar->setMaximumWidth(200);
-    statusBar->addPermanentWidget(m_progressBar);
+    // 状态栏已移除
     
 }
 
@@ -1612,9 +1600,7 @@ void ConferenceWindow::leaveConference()
     m_participantCount = 0;
     
     // 更新UI
-    if (m_statusLabel) {
-        m_statusLabel->setText(tr("已离开会议"));
-    }
+    // 状态标签已移除
 }
 
 /**
@@ -1834,7 +1820,7 @@ void ConferenceWindow::onLoadStarted()
     m_loadProgress = 0;
     
     showLoadingIndicator(true);
-    m_statusLabel->setText(tr("正在连接..."));
+    // 状态标签已移除
     
     // 启动连接超时定时器
     m_connectionTimer->start(CONNECTION_TIMEOUT);
@@ -1847,9 +1833,9 @@ void ConferenceWindow::onLoadStarted()
 void ConferenceWindow::onLoadProgress(int progress)
 {
     m_loadProgress = progress;
-    m_progressBar->setValue(progress);
+    // 进度条已移除
     
-    m_statusLabel->setText(tr("正在加载... %1%").arg(progress));
+    // 状态标签已移除
     
     // 更新启动动画进度
     if (m_loadingAnimation && m_loadingAnimation->isVisible()) {
@@ -1895,7 +1881,7 @@ void ConferenceWindow::onLoadFinished(bool success)
     showLoadingIndicator(false);
     
     if (success) {
-        m_statusLabel->setText(tr("已连接"));
+        // 状态标签已移除
         m_reconnectAttempts = 0; // 重置重连次数
         
         // 更新启动动画到完成状态
@@ -1926,7 +1912,7 @@ void ConferenceWindow::onLoadFinished(bool success)
             });
         });
     } else {
-        m_statusLabel->setText(tr("连接失败"));
+        // 状态标签已移除
         showError(tr("无法连接到会议服务器"));
         
         // 隐藏启动动画
@@ -1942,7 +1928,7 @@ void ConferenceWindow::onLoadFinished(bool success)
         // 尝试重连
         if (m_reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
             m_reconnectAttempts++;
-            m_statusLabel->setText(tr("准备重连... (%1/%2)").arg(m_reconnectAttempts).arg(MAX_RECONNECT_ATTEMPTS));
+            // 状态标签已移除
             m_reconnectTimer->start(RECONNECT_DELAY);
         } else {
             emit conferenceLoadFailed(tr("连接失败，已达到最大重试次数"));
@@ -1991,7 +1977,7 @@ void ConferenceWindow::onConferenceJoined()
     qDebug() << "ConferenceWindow: 会议已加入";
     
     m_isInConference = true;
-    m_statusLabel->setText(tr("已加入会议"));
+    // 状态标签已移除
     
     updateWindowTitle();
     
@@ -2010,7 +1996,7 @@ void ConferenceWindow::onConferenceLeft()
     
     updateWindowTitle();
     
-    m_statusLabel->setText(tr("已离开会议"));
+    // 状态标签已移除
     
     emit conferenceLeft(m_currentRoom);
 }
@@ -2028,7 +2014,7 @@ void ConferenceWindow::onConferenceFailed(const QString& error)
     
     updateWindowTitle();
     
-    m_statusLabel->setText(tr("会议连接失败"));
+    // 状态标签已移除
     
     // 显示错误消息
     QMessageBox::warning(this, tr("会议连接失败"), tr("无法加入会议: %1").arg(error));
@@ -2139,9 +2125,7 @@ void ConferenceWindow::onJitsiMeetLoaded()
     showLoadingIndicator(false);
     
     // 更新状态
-    if (m_statusLabel) {
-        m_statusLabel->setText("会议已准备就绪");
-    }
+    // 状态标签已移除
     
     // 注入JavaScript代码
     injectJavaScript();
@@ -2217,9 +2201,7 @@ void ConferenceWindow::onJavaScriptError(const QString& error)
     qWarning() << "JavaScript错误:" << error;
     
     // 显示错误信息
-    if (m_statusLabel) {
-        m_statusLabel->setText(QString("JavaScript错误: %1").arg(error));
-    }
+    // 状态标签已移除
     
     // 可以考虑重新注入JavaScript代码
     QTimer::singleShot(2000, this, [this]() {
@@ -2237,9 +2219,7 @@ void ConferenceWindow::onPromiseRejected(const QString& reason)
     qWarning() << "Promise被拒绝:" << reason;
     
     // 记录Promise拒绝事件
-    if (m_statusLabel) {
-        m_statusLabel->setText(QString("操作失败: %1").arg(reason));
-    }
+    // 状态标签已移除
     
     // 可以根据拒绝原因采取相应的恢复措施
     if (reason.contains("conference", Qt::CaseInsensitive)) {
@@ -2271,7 +2251,7 @@ void ConferenceWindow::onConnectionTimeout()
         // 尝试重连
         if (m_reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
             m_reconnectAttempts++;
-            m_statusLabel->setText(tr("连接超时，准备重连... (%1/%2)").arg(m_reconnectAttempts).arg(MAX_RECONNECT_ATTEMPTS));
+            // 状态标签已移除
             qDebug() << "ConferenceWindow: 准备第" << m_reconnectAttempts << "次重连";
             
             // 启动重连定时器
@@ -2294,7 +2274,7 @@ void ConferenceWindow::onReconnectTimer()
     m_reconnectTimer->stop();
     
     if (!m_currentUrl.isEmpty()) {
-        m_statusLabel->setText(tr("正在重连..."));
+        // 状态标签已移除
         
         // 重置加载状态
         m_isLoading = true;
@@ -2348,7 +2328,7 @@ void ConferenceWindow::onReconnectRequested()
     m_reconnectTimer->stop();
     
     if (!m_currentUrl.isEmpty()) {
-        m_statusLabel->setText(tr("正在重连..."));
+        // 状态标签已移除
         
         // 重置加载状态
         m_isLoading = true;
@@ -2396,10 +2376,7 @@ void ConferenceWindow::updateWindowTitle()
  */
 void ConferenceWindow::showLoadingIndicator(bool show)
 {
-    m_progressBar->setVisible(show);
-    if (show) {
-        m_progressBar->setValue(m_loadProgress);
-    }
+    // 进度条已移除
 }
 
 /**
@@ -2696,7 +2673,7 @@ void ConferenceWindow::onNetworkReplyFinished()
             // 重置重连计数器
             m_reconnectAttempts = 0;
             
-            m_statusLabel->setText(tr("连接成功，会议已在浏览器中打开"));
+            // 状态标签已移除
             qDebug() << "ConferenceWindow: 连接成功";
             
             // 发送会议加入信号
@@ -2957,11 +2934,7 @@ void ConferenceWindow::showErrorMessage(const QString& message)
 {
     qWarning() << "ConferenceWindow: 显示错误消息:" << message;
     
-    // 这里可以显示一个消息框或在状态栏显示错误
-    if (m_statusLabel) {
-        m_statusLabel->setText(message);
-        m_statusLabel->setStyleSheet("color: red;");
-    }
+    // 状态标签已移除
     
     // 也可以使用QMessageBox显示错误
     // QMessageBox::warning(this, tr("错误"), message);
@@ -2978,10 +2951,10 @@ void ConferenceWindow::onNetworkDiagnosticsCompleted(bool success, const QString
     
     // 显示诊断结果
     if (success) {
-        m_statusLabel->setText(tr("网络诊断: 成功"));
+        // 状态标签已移除
         qDebug() << "ConferenceWindow: 网络诊断成功:" << summary;
     } else {
-        m_statusLabel->setText(tr("网络诊断: 失败"));
+        // 状态标签已移除
         qWarning() << "ConferenceWindow: 网络诊断失败:" << summary;
         
         // 显示错误对话框
@@ -3093,9 +3066,7 @@ void ConferenceWindow::onRenderProcessTerminated(QWebEnginePage::RenderProcessTe
             m_isLoading = false;
             m_webEngineInitialized = false;
             
-            if (m_statusLabel) {
-                m_statusLabel->setText(tr("连接中断"));
-            }
+            // 状态标签已移除
             
             showLoadingIndicator(false);
             // updateToolbarState()方法已移除
@@ -3165,9 +3136,7 @@ void ConferenceWindow::onRenderProcessTerminated(QWebEnginePage::RenderProcessTe
                     // 重新初始化
                     lazyInitializeWebEngine();
                     
-                    if (m_statusLabel) {
-                        m_statusLabel->setText(tr("WebEngine已重新初始化，请重新加入会议"));
-                    }
+                    // 状态标签已移除
                     
                 } catch (const std::exception& e) {
                     qCritical() << "ConferenceWindow: 重新初始化WebEngine时异常:" << e.what();

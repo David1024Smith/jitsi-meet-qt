@@ -18,7 +18,7 @@
 #include <QHBoxLayout>
 #include <QAction>
 #include <QLabel>
-#include <QProgressBar>
+// QProgressBar已移除
 #include <QTimer>
 #include <QCloseEvent>
 #include <QResizeEvent>
@@ -562,9 +562,7 @@ private:
     
     // 工具栏和控件
     
-    // 状态指示器
-    QLabel* m_statusLabel;              ///< 状态标签
-    QProgressBar* m_progressBar;        ///< 进度条
+    // 状态指示器已移除
     
     // 定时器
     QTimer* m_connectionTimer;          ///< 连接超时定时器

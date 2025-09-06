@@ -48,7 +48,7 @@ MainApplication::MainApplication(int &argc, char **argv)
     setOrganizationDomain("jitsi.org");
     
     // 设置应用程序图标
-    setWindowIcon(QIcon(":/images/logo.svg"));
+    setWindowIcon(QIcon(":/icons/icon.png"));
     
     qDebug() << QString("MainApplication 构造函数完成，耗时: %1ms").arg(constructorTimer.elapsed());
 }
@@ -393,7 +393,8 @@ void MainApplication::initializeSystemTray()
     qDebug() << "初始化系统托盘";
     
     m_trayIcon = new QSystemTrayIcon(this);
-    m_trayIcon->setIcon(QIcon(":/icons/app.svg"));
+    QIcon trayIconImage(":/icons/icon.png");
+    m_trayIcon->setIcon(trayIconImage);
     m_trayIcon->setToolTip(tr("Jitsi Meet Qt"));
     
     createTrayMenu();
@@ -460,8 +461,7 @@ void MainApplication::preloadResourcesAsync()
     
     // 可以在这里添加其他资源的异步加载，如图标、翻译文件等
     QtConcurrent::run([this]() {
-        // 预加载应用图标
-        QIcon appIcon(":/icons/app.svg");
+        // 应用图标已移除
         
         // 预加载其他常用图标
         QIcon settingsIcon(":/icons/settings.svg");
