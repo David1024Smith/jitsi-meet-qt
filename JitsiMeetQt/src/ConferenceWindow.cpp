@@ -1,13 +1,12 @@
 #include "ConferenceWindow.h"
 #include "ConfigurationManager.h"
 #include "JitsiMeetAPI.h"
+#include "Logger.h"
 
 #include <QApplication>
 #include <QDesktopServices>
 #include <QMessageBox>
 #include <QStatusBar>
-#include <QMenuBar>
-#include <QMenu>
 #include <QSplitter>
 #include <QTextEdit>
 #include <QLineEdit>
@@ -40,6 +39,7 @@
 #include <QTextStream>
 #include <QRegularExpression>
 #include <QElapsedTimer>
+#include <QDateTime>
 
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -58,14 +58,6 @@ ConferenceWindow::ConferenceWindow(QWidget *parent)
     , m_webPage(nullptr)
     , m_statusDisplay(nullptr)
     , m_webContainer(nullptr)
-    , m_toolbar(nullptr)
-    , m_muteAction(nullptr)
-    , m_cameraAction(nullptr)
-    , m_screenShareAction(nullptr)
-    , m_chatAction(nullptr)
-    , m_fullscreenAction(nullptr)
-    , m_leaveAction(nullptr)
-    , m_settingsAction(nullptr)
     , m_statusLabel(nullptr)
     , m_progressBar(nullptr)
     , m_connectionTimer(nullptr)
@@ -74,6 +66,7 @@ ConferenceWindow::ConferenceWindow(QWidget *parent)
     , m_configManager(ConfigurationManager::instance())
     , m_jitsiAPI(nullptr)
     , m_networkDiagnostics(nullptr)
+    , m_loadingAnimation(nullptr)
     , m_currentUrl()
     , m_currentRoom()
     , m_currentServer()
@@ -103,10 +96,6 @@ ConferenceWindow::ConferenceWindow(QWidget *parent)
     stageTimer.restart();
     initializeUI();
     qDebug() << QString("ConferenceWindow: UI初始化耗时: %1ms").arg(stageTimer.elapsed());
-    
-    stageTimer.restart();
-    initializeToolbar();
-    qDebug() << QString("ConferenceWindow: 工具栏初始化耗时: %1ms").arg(stageTimer.elapsed());
     
     // WebEngine延迟初始化 - 仅在需要时创建，避免阻塞主线程
     qDebug() << "ConferenceWindow: WebEngine采用延迟加载策略，将在首次使用时初始化";
@@ -142,6 +131,27 @@ ConferenceWindow::ConferenceWindow(QWidget *parent)
             this, [this](int progress, const QString& currentStep) {
                 qDebug() << "ConferenceWindow: 网络诊断进度:" << progress << "% -" << currentStep;
             });
+    
+    // 创建启动动画组件
+    m_loadingAnimation = new LoadingAnimationWidget(this);
+    connect(m_loadingAnimation, &LoadingAnimationWidget::animationShown,
+            this, [this]() {
+                qDebug() << "ConferenceWindow: 启动动画显示完成";
+            });
+    connect(m_loadingAnimation, &LoadingAnimationWidget::animationHidden,
+            this, [this]() {
+                qDebug() << "ConferenceWindow: 启动动画隐藏完成";
+            });
+    connect(m_loadingAnimation, &LoadingAnimationWidget::loadingCancelled,
+            this, [this]() {
+                qDebug() << "ConferenceWindow: 用户取消加载";
+                // 停止当前加载过程
+                if (m_isLoading) {
+                    leaveConference();
+                }
+            });
+    
+    qDebug() << "ConferenceWindow: 启动动画组件初始化完成";
     
     // 连接JitsiMeetAPI信号槽
     connect(m_jitsiAPI, &JitsiMeetAPI::roomJoined, this, 
@@ -329,6 +339,41 @@ void ConferenceWindow::performMemoryCleanup()
 }
 
 /**
+ * @brief 处理启动动画取消按钮点击
+ */
+void ConferenceWindow::onLoadingAnimationCancelled()
+{
+    qDebug() << "用户取消了会议加载";
+    
+    // 停止当前的加载过程
+    if (m_webView && m_isLoading) {
+        m_webView->stop();
+        m_isLoading = false;
+    }
+    
+    // 停止相关定时器
+    if (m_connectionTimer && m_connectionTimer->isActive()) {
+        m_connectionTimer->stop();
+    }
+    
+    if (m_reconnectTimer && m_reconnectTimer->isActive()) {
+        m_reconnectTimer->stop();
+    }
+    
+    // 隐藏启动动画
+    if (m_loadingAnimation && m_loadingAnimation->isVisible()) {
+        m_loadingAnimation->hideAnimation();
+    }
+    
+    // 更新状态
+    m_statusLabel->setText(tr("已取消加载"));
+    showLoadingIndicator(false);
+    
+    // 发送取消信号
+    emit conferenceLoadFailed(tr("用户取消了会议加载"));
+}
+
+/**
  * @brief ConferenceWindow析构函数
  */
 ConferenceWindow::~ConferenceWindow()
@@ -400,6 +445,7 @@ void ConferenceWindow::initializeWebEngine()
 
 /**
  * @brief 延迟初始化WebEngine（仅在需要时创建）
+ * 简化版本：快速初始化，减少不必要的配置步骤
  */
 void ConferenceWindow::lazyInitializeWebEngine()
 {
@@ -410,41 +456,113 @@ void ConferenceWindow::lazyInitializeWebEngine()
     QElapsedTimer webEngineTimer;
     webEngineTimer.start();
     
-    qDebug() << "ConferenceWindow: 开始延迟初始化WebEngine";
+    qDebug() << "ConferenceWindow: 开始快速WebEngine初始化";
     
-    // 创建Web容器
-    m_webContainer = new QWidget(this);
-    QVBoxLayout* containerLayout = new QVBoxLayout(m_webContainer);
+    try {
+        // 创建Web容器（最小化布局开销）
+        m_webContainer = new QWidget(this);
+        if (!m_webContainer) {
+            throw std::runtime_error("Failed to create web container");
+        }
+        
+        QVBoxLayout* containerLayout = new QVBoxLayout(m_webContainer);
+        if (!containerLayout) {
+            throw std::runtime_error("Failed to create container layout");
+        }
+        containerLayout->setContentsMargins(0, 0, 0, 0);
+        containerLayout->setSpacing(0);
+        
+        // 创建Web视图（使用QWebEngineView）
+        m_webView = new QWebEngineView(this);
+        if (!m_webView) {
+            throw std::runtime_error("Failed to create QWebEngineView");
+        }
+        
+        // 获取Web页面
+        m_webPage = m_webView->page();
+        if (!m_webPage) {
+            throw std::runtime_error("Failed to get QWebEnginePage");
+        }
+        
+        // 立即设置所有必要的WebEngine配置（一次性完成）
+        setupWebEngineSettings();
+        
+        // 连接所有必要信号
+        connect(m_webView, &QWebEngineView::loadStarted, this, &ConferenceWindow::onLoadStarted);
+        connect(m_webView, &QWebEngineView::loadProgress, this, &ConferenceWindow::onLoadProgress);
+        connect(m_webView, &QWebEngineView::loadFinished, this, &ConferenceWindow::onLoadFinished);
+        connect(m_webPage, &QWebEnginePage::renderProcessTerminated, this, &ConferenceWindow::onRenderProcessTerminated);
+        
+        // 添加到容器布局
+        containerLayout->addWidget(m_webView);
+        
+        // 添加到主布局
+        if (!m_mainLayout) {
+            throw std::runtime_error("Main layout is null");
+        }
+        m_mainLayout->addWidget(m_webContainer);
+        
+        // 标记为已初始化
+        m_webEngineInitialized = true;
+        
+        qDebug() << QString("ConferenceWindow: WebEngine快速初始化完成，耗时: %1ms").arg(webEngineTimer.elapsed());
+        
+    } catch (const std::exception& e) {
+        qCritical() << "ConferenceWindow: WebEngine初始化异常:" << e.what();
+        Logger::instance().error(QString("WebEngine初始化失败: %1").arg(e.what()));
+        
+        // 清理已创建的对象
+        if (m_webView) {
+            m_webView->deleteLater();
+            m_webView = nullptr;
+        }
+        if (m_webContainer) {
+            m_webContainer->deleteLater();
+            m_webContainer = nullptr;
+        }
+        m_webPage = nullptr;
+        m_webEngineInitialized = false;
+        
+        // 显示错误消息
+        QMessageBox::critical(this, tr("初始化错误"), 
+                             tr("WebEngine初始化失败: %1\n\n请重新启动应用程序。").arg(e.what()));
+        return;
+    } catch (...) {
+        qCritical() << "ConferenceWindow: WebEngine初始化发生未知异常";
+        Logger::instance().error("WebEngine初始化发生未知异常");
+        
+        // 清理已创建的对象
+        if (m_webView) {
+            m_webView->deleteLater();
+            m_webView = nullptr;
+        }
+        if (m_webContainer) {
+            m_webContainer->deleteLater();
+            m_webContainer = nullptr;
+        }
+        m_webPage = nullptr;
+        m_webEngineInitialized = false;
+        
+        // 显示错误消息
+        QMessageBox::critical(this, tr("初始化错误"), 
+                             tr("WebEngine初始化发生未知错误\n\n请重新启动应用程序。"));
+        return;
+    }
     
-    // 创建Web视图（使用QWebEngineView）
-    m_webView = new QWebEngineView(this);
-    
-    // 获取Web页面
-    m_webPage = m_webView->page();
-    
-    // 设置WebEngine配置
-    setupWebEngineSettings();
-    
-    // 连接WebEngine信号
-    connect(m_webView, &QWebEngineView::loadStarted, this, &ConferenceWindow::onLoadStarted);
-    connect(m_webView, &QWebEngineView::loadProgress, this, &ConferenceWindow::onLoadProgress);
-    connect(m_webView, &QWebEngineView::loadFinished, this, &ConferenceWindow::onLoadFinished);
-    connect(m_webView, &QWebEngineView::titleChanged, this, &ConferenceWindow::onTitleChanged);
-    connect(m_webView, &QWebEngineView::urlChanged, this, &ConferenceWindow::onUrlChanged);
-    
-    // 添加到容器布局
-    containerLayout->addWidget(m_webView);
-    
-    // 初始化JavaScript桥接
-    initializeJavaScriptBridge();
-    
-    // 添加到主布局
-    m_mainLayout->addWidget(m_webContainer);
-    
-    // 标记为已初始化
-    m_webEngineInitialized = true;
-    
-    qDebug() << QString("ConferenceWindow: WebEngine延迟初始化完成，耗时: %1ms").arg(webEngineTimer.elapsed());
+    // 异步完成剩余的初始化工作
+    QTimer::singleShot(0, this, [this]() {
+        QElapsedTimer asyncTimer;
+        asyncTimer.start();
+        
+        // 连接剩余信号
+        connect(m_webView, &QWebEngineView::titleChanged, this, &ConferenceWindow::onTitleChanged);
+        connect(m_webView, &QWebEngineView::urlChanged, this, &ConferenceWindow::onUrlChanged);
+            
+        // 初始化JavaScript桥接
+        initializeJavaScriptBridge();
+        
+        qDebug() << QString("ConferenceWindow: WebEngine异步初始化完成，耗时: %1ms").arg(asyncTimer.elapsed());
+    });
 }
 
 /**
@@ -455,71 +573,11 @@ bool ConferenceWindow::isWebEngineInitialized() const
     return m_webEngineInitialized;
 }
 
-// 删除重复的setupWebEngineSettings函数定义，保留后面的正确版本
 
-/**
- * @brief 初始化工具栏
- */
-void ConferenceWindow::initializeToolbar()
-{
-    
-    // 创建工具栏
-    m_toolbar = addToolBar(tr("会议控制"));
-    m_toolbar->setObjectName("conferenceToolbar");  // 设置对象名称以避免警告
-    m_toolbar->setMovable(false);
-    m_toolbar->setFloatable(false);
-    
-    // 创建动作
-    m_muteAction = new QAction(QIcon(":/icons/microphone.svg"), tr("静音"), this);
-    m_muteAction->setCheckable(true);
-    m_muteAction->setToolTip(tr("切换麦克风静音状态"));
-    connect(m_muteAction, &QAction::triggered, this, &ConferenceWindow::onMuteAction);
-    
-    m_cameraAction = new QAction(QIcon(":/icons/camera.svg"), tr("摄像头"), this);
-    m_cameraAction->setCheckable(true);
-    m_cameraAction->setToolTip(tr("切换摄像头开关状态"));
-    connect(m_cameraAction, &QAction::triggered, this, &ConferenceWindow::onCameraAction);
-    
-    m_screenShareAction = new QAction(QIcon(":/icons/screen-share.svg"), tr("屏幕共享"), this);
-    m_screenShareAction->setCheckable(true);
-    m_screenShareAction->setToolTip(tr("切换屏幕共享状态"));
-    connect(m_screenShareAction, &QAction::triggered, this, &ConferenceWindow::onScreenShareAction);
-    
-    m_chatAction = new QAction(QIcon(":/icons/chat.svg"), tr("聊天"), this);
-    m_chatAction->setCheckable(true);
-    m_chatAction->setToolTip(tr("显示/隐藏聊天面板"));
-    connect(m_chatAction, &QAction::triggered, this, &ConferenceWindow::onChatAction);
-    
-    m_fullscreenAction = new QAction(QIcon(":/icons/fullscreen.svg"), tr("全屏"), this);
-    m_fullscreenAction->setCheckable(true);
-    m_fullscreenAction->setToolTip(tr("切换全屏模式"));
-    connect(m_fullscreenAction, &QAction::triggered, this, &ConferenceWindow::onFullscreenAction);
-    
-    m_leaveAction = new QAction(QIcon(":/icons/leave.svg"), tr("离开"), this);
-    m_leaveAction->setToolTip(tr("离开会议"));
-    connect(m_leaveAction, &QAction::triggered, this, &ConferenceWindow::onLeaveAction);
-    
-    m_settingsAction = new QAction(QIcon(":/icons/settings.svg"), tr("设置"), this);
-    m_settingsAction->setToolTip(tr("打开设置"));
-    connect(m_settingsAction, &QAction::triggered, this, &ConferenceWindow::onSettingsAction);
-    
-    // 添加动作到工具栏
-    m_toolbar->addAction(m_muteAction);
-    m_toolbar->addAction(m_cameraAction);
-    m_toolbar->addAction(m_screenShareAction);
-    m_toolbar->addSeparator();
-    m_toolbar->addAction(m_chatAction);
-    m_toolbar->addAction(m_fullscreenAction);
-    m_toolbar->addSeparator();
-    m_toolbar->addAction(m_leaveAction);
-    m_toolbar->addAction(m_settingsAction);
-    
-    // 初始状态下禁用控制按钮
-    updateToolbarState();
-}
 
 /**
  * @brief 设置WebEngine配置
+ * 优化版本：减少配置项，专注于核心功能和性能
  */
 void ConferenceWindow::setupWebEngineSettings()
 {
@@ -531,86 +589,40 @@ void ConferenceWindow::setupWebEngineSettings()
     
     QWebEngineSettings* settings = m_webView->settings();
     
-    // 启用JavaScript
+    // === 核心功能配置 ===
     settings->setAttribute(QWebEngineSettings::JavascriptEnabled, true);
-    
-    // 启用本地存储
     settings->setAttribute(QWebEngineSettings::LocalStorageEnabled, true);
     
-    // 启用WebGL
     settings->setAttribute(QWebEngineSettings::WebGLEnabled, true);
-    
-    // 启用媒体访问
     settings->setAttribute(QWebEngineSettings::PluginsEnabled, true);
-    
-    // 启用自动播放媒体
     settings->setAttribute(QWebEngineSettings::PlaybackRequiresUserGesture, false);
-    
-    // 允许运行不安全内容（用于开发环境）
-    settings->setAttribute(QWebEngineSettings::AllowRunningInsecureContent, true);
-    
-    // 启用全屏支持
     settings->setAttribute(QWebEngineSettings::FullScreenSupportEnabled, true);
-    
-    // 允许本地内容访问远程URL
-    settings->setAttribute(QWebEngineSettings::LocalContentCanAccessRemoteUrls, true);
-    
-    // 启用WebRTC功能
     settings->setAttribute(QWebEngineSettings::WebRTCPublicInterfacesOnly, false);
     
     // === 性能优化设置 ===
-    // 启用硬件加速
     settings->setAttribute(QWebEngineSettings::Accelerated2dCanvasEnabled, true);
-    
-    // 启用GPU光栅化
-    settings->setAttribute(QWebEngineSettings::WebGLEnabled, true);
-    
-    // 启用DNS预取
-    settings->setAttribute(QWebEngineSettings::DnsPrefetchEnabled, true);
-    
-    // 启用触摸图标
-    settings->setAttribute(QWebEngineSettings::TouchIconsEnabled, false); // 禁用以节省内存
-    
-    // 启用焦点在页面加载时
     settings->setAttribute(QWebEngineSettings::FocusOnNavigationEnabled, true);
     
-    // 启用PDF查看器插件
-    settings->setAttribute(QWebEngineSettings::PdfViewerEnabled, false); // 禁用以节省内存
+    // 禁用不必要的功能以提升性能
+    settings->setAttribute(QWebEngineSettings::TouchIconsEnabled, false);
+    settings->setAttribute(QWebEngineSettings::PdfViewerEnabled, false);
     
-    // 设置默认字体大小（优化渲染性能）
+    // 简化字体设置
     settings->setFontSize(QWebEngineSettings::DefaultFontSize, 14);
-    settings->setFontSize(QWebEngineSettings::DefaultFixedFontSize, 13);
-    settings->setFontSize(QWebEngineSettings::MinimumFontSize, 8);
-    settings->setFontSize(QWebEngineSettings::MinimumLogicalFontSize, 6);
     
-    // 设置用户代理 - 使用最新Chrome用户代理以确保兼容性
+    // 设置用户代理
     QString userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
     m_webView->page()->profile()->setHttpUserAgent(userAgent);
     
-    // === 配置WebEngine Profile以优化性能 ===
+    // === 简化的Profile配置 ===
     QWebEngineProfile* profile = m_webView->page()->profile();
-    
-    // 设置缓存策略
     profile->setHttpCacheType(QWebEngineProfile::DiskHttpCache);
-    profile->setHttpCacheMaximumSize(100 * 1024 * 1024); // 100MB缓存
+    profile->setHttpCacheMaximumSize(50 * 1024 * 1024); // 减少到50MB缓存
+    profile->setSpellCheckEnabled(false); // 禁用拼写检查提升性能
     
-    // 设置持久化Cookie策略
-    profile->setPersistentCookiesPolicy(QWebEngineProfile::ForcePersistentCookies);
-    
-    // 启用拼写检查（可选，可能影响性能）
-    profile->setSpellCheckEnabled(false); // 禁用以提升性能
-    
-    // 设置下载路径
-    QString downloadPath = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
-    profile->setDownloadPath(downloadPath);
-    
-    // 设置状态显示
-    if (m_statusDisplay) {
-        m_statusDisplay->setText("Jitsi Meet 客户端已就绪（性能优化已启用）");
-    }
-    
-    qDebug() << "ConferenceWindow: WebEngine性能优化配置完成";
+    qDebug() << "ConferenceWindow: WebEngine配置完成";
 }
+
 
 /**
  * @brief 初始化JavaScript桥接
@@ -1250,19 +1262,89 @@ bool ConferenceWindow::loadConference(const QString& url, const QString& display
 {
     // 加载会议URL
     
-    if (url.isEmpty()) {
-        qWarning() << "ConferenceWindow: 会议URL为空";
+    try {
+        if (url.isEmpty()) {
+            throw std::invalid_argument("会议URL为空");
+        }
+        
+        // 验证URL格式
+        QUrl qurl(url);
+        if (!qurl.isValid()) {
+            throw std::invalid_argument(QString("无效的会议URL: %1").arg(url).toStdString());
+        }
+        
+        // 确保WebEngine已初始化（延迟加载策略）
+        if (!isWebEngineInitialized()) {
+            qDebug() << "ConferenceWindow: 开始延迟初始化WebEngine";
+            lazyInitializeWebEngine();
+            if (!isWebEngineInitialized()) {
+                throw std::runtime_error("WebEngine初始化失败");
+            }
+        }
+        
+        // 检查关键组件
+        if (!m_webView || !m_webPage) {
+            throw std::runtime_error("WebEngine组件未正确初始化");
+        }
+        
+    } catch (const std::invalid_argument& e) {
+        qCritical() << "ConferenceWindow: 参数错误:" << e.what();
+        Logger::instance().error(QString("加载会议参数错误: %1").arg(e.what()));
+        return false;
+        
+    } catch (const std::runtime_error& e) {
+        qCritical() << "ConferenceWindow: 运行时错误:" << e.what();
+        Logger::instance().error(QString("加载会议运行时错误: %1").arg(e.what()));
+        return false;
+        
+    } catch (const std::exception& e) {
+        qCritical() << "ConferenceWindow: 异常:" << e.what();
+        Logger::instance().error(QString("加载会议异常: %1").arg(e.what()));
+        return false;
+        
+    } catch (...) {
+        qCritical() << "ConferenceWindow: 未知异常";
+        Logger::instance().error("加载会议发生未知异常");
         return false;
     }
     
-    // 确保WebEngine已初始化（延迟加载策略）
-    if (!isWebEngineInitialized()) {
-        qDebug() << "ConferenceWindow: 开始延迟初始化WebEngine";
+    // 确保WebEngine已初始化，以便获取正确的容器大小
+    if (!m_webEngineInitialized) {
         lazyInitializeWebEngine();
-        if (!isWebEngineInitialized()) {
-            qWarning() << "ConferenceWindow: WebEngine初始化失败";
-            return false;
-        }
+    }
+    
+    // 显示启动动画
+    if (m_loadingAnimation) {
+        // 先显示动画，然后设置正确的大小
+        m_loadingAnimation->showAnimation();
+        m_loadingAnimation->updateMessage("正在连接会议服务器...");
+        m_loadingAnimation->updateProgress(10);
+        
+        // 使用QTimer确保在下一个事件循环中设置动画大小，此时布局已经完成
+        QTimer::singleShot(0, this, [this]() {
+            if (m_loadingAnimation && m_loadingAnimation->isVisible()) {
+                QRect targetGeometry;
+                
+                if (m_webContainer && m_webContainer->isVisible()) {
+                    // 使用webContainer的大小，这是真正的会议界面容器
+                    targetGeometry = m_webContainer->geometry();
+                    qDebug() << "ConferenceWindow: 延迟设置动画大小为webContainer:" << targetGeometry;
+                } else if (m_centralWidget) {
+                    // 如果webContainer还未显示，使用centralWidget的大小
+                    targetGeometry = m_centralWidget->rect();
+                    qDebug() << "ConferenceWindow: 延迟设置动画大小为centralWidget:" << targetGeometry;
+                }
+                
+                // 确保几何属性有效
+                if (targetGeometry.isValid() && !targetGeometry.isEmpty()) {
+                    m_loadingAnimation->setGeometry(targetGeometry);
+                    m_loadingAnimation->raise(); // 确保在最前面显示
+                    qDebug() << "ConferenceWindow: 动画大小设置完成:" << targetGeometry;
+                } else {
+                    qDebug() << "ConferenceWindow: 目标几何属性无效，将在resizeEvent中重新设置";
+                }
+            }
+        });
     }
     
     // 保存参数
@@ -1311,12 +1393,25 @@ bool ConferenceWindow::loadConference(const QString& url, const QString& display
         fullUrl = qurl.toString();
     }
     
+    // 更新动画进度
+    if (m_loadingAnimation) {
+        m_loadingAnimation->updateMessage("正在准备会议资源...");
+        m_loadingAnimation->updateProgress(30);
+    }
+    
     // 开始加载
     m_isLoading = true;
     m_connectionTimer->start(CONNECTION_TIMEOUT);
     
     // 使用QWebEngineView加载实际的Jitsi Meet页面
     qDebug() << "ConferenceWindow: 开始加载会议URL:" << fullUrl;
+    
+    // 更新动画进度
+    if (m_loadingAnimation) {
+        m_loadingAnimation->updateMessage("正在加载会议界面...");
+        m_loadingAnimation->updateProgress(50);
+    }
+    
     m_webView->load(QUrl(fullUrl));
     
     // 初始化WebEngine（如果还未初始化）
@@ -1345,16 +1440,56 @@ bool ConferenceWindow::loadRoom(const QString& roomName, const QString& serverUr
 {
     // 加载会议房间
     
-    if (roomName.isEmpty()) {
-        qWarning() << "ConferenceWindow: 房间名称为空";
+    try {
+        if (roomName.isEmpty()) {
+            throw std::invalid_argument("房间名称为空");
+        }
+        
+        // 验证房间名称格式（基本检查）
+        if (roomName.contains(QRegularExpression("[<>\"'&]")) || roomName.length() > 255) {
+            throw std::invalid_argument(QString("房间名称格式无效: %1").arg(roomName).toStdString());
+        }
+        
+        // 检查配置管理器
+        if (!m_configManager) {
+            throw std::runtime_error("配置管理器未初始化");
+        }
+        
+        // 构建会议URL
+        QString server = serverUrl.isEmpty() ? m_configManager->getDefaultServerUrl() : serverUrl;
+        if (server.isEmpty()) {
+            throw std::runtime_error("无法获取有效的服务器URL");
+        }
+        
+        QString url = buildConferenceUrl(roomName, server, displayName, password);
+        if (url.isEmpty()) {
+            throw std::runtime_error("构建会议URL失败");
+        }
+        
+        Logger::instance().info(QString("加载会议房间: %1 (服务器: %2)").arg(roomName, server));
+        
+        return loadConference(url, displayName, password);
+        
+    } catch (const std::invalid_argument& e) {
+        qCritical() << "ConferenceWindow: 房间参数错误:" << e.what();
+        Logger::instance().error(QString("加载房间参数错误: %1").arg(e.what()));
+        return false;
+        
+    } catch (const std::runtime_error& e) {
+        qCritical() << "ConferenceWindow: 加载房间运行时错误:" << e.what();
+        Logger::instance().error(QString("加载房间运行时错误: %1").arg(e.what()));
+        return false;
+        
+    } catch (const std::exception& e) {
+        qCritical() << "ConferenceWindow: 加载房间异常:" << e.what();
+        Logger::instance().error(QString("加载房间异常: %1").arg(e.what()));
+        return false;
+        
+    } catch (...) {
+        qCritical() << "ConferenceWindow: 加载房间发生未知异常";
+        Logger::instance().error("加载房间发生未知异常");
         return false;
     }
-    
-    // 构建会议URL
-    QString server = serverUrl.isEmpty() ? m_configManager->getDefaultServerUrl() : serverUrl;
-    QString url = buildConferenceUrl(roomName, server, displayName, password);
-    
-    return loadConference(url, displayName, password);
 }
 
 /**
@@ -1458,22 +1593,14 @@ void ConferenceWindow::leaveConference()
     qDebug() << "ConferenceWindow: 离开会议";
     
     if (m_isInConference) {
-        // 使用JitsiMeetAPI离开房间
-        if (m_jitsiAPI) {
-            qDebug() << "ConferenceWindow: 使用JitsiMeetAPI离开房间:" << m_currentRoom;
-            m_jitsiAPI->leaveRoom(m_currentRoom);
-            
-            qDebug() << "ConferenceWindow: 使用JitsiMeetAPI断开服务器连接";
-            m_jitsiAPI->disconnectFromServer();
-        }
         
-        // 通过JavaScript离开会议（作为备用方案）
-        executeJavaScript("if (window.qtJitsiMeet) { window.qtJitsiMeet.leaveConference(); }");
+        // 通过JavaScript快速离开会议
+        if (m_webView && m_webView->page()) {
+            m_webView->page()->runJavaScript("if (window.qtJitsiMeet) { window.qtJitsiMeet.leaveConference(); }");
+        }
         
         // 更新状态
         m_isInConference = false;
-        updateToolbarState();
-        updateWindowTitle();
         
         // 发送信号
         emit conferenceLeft(m_currentRoom);
@@ -1485,7 +1612,9 @@ void ConferenceWindow::leaveConference()
     m_participantCount = 0;
     
     // 更新UI
-    m_statusLabel->setText(tr("已离开会议"));
+    if (m_statusLabel) {
+        m_statusLabel->setText(tr("已离开会议"));
+    }
 }
 
 /**
@@ -1497,90 +1626,67 @@ void ConferenceWindow::joinConference(const QString& roomName, const QString& se
 {
     qDebug() << "加入会议:" << roomName << "服务器:" << serverUrl;
     
-    // 参考Electron版本，只使用WebEngine加载会议页面，不使用REST API
-    // 移除JitsiMeetAPI调用，避免双重连接导致的问题
-    if (loadRoom(roomName, serverUrl)) {
-        qDebug() << "ConferenceWindow: 使用WebEngine加载会议页面:" << roomName;
-        show();
-        raise();
-        activateWindow();
-    } else {
-        qWarning() << "无法加载会议页面:" << roomName;
-        showError(QString("无法加载会议页面: %1").arg(roomName));
+    try {
+        // 验证输入参数
+        if (roomName.isEmpty()) {
+            throw std::invalid_argument("房间名称不能为空");
+        }
+        
+        // 确保WebEngine已初始化
+        if (!m_webEngineInitialized) {
+            lazyInitializeWebEngine();
+        }
+        
+        // 检查WebEngine是否成功初始化
+        if (!m_webView || !m_webPage) {
+            throw std::runtime_error("WebEngine未正确初始化");
+        }
+        
+        Logger::instance().info(QString("开始加入会议: %1 (服务器: %2)").arg(roomName, serverUrl));
+        if (loadRoom(roomName, serverUrl)) {
+            qDebug() << "ConferenceWindow: 使用WebEngine加载会议页面:" << roomName;
+            show();
+            raise();
+            activateWindow();
+        } else {
+            throw std::runtime_error(QString("无法加载会议页面: %1").arg(roomName).toStdString());
+        }
+        
+    } catch (const std::invalid_argument& e) {
+        qCritical() << "ConferenceWindow: 参数错误:" << e.what();
+        Logger::instance().error(QString("加入会议参数错误: %1").arg(e.what()));
+        
+        QMessageBox::warning(this, tr("参数错误"), 
+                            tr("加入会议失败: %1\n\n请检查房间名称是否正确。").arg(e.what()));
+        return;
+        
+    } catch (const std::runtime_error& e) {
+        qCritical() << "ConferenceWindow: 加入会议运行时错误:" << e.what();
+        Logger::instance().error(QString("加入会议失败: %1").arg(e.what()));
+        
+        QMessageBox::critical(this, tr("加入会议失败"), 
+                             tr("无法加入会议: %1\n\n请重新启动应用程序后重试。").arg(e.what()));
+        return;
+        
+    } catch (const std::exception& e) {
+        qCritical() << "ConferenceWindow: 加入会议异常:" << e.what();
+        Logger::instance().error(QString("加入会议异常: %1").arg(e.what()));
+        
+        QMessageBox::critical(this, tr("加入会议失败"), 
+                             tr("加入会议时发生错误: %1\n\n请重试或联系技术支持。").arg(e.what()));
+        return;
+        
+    } catch (...) {
+        qCritical() << "ConferenceWindow: 加入会议发生未知异常";
+        Logger::instance().error("加入会议发生未知异常");
+        
+        QMessageBox::critical(this, tr("加入会议失败"), 
+                             tr("加入会议时发生未知错误\n\n请重试或联系技术支持。"));
+        return;
     }
 }
 
-/**
- * @brief 切换静音状态
- */
-void ConferenceWindow::toggleMute()
-{
-    qDebug() << "ConferenceWindow: 切换静音状态";
-    
-    if (m_isInConference) {
-        executeJavaScript("if (window.qtJitsiMeet) { window.qtJitsiMeet.toggleMute(); }");
-    }
-}
 
-/**
- * @brief 切换摄像头状态
- */
-void ConferenceWindow::toggleCamera()
-{
-    qDebug() << "ConferenceWindow: 切换摄像头状态";
-    
-    if (m_isInConference) {
-        executeJavaScript("if (window.qtJitsiMeet) { window.qtJitsiMeet.toggleCamera(); }");
-    }
-}
-
-/**
- * @brief 切换屏幕共享
- */
-void ConferenceWindow::toggleScreenShare()
-{
-    qDebug() << "ConferenceWindow: 切换屏幕共享";
-    
-    if (m_isInConference) {
-        executeJavaScript("if (window.qtJitsiMeet) { window.qtJitsiMeet.toggleScreenShare(); }");
-    }
-}
-
-/**
- * @brief 切换聊天面板
- */
-void ConferenceWindow::toggleChat()
-{
-    qDebug() << "ConferenceWindow: 切换聊天面板";
-    
-    if (m_isInConference) {
-        executeJavaScript("if (window.qtJitsiMeet) { window.qtJitsiMeet.toggleChat(); }");
-        m_isChatVisible = !m_isChatVisible;
-        m_chatAction->setChecked(m_isChatVisible);
-    }
-}
-
-/**
- * @brief 切换全屏模式
- */
-void ConferenceWindow::toggleFullscreen()
-{
-    qDebug() << "ConferenceWindow: 切换全屏模式";
-    
-    if (m_isFullscreen) {
-        showNormal();
-        m_toolbar->setVisible(true);
-        statusBar()->setVisible(true);
-        m_isFullscreen = false;
-    } else {
-        showFullScreen();
-        m_toolbar->setVisible(false);
-        statusBar()->setVisible(false);
-        m_isFullscreen = true;
-    }
-    
-    m_fullscreenAction->setChecked(m_isFullscreen);
-}
 
 /**
  * @brief 设置显示名称
@@ -1634,20 +1740,86 @@ void ConferenceWindow::executeJavaScript(const QString& script, std::function<vo
 {
     qDebug() << "ConferenceWindow: 执行JavaScript:" << script;
     
-    if (!m_webView) {
-        qWarning() << "ConferenceWindow: WebView未初始化，无法执行JavaScript";
+    try {
+        // 参数验证
+        if (script.isEmpty()) {
+            throw std::invalid_argument("JavaScript脚本不能为空");
+        }
+        
+        if (script.length() > 10000) {
+            throw std::invalid_argument("JavaScript脚本过长，可能存在安全风险");
+        }
+        
+        // WebView状态检查
+        if (!m_webView) {
+            throw std::runtime_error("WebView未初始化");
+        }
+        
+        if (!m_webPage) {
+            throw std::runtime_error("WebPage未初始化");
+        }
+        
+        if (!m_webEngineInitialized) {
+            throw std::runtime_error("WebEngine未完成初始化");
+        }
+        
+        // 检查WebEngine进程状态
+        if (m_webView->page()->isLoading()) {
+            qWarning() << "ConferenceWindow: 页面正在加载中，延迟执行JavaScript";
+            QTimer::singleShot(500, this, [this, script, callback]() {
+                executeJavaScript(script, callback);
+            });
+            return;
+        }
+        
+        // 执行JavaScript
+        if (callback) {
+            m_webView->page()->runJavaScript(script, [this, script, callback](const QVariant& result) {
+                try {
+                    callback(result);
+                } catch (const std::exception& e) {
+                    qCritical() << "ConferenceWindow: JavaScript回调异常:" << e.what();
+                    Logger::instance().error(QString("JavaScript回调异常: %1, 脚本: %2").arg(e.what(), script));
+                } catch (...) {
+                    qCritical() << "ConferenceWindow: JavaScript回调发生未知异常";
+                    Logger::instance().error(QString("JavaScript回调未知异常, 脚本: %1").arg(script));
+                }
+            });
+        } else {
+            m_webView->page()->runJavaScript(script);
+        }
+        
+    } catch (const std::invalid_argument& e) {
+        qCritical() << "ConferenceWindow: JavaScript执行参数错误:" << e.what();
+        Logger::instance().error(QString("JavaScript执行参数错误: %1, 脚本: %2").arg(e.what(), script));
+        
         if (callback) {
             callback(QVariant());
         }
-        return;
-    }
-    
-    if (callback) {
-        m_webView->page()->runJavaScript(script, [callback](const QVariant& result) {
-            callback(result);
-        });
-    } else {
-        m_webView->page()->runJavaScript(script);
+        
+    } catch (const std::runtime_error& e) {
+        qCritical() << "ConferenceWindow: JavaScript执行运行时错误:" << e.what();
+        Logger::instance().error(QString("JavaScript执行运行时错误: %1, 脚本: %2").arg(e.what(), script));
+        
+        if (callback) {
+            callback(QVariant());
+        }
+        
+    } catch (const std::exception& e) {
+        qCritical() << "ConferenceWindow: JavaScript执行异常:" << e.what();
+        Logger::instance().error(QString("JavaScript执行异常: %1, 脚本: %2").arg(e.what(), script));
+        
+        if (callback) {
+            callback(QVariant());
+        }
+        
+    } catch (...) {
+        qCritical() << "ConferenceWindow: JavaScript执行发生未知异常";
+        Logger::instance().error(QString("JavaScript执行未知异常, 脚本: %1").arg(script));
+        
+        if (callback) {
+            callback(QVariant());
+        }
     }
 }
 
@@ -1678,6 +1850,36 @@ void ConferenceWindow::onLoadProgress(int progress)
     m_progressBar->setValue(progress);
     
     m_statusLabel->setText(tr("正在加载... %1%").arg(progress));
+    
+    // 更新启动动画进度
+    if (m_loadingAnimation && m_loadingAnimation->isVisible()) {
+        // 将WebEngine的加载进度映射到50-90%的范围
+        int animationProgress = 50 + (progress * 40 / 100);
+        m_loadingAnimation->updateProgress(animationProgress);
+        
+        if (progress < 30) {
+            m_loadingAnimation->updateMessage("正在建立连接...");
+        } else if (progress < 60) {
+            m_loadingAnimation->updateMessage("正在加载会议组件...");
+        } else if (progress < 90) {
+            m_loadingAnimation->updateMessage("正在初始化会议环境...");
+        } else {
+            m_loadingAnimation->updateMessage("即将进入会议...");
+        }
+        
+        // 在加载过程中重新调整动画大小，确保正确覆盖会议界面
+        if (progress >= 30 && m_webContainer && m_webContainer->isVisible()) {
+            QRect containerGeometry = m_webContainer->geometry();
+            if (containerGeometry.isValid() && !containerGeometry.isEmpty()) {
+                QRect currentGeometry = m_loadingAnimation->geometry();
+                if (currentGeometry != containerGeometry) {
+                    m_loadingAnimation->setGeometry(containerGeometry);
+                    m_loadingAnimation->raise();
+                    qDebug() << "ConferenceWindow: 在加载过程中重新调整动画大小:" << containerGeometry;
+                }
+            }
+        }
+    }
 }
 
 /**
@@ -1696,14 +1898,46 @@ void ConferenceWindow::onLoadFinished(bool success)
         m_statusLabel->setText(tr("已连接"));
         m_reconnectAttempts = 0; // 重置重连次数
         
+        // 更新启动动画到完成状态
+        if (m_loadingAnimation && m_loadingAnimation->isVisible()) {
+            m_loadingAnimation->updateProgress(95);
+            m_loadingAnimation->updateMessage("会议加载完成，正在进入...");
+        }
+        
+        
         // 注入JavaScript代码以建立与Jitsi Meet的桥接
         QTimer::singleShot(1000, this, [this]() {
             injectJavaScript();
             qDebug() << "ConferenceWindow: JavaScript注入完成";
+            
+            // 延迟隐藏启动动画，确保平滑过渡
+            QTimer::singleShot(1500, this, [this]() {
+                if (m_loadingAnimation) {
+                    m_loadingAnimation->updateProgress(100);
+                    m_loadingAnimation->updateMessage("欢迎进入会议！");
+                    
+                    // 再延迟一点时间让用户看到完成状态
+                    QTimer::singleShot(800, this, [this]() {
+                        if (m_loadingAnimation) {
+                            m_loadingAnimation->hideAnimation();
+                        }
+                    });
+                }
+            });
         });
     } else {
         m_statusLabel->setText(tr("连接失败"));
         showError(tr("无法连接到会议服务器"));
+        
+        // 隐藏启动动画
+        if (m_loadingAnimation && m_loadingAnimation->isVisible()) {
+            m_loadingAnimation->updateMessage("连接失败");
+            QTimer::singleShot(1000, this, [this]() {
+                if (m_loadingAnimation) {
+                    m_loadingAnimation->hideAnimation();
+                }
+            });
+        }
         
         // 尝试重连
         if (m_reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
@@ -1759,7 +1993,6 @@ void ConferenceWindow::onConferenceJoined()
     m_isInConference = true;
     m_statusLabel->setText(tr("已加入会议"));
     
-    updateToolbarState();
     updateWindowTitle();
     
     emit conferenceJoined(m_currentRoom);
@@ -1775,7 +2008,6 @@ void ConferenceWindow::onConferenceLeft()
     m_isInConference = false;
     m_participantCount = 0;
     
-    updateToolbarState();
     updateWindowTitle();
     
     m_statusLabel->setText(tr("已离开会议"));
@@ -1794,7 +2026,6 @@ void ConferenceWindow::onConferenceFailed(const QString& error)
     m_isInConference = false;
     m_participantCount = 0;
     
-    updateToolbarState();
     updateWindowTitle();
     
     m_statusLabel->setText(tr("会议连接失败"));
@@ -1873,9 +2104,6 @@ void ConferenceWindow::onAudioMuteChanged(bool muted)
     qDebug() << "ConferenceWindow: 音频状态变化:" << muted;
     
     m_isMuted = muted;
-    m_muteAction->setChecked(muted);
-    m_muteAction->setIcon(QIcon(muted ? ":/icons/microphone-off.svg" : ":/icons/microphone.svg"));
-    m_muteAction->setText(muted ? tr("取消静音") : tr("静音"));
 }
 
 /**
@@ -1887,9 +2115,6 @@ void ConferenceWindow::onVideoMuteChanged(bool muted)
     qDebug() << "ConferenceWindow: 视频状态变化:" << muted;
     
     m_isCameraOff = muted;
-    m_cameraAction->setChecked(muted);
-    m_cameraAction->setIcon(QIcon(muted ? ":/icons/camera-off.svg" : ":/icons/camera.svg"));
-    m_cameraAction->setText(muted ? tr("开启摄像头") : tr("关闭摄像头"));
 }
 
 /**
@@ -1901,8 +2126,6 @@ void ConferenceWindow::onScreenShareChanged(bool sharing)
     qDebug() << "ConferenceWindow: 屏幕共享状态变化:" << sharing;
     
     m_isScreenSharing = sharing;
-    m_screenShareAction->setChecked(sharing);
-    m_screenShareAction->setText(sharing ? tr("停止共享") : tr("屏幕共享"));
 }
 
 /**
@@ -2032,63 +2255,7 @@ void ConferenceWindow::onPromiseRejected(const QString& reason)
     }
 }
 
-/**
- * @brief 处理工具栏静音动作
- */
-void ConferenceWindow::onMuteAction()
-{
-    toggleMute();
-}
 
-/**
- * @brief 处理工具栏摄像头动作
- */
-void ConferenceWindow::onCameraAction()
-{
-    toggleCamera();
-}
-
-/**
- * @brief 处理工具栏屏幕共享动作
- */
-void ConferenceWindow::onScreenShareAction()
-{
-    toggleScreenShare();
-}
-
-/**
- * @brief 处理工具栏聊天动作
- */
-void ConferenceWindow::onChatAction()
-{
-    toggleChat();
-}
-
-/**
- * @brief 处理工具栏全屏动作
- */
-void ConferenceWindow::onFullscreenAction()
-{
-    toggleFullscreen();
-}
-
-/**
- * @brief 处理工具栏离开动作
- */
-void ConferenceWindow::onLeaveAction()
-{
-    leaveConference();
-    close();
-}
-
-/**
- * @brief 处理工具栏设置动作
- */
-void ConferenceWindow::onSettingsAction()
-{
-    qDebug() << "ConferenceWindow: 打开设置";
-    // TODO: 实现设置对话框
-}
 
 /**
  * @brief 处理连接超时
@@ -2222,19 +2389,6 @@ void ConferenceWindow::updateWindowTitle()
     setWindowTitle(title);
 }
 
-/**
- * @brief 更新工具栏状态
- */
-void ConferenceWindow::updateToolbarState()
-{
-    bool enabled = m_isInConference;
-    
-    m_muteAction->setEnabled(enabled);
-    m_cameraAction->setEnabled(enabled);
-    m_screenShareAction->setEnabled(enabled);
-    m_chatAction->setEnabled(enabled);
-    m_leaveAction->setEnabled(enabled || m_isLoading);
-}
 
 /**
  * @brief 显示加载指示器
@@ -2306,9 +2460,23 @@ void ConferenceWindow::closeEvent(QCloseEvent *event)
     // 保存窗口状态
     saveWindowState();
     
-    // 离开会议
+    // 快速离开会议（带超时机制）
     if (m_isInConference) {
-        leaveConference();
+        // 设置超时定时器，防止卡死
+        QTimer::singleShot(2000, this, [this]() {
+            qWarning() << "ConferenceWindow: 离开会议超时，强制关闭";
+            QApplication::quit();
+        });
+        
+        // 快速离开会议
+        m_isInConference = false;
+        
+        // 仅执行必要的清理，避免复杂操作
+        if (m_webView && m_webView->page()) {
+            m_webView->page()->runJavaScript("if (window.qtJitsiMeet) { window.qtJitsiMeet.leaveConference(); }");
+        }
+        
+        emit conferenceLeft(m_currentRoom);
     }
     
     // 发送窗口关闭信号
@@ -2324,6 +2492,23 @@ void ConferenceWindow::closeEvent(QCloseEvent *event)
 void ConferenceWindow::resizeEvent(QResizeEvent *event)
 {
     QMainWindow::resizeEvent(event);
+    
+    // 调整LoadingAnimationWidget大小以覆盖整个会议界面
+    if (m_loadingAnimation) {
+        if (m_webContainer) {
+            // 使用会议界面容器的大小，这是真正的会议显示区域
+            QRect containerGeometry = m_webContainer->geometry();
+            m_loadingAnimation->setGeometry(containerGeometry);
+            m_loadingAnimation->raise(); // 确保在最前面显示
+            qDebug() << "ConferenceWindow: resizeEvent中调整动画大小为webContainer:" << containerGeometry;
+        } else if (m_centralWidget) {
+            // 如果webContainer还未创建，使用centralWidget的大小
+            QRect centralRect = m_centralWidget->rect();
+            m_loadingAnimation->setGeometry(centralRect);
+            m_loadingAnimation->raise();
+            qDebug() << "ConferenceWindow: resizeEvent中调整动画大小为centralWidget:" << centralRect;
+        }
+    }
     
     // 保存窗口状态（延迟保存以避免频繁写入）
     static QTimer* saveTimer = nullptr;
@@ -2385,37 +2570,106 @@ void ConferenceWindow::onJavaScriptMessage(const QJsonObject& message)
 {
     qDebug() << "ConferenceWindow: JavaScript message:" << message;
     
-    // 处理来自Web页面的JavaScript消息
-    QString type = message["type"].toString();
-    
-    if (type == "conferenceJoined") {
-        // 会议加入成功
-        QString roomName = message["roomName"].toString();
-        emit conferenceJoined(roomName);
-    } else if (type == "conferenceLeft") {
-        // 会议离开
-        onConferenceJoined(); // 调用会议结束处理
-    } else if (type == "error") {
-        // 错误消息
-        QString errorMsg = message["message"].toString();
-        onNetworkError(errorMsg);
-    } else if (type == "jitsiMeetLoaded") {
-        // Jitsi Meet加载完成
-        onJitsiMeetLoaded();
-    } else if (type == "conferenceStateUpdate") {
-        // 会议状态更新
-        onConferenceStateUpdated(message);
-    } else if (type == "javascriptError") {
-        // JavaScript错误
-        QString error = message["error"].toString();
-        QString source = message["source"].toString();
-        int line = message["line"].toInt();
-        QString detailedError = QString("%1 (来源: %2, 行: %3)").arg(error, source).arg(line);
-        onJavaScriptError(detailedError);
-    } else if (type == "promiseRejected") {
-        // Promise拒绝
-        QString reason = message["reason"].toString();
-        onPromiseRejected(reason);
+    try {
+        // 消息验证
+        if (message.isEmpty()) {
+            throw std::invalid_argument("JavaScript消息为空");
+        }
+        
+        if (!message.contains("type")) {
+            throw std::invalid_argument("JavaScript消息缺少type字段");
+        }
+        
+        // 处理来自Web页面的JavaScript消息
+        QString type = message["type"].toString();
+        
+        if (type.isEmpty()) {
+            throw std::invalid_argument("JavaScript消息type字段为空");
+        }
+        
+        // 记录消息处理
+        Logger::instance().debug(QString("处理JavaScript消息: %1").arg(type));
+        
+        if (type == "conferenceJoined") {
+            // 会议加入成功
+            if (!message.contains("roomName")) {
+                throw std::runtime_error("conferenceJoined消息缺少roomName字段");
+            }
+            
+            QString roomName = message["roomName"].toString();
+            if (roomName.isEmpty()) {
+                throw std::runtime_error("会议房间名称为空");
+            }
+            
+            emit conferenceJoined(roomName);
+            
+        } else if (type == "conferenceLeft") {
+            // 会议离开
+            onConferenceJoined(); // 调用会议结束处理
+            
+        } else if (type == "error") {
+            // 错误消息
+            if (!message.contains("message")) {
+                throw std::runtime_error("error消息缺少message字段");
+            }
+            
+            QString errorMsg = message["message"].toString();
+            if (errorMsg.isEmpty()) {
+                errorMsg = "未知JavaScript错误";
+            }
+            
+            onNetworkError(errorMsg);
+            
+        } else if (type == "jitsiMeetLoaded") {
+            // Jitsi Meet加载完成
+            onJitsiMeetLoaded();
+            
+        } else if (type == "conferenceStateUpdate") {
+            // 会议状态更新
+            onConferenceStateUpdated(message);
+            
+        } else if (type == "javascriptError") {
+            // JavaScript错误
+            QString error = message["error"].toString();
+            QString source = message["source"].toString();
+            int line = message["line"].toInt();
+            
+            if (error.isEmpty()) {
+                error = "未知JavaScript错误";
+            }
+            
+            QString detailedError = QString("%1 (来源: %2, 行: %3)").arg(error, source).arg(line);
+            onJavaScriptError(detailedError);
+            
+        } else if (type == "promiseRejected") {
+            // Promise拒绝
+            QString reason = message["reason"].toString();
+            if (reason.isEmpty()) {
+                reason = "未知Promise拒绝原因";
+            }
+            
+            onPromiseRejected(reason);
+            
+        } else {
+            qWarning() << "ConferenceWindow: 未知的JavaScript消息类型:" << type;
+            Logger::instance().warning(QString("未知的JavaScript消息类型: %1").arg(type));
+        }
+        
+    } catch (const std::invalid_argument& e) {
+        qCritical() << "ConferenceWindow: JavaScript消息参数错误:" << e.what();
+        Logger::instance().error(QString("JavaScript消息参数错误: %1").arg(e.what()));
+        
+    } catch (const std::runtime_error& e) {
+        qCritical() << "ConferenceWindow: JavaScript消息处理运行时错误:" << e.what();
+        Logger::instance().error(QString("JavaScript消息处理运行时错误: %1").arg(e.what()));
+        
+    } catch (const std::exception& e) {
+        qCritical() << "ConferenceWindow: JavaScript消息处理异常:" << e.what();
+        Logger::instance().error(QString("JavaScript消息处理异常: %1").arg(e.what()));
+        
+    } catch (...) {
+        qCritical() << "ConferenceWindow: JavaScript消息处理发生未知异常";
+        Logger::instance().error("JavaScript消息处理未知异常");
     }
 }
 
@@ -2784,5 +3038,163 @@ void ConferenceWindow::onPermissionRequested(QWebEnginePermission permission)
         qDebug() << "ConferenceWindow: 拒绝未知权限请求";
         permission.deny();
         break;
+    }
+}
+
+/**
+ * @brief 处理WebEngine渲染进程崩溃
+ * @param terminationStatus 终止状态
+ * @param exitCode 退出代码
+ */
+void ConferenceWindow::onRenderProcessTerminated(QWebEnginePage::RenderProcessTerminationStatus terminationStatus, int exitCode)
+{
+    try {
+        QString statusText;
+        QString errorMessage;
+        
+        // 记录进程终止事件
+        qCritical() << "ConferenceWindow: WebEngine渲染进程终止 - 状态:" << terminationStatus << "退出代码:" << exitCode;
+        
+        switch (terminationStatus) {
+        case QWebEnginePage::NormalTerminationStatus:
+            statusText = "正常终止";
+            errorMessage = tr("WebEngine进程正常终止");
+            qDebug() << "ConferenceWindow: WebEngine进程正常终止，退出代码:" << exitCode;
+            break;
+        case QWebEnginePage::AbnormalTerminationStatus:
+            statusText = "异常终止";
+            errorMessage = tr("WebEngine进程异常终止，可能是由于内存不足或其他系统问题");
+            qCritical() << "ConferenceWindow: WebEngine进程异常终止，退出代码:" << exitCode;
+            break;
+        case QWebEnginePage::CrashedTerminationStatus:
+            statusText = "崩溃";
+            errorMessage = tr("WebEngine进程崩溃，这可能是由于JavaScript错误、内存问题或驱动程序问题");
+            qCritical() << "ConferenceWindow: WebEngine进程崩溃，退出代码:" << exitCode;
+            break;
+        case QWebEnginePage::KilledTerminationStatus:
+            statusText = "被杀死";
+            errorMessage = tr("WebEngine进程被系统杀死，可能是由于内存不足");
+            qCritical() << "ConferenceWindow: WebEngine进程被杀死，退出代码:" << exitCode;
+            break;
+        default:
+            statusText = "未知状态";
+            errorMessage = tr("WebEngine进程以未知状态终止");
+            qWarning() << "ConferenceWindow: WebEngine进程未知状态终止，退出代码:" << exitCode;
+            break;
+        }
+        
+        // 记录详细的崩溃信息
+        Logger::instance().error(QString("WebEngine渲染进程终止 - 状态: %1, 退出代码: %2")
+                                 .arg(statusText).arg(exitCode));
+        
+        // 安全地更新UI状态
+        try {
+            m_isInConference = false;
+            m_isLoading = false;
+            m_webEngineInitialized = false;
+            
+            if (m_statusLabel) {
+                m_statusLabel->setText(tr("连接中断"));
+            }
+            
+            showLoadingIndicator(false);
+            // updateToolbarState()方法已移除
+            
+        } catch (const std::exception& e) {
+            qCritical() << "ConferenceWindow: 更新UI状态时异常:" << e.what();
+            Logger::instance().error(QString("更新UI状态异常: %1").arg(e.what()));
+        } catch (...) {
+            qCritical() << "ConferenceWindow: 更新UI状态时发生未知异常";
+            Logger::instance().error("更新UI状态未知异常");
+        }
+        
+        // 显示错误对话框
+        try {
+            QString fullMessage = QString("%1\n\n退出代码: %2\n\n建议解决方案:\n• 重新启动应用程序\n• 检查系统内存是否充足\n• 更新显卡驱动程序\n• 关闭其他占用内存的程序")
+                                 .arg(errorMessage).arg(exitCode);
+            
+            QMessageBox::critical(this, tr("WebEngine进程终止"), fullMessage);
+            
+        } catch (const std::exception& e) {
+            qCritical() << "ConferenceWindow: 显示错误对话框时异常:" << e.what();
+            Logger::instance().error(QString("显示错误对话框异常: %1").arg(e.what()));
+        } catch (...) {
+            qCritical() << "ConferenceWindow: 显示错误对话框时发生未知异常";
+            Logger::instance().error("显示错误对话框未知异常");
+        }
+        
+        // 发出会议失败信号
+        try {
+            emit conferenceFailed(m_currentRoom, QString("WebEngine进程%1 (退出代码: %2)").arg(statusText).arg(exitCode));
+        } catch (const std::exception& e) {
+            qCritical() << "ConferenceWindow: 发出会议失败信号时异常:" << e.what();
+            Logger::instance().error(QString("发出会议失败信号异常: %1").arg(e.what()));
+        } catch (...) {
+            qCritical() << "ConferenceWindow: 发出会议失败信号时发生未知异常";
+            Logger::instance().error("发出会议失败信号未知异常");
+        }
+        
+        // 尝试重新初始化WebEngine（如果不是正常终止）
+        if (terminationStatus != QWebEnginePage::NormalTerminationStatus) {
+            QTimer::singleShot(2000, this, [this]() {
+                try {
+                    qDebug() << "ConferenceWindow: 尝试重新初始化WebEngine";
+                    m_webEngineInitialized = false;
+                    
+                    // 安全地清理现有的WebEngine组件
+                    try {
+                        if (m_webView) {
+                            m_webView->deleteLater();
+                            m_webView = nullptr;
+                        }
+                        if (m_webPage) {
+                            m_webPage = nullptr;
+                        }
+                        if (m_webContainer) {
+                            m_webContainer->deleteLater();
+                            m_webContainer = nullptr;
+                        }
+                    } catch (const std::exception& e) {
+                        qCritical() << "ConferenceWindow: 清理WebEngine组件时异常:" << e.what();
+                        Logger::instance().error(QString("清理WebEngine组件异常: %1").arg(e.what()));
+                    } catch (...) {
+                        qCritical() << "ConferenceWindow: 清理WebEngine组件时发生未知异常";
+                        Logger::instance().error("清理WebEngine组件未知异常");
+                    }
+                    
+                    // 重新初始化
+                    lazyInitializeWebEngine();
+                    
+                    if (m_statusLabel) {
+                        m_statusLabel->setText(tr("WebEngine已重新初始化，请重新加入会议"));
+                    }
+                    
+                } catch (const std::exception& e) {
+                    qCritical() << "ConferenceWindow: 重新初始化WebEngine时异常:" << e.what();
+                    Logger::instance().error(QString("重新初始化WebEngine异常: %1").arg(e.what()));
+                } catch (...) {
+                    qCritical() << "ConferenceWindow: 重新初始化WebEngine时发生未知异常";
+                    Logger::instance().error("重新初始化WebEngine未知异常");
+                }
+            });
+        }
+        
+    } catch (const std::exception& e) {
+        qCritical() << "ConferenceWindow: 处理渲染进程终止时异常:" << e.what();
+        Logger::instance().error(QString("处理渲染进程终止异常: %1").arg(e.what()));
+        
+        // 最基本的错误处理
+        m_isInConference = false;
+        m_isLoading = false;
+        m_webEngineInitialized = false;
+        
+    } catch (...) {
+        qCritical() << "ConferenceWindow: 处理渲染进程终止时发生未知异常";
+        Logger::instance().error("处理渲染进程终止未知异常");
+        
+        // 最基本的错误处理
+        m_isInConference = false;
+        m_isLoading = false;
+        m_webEngineInitialized = false;
     }
 }

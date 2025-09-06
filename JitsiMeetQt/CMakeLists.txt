@@ -43,6 +43,7 @@ set(SOURCES
     src/JitsiMeetAPI.cpp
     src/NetworkDiagnostics.cpp
     src/Logger.cpp
+    src/LoadingAnimationWidget.cpp
 )
 
 # 头文件
@@ -57,6 +58,7 @@ set(HEADERS
     include/JitsiMeetAPI.h
     include/NetworkDiagnostics.h
     include/Logger.h
+    include/LoadingAnimationWidget.h
 )
 
 # 资源文件

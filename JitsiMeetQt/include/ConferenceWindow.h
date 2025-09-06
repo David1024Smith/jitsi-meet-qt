@@ -16,7 +16,6 @@
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
-#include <QToolBar>
 #include <QAction>
 #include <QLabel>
 #include <QProgressBar>
@@ -32,6 +31,7 @@
 #include <QNetworkReply>
 #include <QSslConfiguration>
 #include "NetworkDiagnostics.h"
+#include "LoadingAnimationWidget.h"
 
 
 QT_BEGIN_NAMESPACE
@@ -43,7 +43,6 @@ class QLabel;
 class QWidget;
 class QVBoxLayout;
 class QHBoxLayout;
-class QToolBar;
 class QAction;
 class QProgressBar;
 class QTimer;
@@ -128,30 +127,7 @@ public:
      */
     void joinConference(const QString& roomName, const QString& serverUrl = QString());
     
-    /**
-     * @brief 切换静音状态
-     */
-    void toggleMute();
-    
-    /**
-     * @brief 切换摄像头状态
-     */
-    void toggleCamera();
-    
-    /**
-     * @brief 切换屏幕共享
-     */
-    void toggleScreenShare();
-    
-    /**
-     * @brief 显示/隐藏聊天面板
-     */
-    void toggleChat();
-    
-    /**
-     * @brief 切换全屏模式
-     */
-    void toggleFullscreen();
+
     
     /**
      * @brief 设置显示名称
@@ -407,16 +383,6 @@ signals:
     void chatMessageReceived(const QString& senderId, const QString& message, qint64 timestamp);
 
 private slots:
-    /**
-     * @brief 处理工具栏动作
-     */
-    void onMuteAction();
-    void onCameraAction();
-    void onScreenShareAction();
-    void onChatAction();
-    void onFullscreenAction();
-    void onLeaveAction();
-    void onSettingsAction();
     
     /**
      * @brief 处理连接超时
@@ -467,7 +433,19 @@ private slots:
      */
     void performMemoryCleanup();
     
+    /**
+     * @brief 处理启动动画取消按钮点击
+     */
+    void onLoadingAnimationCancelled();
+    
     void onPermissionRequested(QWebEnginePermission permission);
+    
+    /**
+     * @brief 处理渲染进程终止事件
+     * @param terminationStatus 终止状态
+     * @param exitCode 退出代码
+     */
+    void onRenderProcessTerminated(QWebEnginePage::RenderProcessTerminationStatus terminationStatus, int exitCode);
     
     // WebEngine信号处理
     // onLoadStarted、onLoadProgress、onLoadFinished、onTitleChanged和onUrlChanged方法已在前面声明，此处删除重复声明
@@ -493,10 +471,7 @@ private:
      */
     bool isWebEngineInitialized() const;
     
-    /**
-     * @brief 初始化工具栏
-     */
-    void initializeToolbar();
+
     
     /**
      * @brief 初始化JavaScript桥接
@@ -547,11 +522,6 @@ private:
     void updateWindowTitle();
     
     /**
-     * @brief 更新工具栏状态
-     */
-    void updateToolbarState();
-    
-    /**
      * @brief 显示加载指示器
      * @param show 是否显示
      */
@@ -591,14 +561,6 @@ private:
     QWidget* m_webContainer;            ///< Web容器
     
     // 工具栏和控件
-    QToolBar* m_toolbar;                ///< 工具栏
-    QAction* m_muteAction;              ///< 静音动作
-    QAction* m_cameraAction;            ///< 摄像头动作
-    QAction* m_screenShareAction;       ///< 屏幕共享动作
-    QAction* m_chatAction;              ///< 聊天动作
-    QAction* m_fullscreenAction;        ///< 全屏动作
-    QAction* m_leaveAction;             ///< 离开动作
-    QAction* m_settingsAction;          ///< 设置动作
     
     // 状态指示器
     QLabel* m_statusLabel;              ///< 状态标签
@@ -612,10 +574,11 @@ private:
     // 网络管理
     QNetworkAccessManager* m_networkManager; ///< 网络访问管理器
     
-    // 配置和API
+    // 业务对象
     ConfigurationManager* m_configManager; ///< 配置管理器
     JitsiMeetAPI* m_jitsiAPI;           ///< Jitsi Meet API
     NetworkDiagnostics* m_networkDiagnostics; ///< 网络诊断工具
+    LoadingAnimationWidget* m_loadingAnimation; ///< 启动动画组件
     
     // 状态变量
     QString m_currentUrl;               ///< 当前URL

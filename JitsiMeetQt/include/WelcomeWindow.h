@@ -53,6 +53,7 @@ QT_END_NAMESPACE
 
 class ConfigurationManager;
 class ProtocolHandler;
+class LoadingAnimationWidget;
 
 /**
  * @brief 欢迎窗口类 - 应用程序的主入口界面
@@ -123,28 +124,46 @@ public:
     void refreshMeetingHistory();
     
     /**
-     * @brief 清除输入字段
+     * @brief 清空所有输入
      */
     void clearInputs();
+    
+    /**
+     * @brief 显示启动动画
+     * @param message 动画显示的消息
+     */
+    void showLoadingAnimation(const QString& message = QString());
+    
+    /**
+     * @brief 隐藏启动动画
+     * @param fadeOut 是否使用淡出效果
+     */
+    void hideLoadingAnimation(bool fadeOut = true);
+    
+    /**
+     * @brief 更新启动动画进度
+     * @param progress 进度值（0-100）
+     */
+    void updateLoadingProgress(int progress);
 
 protected:
     /**
      * @brief 窗口关闭事件处理
      * @param event 关闭事件
      */
-    void closeEvent(QCloseEvent *event) override;
+    void closeEvent(QCloseEvent* event) override;
+    
+    /**
+     * @brief 窗口大小改变事件处理
+     * @param event 大小改变事件
+     */
+    void resizeEvent(QResizeEvent* event) override;
     
     /**
      * @brief 窗口显示事件处理
      * @param event 显示事件
      */
     void showEvent(QShowEvent *event) override;
-    
-    /**
-     * @brief 窗口大小改变事件处理
-     * @param event 大小改变事件
-     */
-    void resizeEvent(QResizeEvent *event) override;
 
 public slots:
     /**
@@ -438,6 +457,9 @@ private:
     // 管理器
     ConfigurationManager* m_configManager; ///< 配置管理器
     ProtocolHandler* m_protocolHandler; ///< 协议处理器
+    
+    // 启动动画组件
+    LoadingAnimationWidget* m_loadingAnimation; ///< 启动动画组件
     
     // 状态变量
     bool m_isValidatingUrl;             ///< 是否正在验证URL

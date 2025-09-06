@@ -2,6 +2,7 @@
 #include "ConfigurationManager.h"
 #include "ProtocolHandler.h"
 #include "Logger.h"
+#include "LoadingAnimationWidget.h"
 #include <QString>
 #include <type_traits>
 #include <QApplication>
@@ -34,6 +35,7 @@
 #include <QSvgRenderer>
 #include <QFile>
 #include <QIODevice>
+#include <QTimer>
 
 /**
  * @brief WelcomeWindow构造函数
@@ -88,6 +90,7 @@ WelcomeWindow::WelcomeWindow(QWidget *parent)
     , m_nameModel(nullptr)
     , m_configManager(nullptr)
     , m_protocolHandler(nullptr)
+    , m_loadingAnimation(nullptr)
     , m_isValidatingUrl(false)
     , m_isCheckingServer(false)
 {
@@ -288,20 +291,7 @@ void WelcomeWindow::showEvent(QShowEvent *event)
     refreshMeetingHistory();
 }
 
-/**
- * @brief 窗口大小改变事件处理
- * @param event 大小改变事件
- */
-void WelcomeWindow::resizeEvent(QResizeEvent *event)
-{
-    QMainWindow::resizeEvent(event);
 
-    // 保存窗口大小
-    if (m_configManager)
-    {
-        m_configManager->setMainWindowSize(size());
-    }
-}
 
 /**
  * @brief 加入会议按钮点击处理
@@ -378,7 +368,7 @@ void WelcomeWindow::onAbout()
 {
     QMessageBox::about(this, tr("关于 Jitsi Meet Qt"),
                        tr("<h3>Jitsi Meet Qt</h3>"
-                          "<p>版本: 2.0.0</p>"
+                          "<p>版本: 2.1.0</p>"
                           "<p>基于Qt的Jitsi Meet桌面客户端</p>"
                           "<p>Copyright © 2025</p>"
                           "<p>使用Qt %1构建</p>")
@@ -925,6 +915,11 @@ void WelcomeWindow::initializeUI()
     m_historyList->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
     m_historyList->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 
+    // 创建启动动画组件
+    m_loadingAnimation = new LoadingAnimationWidget(this);
+    m_loadingAnimation->setObjectName("loadingAnimation");
+    m_loadingAnimation->setVisible(false); // 初始隐藏
+    
     // 创建状态栏
     m_statusLabel = new QLabel(tr("就绪"));
     m_statusLabel->setObjectName("statusLabel");
@@ -1030,6 +1025,14 @@ void WelcomeWindow::initializeLayout()
 
     // 设置窗口布局
     m_centralWidget->setLayout(m_mainLayout);
+    
+    // 将启动动画组件添加为覆盖层
+    if (m_loadingAnimation) {
+        // 设置启动动画组件的父窗口为中央窗口部件
+        m_loadingAnimation->setParent(m_centralWidget);
+        // 确保启动动画在最前面显示
+        m_loadingAnimation->raise();
+    }
 
     // 确保侧边栏在最前面显示，避免被其他组件遮挡
     m_sidebarPanel->raise();
@@ -1869,7 +1872,7 @@ void WelcomeWindow::onDeleteHistoryItem(QListWidgetItem *item)
  * @param serverUrl 服务器URL
  * @return 格式化的服务器地址（去除协议前缀）
  */
-QString WelcomeWindow::formatServerUrl(const QString &serverUrl) const
+QString WelcomeWindow::formatServerUrl(const QString& serverUrl) const
 {
     QString formatted = serverUrl;
     
@@ -1890,4 +1893,58 @@ QString WelcomeWindow::formatServerUrl(const QString &serverUrl) const
     }
     
     return formatted;
+}
+
+/**
+ * @brief 窗口大小改变事件处理
+ * @param event 大小改变事件
+ */
+void WelcomeWindow::resizeEvent(QResizeEvent* event)
+{
+    QMainWindow::resizeEvent(event);
+    
+    // 调整启动动画组件的大小以覆盖整个中央窗口部件
+    if (m_loadingAnimation && m_centralWidget) {
+        m_loadingAnimation->setGeometry(m_centralWidget->rect());
+    }
+}
+
+/**
+ * @brief 显示启动动画
+ * @param message 动画显示的消息
+ */
+void WelcomeWindow::showLoadingAnimation(const QString& message)
+{
+    if (m_loadingAnimation) {
+        // 调整动画组件大小以覆盖整个中央窗口部件
+        if (m_centralWidget) {
+            m_loadingAnimation->setGeometry(m_centralWidget->rect());
+        }
+        
+        // 显示动画
+        m_loadingAnimation->showAnimation(message.isEmpty() ? tr("正在启动...") : message);
+        m_loadingAnimation->raise(); // 确保在最前面显示
+    }
+}
+
+/**
+ * @brief 隐藏启动动画
+ * @param fadeOut 是否使用淡出效果
+ */
+void WelcomeWindow::hideLoadingAnimation(bool fadeOut)
+{
+    if (m_loadingAnimation) {
+        m_loadingAnimation->hideAnimation(fadeOut);
+    }
+}
+
+/**
+ * @brief 更新启动动画进度
+ * @param progress 进度值（0-100）
+ */
+void WelcomeWindow::updateLoadingProgress(int progress)
+{
+    if (m_loadingAnimation) {
+        m_loadingAnimation->updateProgress(progress);
+    }
 }
