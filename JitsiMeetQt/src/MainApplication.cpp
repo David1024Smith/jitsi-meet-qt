@@ -15,6 +15,9 @@
 #include <QStyleFactory>
 #include <QFile>
 #include <QTextStream>
+#include <QElapsedTimer>
+#include <QtConcurrent/QtConcurrent>
+#include <QFutureWatcher>
 
 // 静态成员初始化
 MainApplication* MainApplication::s_instance = nullptr;
@@ -30,7 +33,11 @@ MainApplication::MainApplication(int &argc, char **argv)
     , m_translator(nullptr)
     , m_currentLanguage("zh_CN")
     , m_initialized(false)
+    , m_conferenceWindowReady(false)
 {
+    QElapsedTimer constructorTimer;
+    constructorTimer.start();
+    
     // 设置单例实例
     s_instance = this;
     
@@ -41,9 +48,9 @@ MainApplication::MainApplication(int &argc, char **argv)
     setOrganizationDomain("jitsi.org");
     
     // 设置应用程序图标
-    setWindowIcon(QIcon(":/icons/app.svg"));
+    setWindowIcon(QIcon(":/images/logo.svg"));
     
-    qDebug() << "MainApplication 构造函数完成";
+    qDebug() << QString("MainApplication 构造函数完成，耗时: %1ms").arg(constructorTimer.elapsed());
 }
 
 MainApplication::~MainApplication()
@@ -64,27 +71,44 @@ bool MainApplication::initialize()
         return true;
     }
     
+    QElapsedTimer initTimer, stageTimer;
+    initTimer.start();
+    stageTimer.start();
+    
     qDebug() << "开始初始化应用程序...";
     
     try {
         // 初始化配置管理器
+        stageTimer.restart();
         m_configManager = ConfigurationManager::instance();// 配置管理器已通过单例模式自动初始化
+        qDebug() << QString("配置管理器初始化耗时: %1ms").arg(stageTimer.elapsed());
         
         // 初始化协议处理器
+        stageTimer.restart();
         m_protocolHandler = std::make_unique<ProtocolHandler>(this);
         if (!m_protocolHandler->registerProtocol()) {
             qWarning() << "协议注册失败，但应用程序将继续运行";
         }
+        qDebug() << QString("协议处理器初始化耗时: %1ms").arg(stageTimer.elapsed());
         
         // 连接协议处理器信号
         connect(m_protocolHandler.get(), &ProtocolHandler::protocolUrlReceived,
                 this, &MainApplication::handleProtocolUrl);
         
         // 初始化翻译
+        stageTimer.restart();
         initializeTranslations();
+        qDebug() << QString("翻译初始化耗时: %1ms").arg(stageTimer.elapsed());
         
-        // 初始化主题
-        initializeTheme();
+        // 启动异步资源预加载
+        stageTimer.restart();
+        preloadResourcesAsync();
+        qDebug() << QString("异步资源预加载启动耗时: %1ms").arg(stageTimer.elapsed());
+        
+        // 为了确保UI立即可用，先同步加载基础样式
+         stageTimer.restart();
+         loadStyleSheet("default");
+         qDebug() << QString("基础样式表同步加载耗时: %1ms").arg(stageTimer.elapsed());
         
         // 初始化系统托盘 - 暂时跳过以避免初始化问题
         // if (QSystemTrayIcon::isSystemTrayAvailable()) {
@@ -94,7 +118,9 @@ bool MainApplication::initialize()
         // }
         
         // 创建窗口实例
+        stageTimer.restart();
         m_welcomeWindow = std::make_unique<WelcomeWindow>();
+        qDebug() << QString("WelcomeWindow创建耗时: %1ms").arg(stageTimer.elapsed());
         connect(m_welcomeWindow.get(), &WelcomeWindow::joinMeetingRequested,
                 this, [this](const QString& url, const QString& displayName, const QString& password) {
                     Q_UNUSED(password)
@@ -133,14 +159,16 @@ bool MainApplication::initialize()
         connect(m_welcomeWindow.get(), &WelcomeWindow::settingsRequested,
                 this, &MainApplication::showSettingsDialog);
         
-        m_conferenceWindow = std::make_unique<ConferenceWindow>();
-        connect(m_conferenceWindow.get(), &ConferenceWindow::conferenceLeft,
-                this, &MainApplication::onConferenceWindowClosed);
+        // 启动ConferenceWindow的异步并行初始化
+        qDebug() << "开始ConferenceWindow异步初始化";
+        initializeConferenceWindowAsync();
         
+        stageTimer.restart();
         m_settingsDialog = std::make_unique<SettingsDialog>();
+        qDebug() << QString("SettingsDialog创建耗时: %1ms").arg(stageTimer.elapsed());
         
         m_initialized = true;
-        qDebug() << "应用程序初始化完成";
+        qDebug() << QString("应用程序初始化完成，总耗时: %1ms").arg(initTimer.elapsed());
         return true;
         
     } catch (const std::exception& e) {
@@ -172,8 +200,19 @@ void MainApplication::showConferenceWindow(const QString &roomName, const QStrin
 {
     qDebug() << "显示会议窗口 - 房间:" << roomName << "服务器:" << serverUrl;
     
-    if (!m_conferenceWindow) {
-        qCritical() << "会议窗口未初始化";
+    // 检查ConferenceWindow是否已准备就绪
+    if (!isConferenceWindowReady()) {
+        qDebug() << "ConferenceWindow未初始化，开始初始化...";
+        initializeConferenceWindowAsync();
+        
+        // 连接一次性信号，等待初始化完成后再显示窗口
+        QMetaObject::Connection* connection = new QMetaObject::Connection();
+        *connection = connect(this, &MainApplication::conferenceWindowReady, this, 
+            [this, roomName, serverUrl, connection]() {
+                disconnect(*connection);
+                delete connection;
+                showConferenceWindow(roomName, serverUrl);
+            });
         return;
     }
     
@@ -393,7 +432,7 @@ void MainApplication::initializeTheme()
 
 void MainApplication::loadStyleSheet(const QString &themeName)
 {
-    qDebug() << "加载样式表:" << themeName;
+    qDebug() << "同步加载样式表:" << themeName;
     
     // 直接加载main.qss样式文件
     QString styleFile = ":/styles/main.qss";
@@ -407,6 +446,76 @@ void MainApplication::loadStyleSheet(const QString &themeName)
     } else {
         qWarning() << "无法加载样式表:" << styleFile;
     }
+}
+
+/**
+ * @brief 异步预加载静态资源
+ */
+void MainApplication::preloadResourcesAsync()
+{
+    qDebug() << "开始异步预加载静态资源...";
+    
+    // 异步加载样式表
+    loadStyleSheetAsync("default");
+    
+    // 可以在这里添加其他资源的异步加载，如图标、翻译文件等
+    QtConcurrent::run([this]() {
+        // 预加载应用图标
+        QIcon appIcon(":/icons/app.svg");
+        
+        // 预加载其他常用图标
+        QIcon settingsIcon(":/icons/settings.svg");
+        QIcon aboutIcon(":/icons/about.svg");
+        
+        qDebug() << "静态图标资源预加载完成";
+    });
+}
+
+/**
+ * @brief 异步加载样式表
+ * @param themeName 主题名称
+ */
+void MainApplication::loadStyleSheetAsync(const QString &themeName)
+{
+    qDebug() << "异步加载样式表:" << themeName;
+    
+    // 使用QtConcurrent在后台线程加载样式表
+    QFuture<QString> future = QtConcurrent::run([themeName]() -> QString {
+        QString styleFile = ":/styles/main.qss";
+        QFile file(styleFile);
+        
+        if (file.open(QFile::ReadOnly | QFile::Text)) {
+            QTextStream stream(&file);
+            QString styleSheet = stream.readAll();
+            qDebug() << "样式表异步加载完成:" << styleFile;
+            return styleSheet;
+        } else {
+            qWarning() << "无法异步加载样式表:" << styleFile;
+            return QString();
+        }
+    });
+    
+    // 监听加载完成
+    QFutureWatcher<QString>* watcher = new QFutureWatcher<QString>(this);
+    connect(watcher, &QFutureWatcher<QString>::finished, this, [this, watcher]() {
+        QString styleSheet = watcher->result();
+        if (!styleSheet.isEmpty()) {
+            onStyleSheetLoaded(styleSheet);
+        }
+        watcher->deleteLater();
+    });
+    watcher->setFuture(future);
+}
+
+/**
+ * @brief 样式表异步加载完成处理
+ * @param styleSheet 加载的样式表内容
+ */
+void MainApplication::onStyleSheetLoaded(const QString &styleSheet)
+{
+    // 在主线程中应用样式表
+    setStyleSheet(styleSheet);
+    qDebug() << "异步加载的样式表已应用";
 }
 
 void MainApplication::createTrayMenu()
@@ -459,5 +568,49 @@ bool MainApplication::parseProtocolUrl(const QString &url, QString &roomName, QS
     }
     
     qDebug() << "解析结果 - 房间:" << roomName << "服务器:" << serverUrl;
-    return !roomName.isEmpty();
+    return true;
+}
+
+/**
+ * @brief 异步初始化ConferenceWindow（并行初始化）
+ */
+void MainApplication::initializeConferenceWindowAsync()
+{
+    if (m_conferenceWindowReady) {
+        qDebug() << "ConferenceWindow已经初始化完成";
+        return;
+    }
+    
+    if (m_conferenceWindow) {
+        qDebug() << "ConferenceWindow异步初始化已在进行中";
+        return;
+    }
+    
+    QElapsedTimer timer;
+    timer.start();
+    
+    qDebug() << "开始在主线程中创建ConferenceWindow";
+    
+    // 在主线程中创建ConferenceWindow（延迟WebEngine初始化）
+    m_conferenceWindow = std::make_unique<ConferenceWindow>();
+    
+    // 连接信号
+    connect(m_conferenceWindow.get(), &ConferenceWindow::conferenceLeft,
+            this, &MainApplication::onConferenceWindowClosed);
+    
+    // 标记为已准备就绪
+    m_conferenceWindowReady = true;
+    
+    qDebug() << QString("ConferenceWindow在主线程中创建完成，耗时: %1ms").arg(timer.elapsed());
+    
+    // 发射准备就绪信号
+    emit conferenceWindowReady();
+}
+
+/**
+ * @brief 检查ConferenceWindow是否已准备就绪
+ */
+bool MainApplication::isConferenceWindowReady() const
+{
+    return m_conferenceWindowReady && m_conferenceWindow != nullptr;
 }

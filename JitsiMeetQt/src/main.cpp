@@ -7,6 +7,8 @@
 #include <QStandardPaths>
 #include <QLoggingCategory>
 #include <QString>
+#include <QElapsedTimer>
+#include <QFileInfo>
 #include <cstdio>
 #include <fstream>
 #include <iostream>
@@ -127,8 +129,14 @@ bool handleCommandLineArguments(MainApplication *app)
  */
 int main(int argc, char *argv[])
 {
+    // 性能分析计时器
+    QElapsedTimer totalTimer, stageTimer;
+    totalTimer.start();
+    stageTimer.start();
+    
     // 立即写入文件以确认程序启动 - 使用绝对路径
     Logger::instance().info("程序启动 - main函数开始执行");
+    Logger::instance().info(QString("程序启动阶段耗时: %1ms").arg(stageTimer.elapsed()));
 
     // 设置硬件加速和GPU渲染优化的命令行参数
     // 这些参数必须在QApplication创建之前设置
@@ -153,7 +161,9 @@ int main(int argc, char *argv[])
             "--max_old_space_size=4096");
     
     // 创建应用程序实例
+    stageTimer.restart();
     MainApplication app(argc, argv);
+    Logger::instance().info(QString("MainApplication创建耗时: %1ms").arg(stageTimer.elapsed()));
 
     // 设置设备像素比例策略
     app.setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
@@ -162,7 +172,9 @@ int main(int argc, char *argv[])
     Logger::instance().info("MainApplication实例创建成功");
 
     // 设置日志
+    stageTimer.restart();
     setupLogging();
+    Logger::instance().info(QString("日志设置耗时: %1ms").arg(stageTimer.elapsed()));
 
     // 添加文件调试输出
     Logger::instance().info("日志设置完成");
@@ -195,8 +207,9 @@ int main(int argc, char *argv[])
 
         // 处理命令行参数
         // Logger::instance().info("开始处理命令行参数");
-
+        stageTimer.restart();
         bool shouldExit = handleCommandLineArguments(&app);
+        Logger::instance().info(QString("命令行参数处理耗时: %1ms").arg(stageTimer.elapsed()));
         if (shouldExit)
         {
             // Logger::instance().info("命令行参数处理完成，程序应该退出（显示帮助或版本信息）");
@@ -208,6 +221,7 @@ int main(int argc, char *argv[])
 
         // 初始化应用程序
         // Logger::instance().info("开始初始化应用程序");
+        stageTimer.restart();
         qDebug() << "开始初始化应用程序...";
         if (!app.initialize())
         {
@@ -220,16 +234,20 @@ int main(int argc, char *argv[])
         }
 
         // Logger::instance().info("应用程序初始化成功");
+        Logger::instance().info(QString("应用程序初始化耗时: %1ms").arg(stageTimer.elapsed()));
         qDebug() << "应用程序初始化成功，显示欢迎窗口...";
 
         // 显示欢迎窗口
         // Logger::instance().info("开始显示欢迎窗口");
+        stageTimer.restart();
         app.showWelcomeWindow();
+        Logger::instance().info(QString("欢迎窗口显示耗时: %1ms").arg(stageTimer.elapsed()));
         // Logger::instance().info("欢迎窗口显示完成");
         qDebug() << "欢迎窗口已显示，进入事件循环...";
 
         // 进入事件循环
         // Logger::instance().info("进入事件循环");
+        Logger::instance().info(QString("程序总启动耗时: %1ms").arg(totalTimer.elapsed()));
         int result = app.exec();
         // Logger::instance().info(QString("事件循环结束，退出代码: %1").arg(result));
 

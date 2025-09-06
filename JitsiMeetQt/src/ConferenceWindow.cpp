@@ -39,6 +39,7 @@
 #include <QDebug>
 #include <QTextStream>
 #include <QRegularExpression>
+#include <QElapsedTimer>
 
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -84,6 +85,7 @@ ConferenceWindow::ConferenceWindow(QWidget *parent)
     , m_isScreenSharing(false)
     , m_isChatVisible(false)
     , m_isFullscreen(false)
+    , m_webEngineInitialized(false)
     , m_participantCount(0)
     , m_loadProgress(0)
     , m_lastMemoryUsage(0)
@@ -91,13 +93,28 @@ ConferenceWindow::ConferenceWindow(QWidget *parent)
     , m_memoryCleanupCount(0)
     , m_reconnectAttempts(0)
 {
+    QElapsedTimer constructorTimer, stageTimer;
+    constructorTimer.start();
+    stageTimer.start();
+    
+    qDebug() << "ConferenceWindow: 开始构造函数";
+    
     // 初始化组件
+    stageTimer.restart();
     initializeUI();
+    qDebug() << QString("ConferenceWindow: UI初始化耗时: %1ms").arg(stageTimer.elapsed());
+    
+    stageTimer.restart();
     initializeToolbar();
-    initializeWebEngine();
+    qDebug() << QString("ConferenceWindow: 工具栏初始化耗时: %1ms").arg(stageTimer.elapsed());
+    
+    // WebEngine延迟初始化 - 仅在需要时创建，避免阻塞主线程
+    qDebug() << "ConferenceWindow: WebEngine采用延迟加载策略，将在首次使用时初始化";
     
     // 创建定时器
+    stageTimer.restart();
     m_connectionTimer = new QTimer(this);
+    qDebug() << QString("ConferenceWindow: 定时器创建耗时: %1ms").arg(stageTimer.elapsed());
     m_connectionTimer->setSingleShot(true);
     connect(m_connectionTimer, &QTimer::timeout, this, &ConferenceWindow::onConnectionTimeout);
     
@@ -163,6 +180,9 @@ ConferenceWindow::ConferenceWindow(QWidget *parent)
     
     // 恢复窗口状态
     restoreWindowState();
+    
+    // 记录ConferenceWindow构造函数总耗时
+    qDebug() << "ConferenceWindow构造函数完成，总耗时:" << stageTimer.elapsed() << "ms";
 }
 
 /**
@@ -370,11 +390,27 @@ void ConferenceWindow::initializeUI()
 }
 
 /**
- * @brief 初始化WebEngine
+ * @brief 初始化WebEngine（延迟加载版本）
  */
 void ConferenceWindow::initializeWebEngine()
 {
-    qDebug() << "ConferenceWindow: 初始化WebEngine";
+    // 这个方法现在只是为了兼容性保留，实际初始化在lazyInitializeWebEngine中进行
+    lazyInitializeWebEngine();
+}
+
+/**
+ * @brief 延迟初始化WebEngine（仅在需要时创建）
+ */
+void ConferenceWindow::lazyInitializeWebEngine()
+{
+    if (m_webEngineInitialized) {
+        return; // 已经初始化过了
+    }
+    
+    QElapsedTimer webEngineTimer;
+    webEngineTimer.start();
+    
+    qDebug() << "ConferenceWindow: 开始延迟初始化WebEngine";
     
     // 创建Web容器
     m_webContainer = new QWidget(this);
@@ -404,6 +440,19 @@ void ConferenceWindow::initializeWebEngine()
     
     // 添加到主布局
     m_mainLayout->addWidget(m_webContainer);
+    
+    // 标记为已初始化
+    m_webEngineInitialized = true;
+    
+    qDebug() << QString("ConferenceWindow: WebEngine延迟初始化完成，耗时: %1ms").arg(webEngineTimer.elapsed());
+}
+
+/**
+ * @brief 检查WebEngine是否已初始化
+ */
+bool ConferenceWindow::isWebEngineInitialized() const
+{
+    return m_webEngineInitialized;
 }
 
 // 删除重复的setupWebEngineSettings函数定义，保留后面的正确版本
@@ -1204,6 +1253,16 @@ bool ConferenceWindow::loadConference(const QString& url, const QString& display
     if (url.isEmpty()) {
         qWarning() << "ConferenceWindow: 会议URL为空";
         return false;
+    }
+    
+    // 确保WebEngine已初始化（延迟加载策略）
+    if (!isWebEngineInitialized()) {
+        qDebug() << "ConferenceWindow: 开始延迟初始化WebEngine";
+        lazyInitializeWebEngine();
+        if (!isWebEngineInitialized()) {
+            qWarning() << "ConferenceWindow: WebEngine初始化失败";
+            return false;
+        }
     }
     
     // 保存参数

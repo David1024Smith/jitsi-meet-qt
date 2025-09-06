@@ -7,6 +7,7 @@
 #include <QAction>
 #include <QSettings>
 #include <QTranslator>
+#include <QtConcurrent/QtConcurrent>
 #include <memory>
 
 class ConferenceWindow;
@@ -27,6 +28,12 @@ class ProtocolHandler;
 class MainApplication : public QApplication
 {
     Q_OBJECT
+
+signals:
+    /**
+     * @brief ConferenceWindow准备就绪信号
+     */
+    void conferenceWindowReady();
 
 public:
     /**
@@ -52,6 +59,17 @@ public:
      * @return 初始化是否成功
      */
     bool initialize();
+    
+    /**
+     * @brief 异步初始化ConferenceWindow（并行初始化）
+     */
+    void initializeConferenceWindowAsync();
+    
+    /**
+     * @brief 检查ConferenceWindow是否已准备就绪
+     * @return 是否已准备就绪
+     */
+    bool isConferenceWindowReady() const;
     
     /**
      * @brief 显示欢迎窗口
@@ -129,14 +147,16 @@ protected:
 
 private slots:
     /**
-     * @brief 处理会议窗口关闭
+     * @brief 会议窗口关闭处理
      */
     void onConferenceWindowClosed();
     
     /**
-     * @brief 处理欢迎窗口关闭
+     * @brief 欢迎窗口关闭处理
      */
     void onWelcomeWindowClosed();
+    
+
 
 private:
     /**
@@ -159,6 +179,23 @@ private:
      * @param themeName 主题名称
      */
     void loadStyleSheet(const QString &themeName);
+    
+    /**
+     * @brief 异步预加载静态资源
+     */
+    void preloadResourcesAsync();
+    
+    /**
+     * @brief 异步加载样式表
+     * @param themeName 主题名称
+     */
+    void loadStyleSheetAsync(const QString &themeName);
+    
+    /**
+     * @brief 样式表异步加载完成处理
+     * @param styleSheet 加载的样式表内容
+     */
+    void onStyleSheetLoaded(const QString &styleSheet);
     
     // 主题初始化方法已移除
     
@@ -197,6 +234,9 @@ private:
     // 主题相关成员变量已移除
     
     bool m_initialized;                 ///< 是否已初始化
+    
+    // 并行初始化相关
+    bool m_conferenceWindowReady;       ///< ConferenceWindow是否已准备就绪
 };
 
 #endif // MAINAPPLICATION_H

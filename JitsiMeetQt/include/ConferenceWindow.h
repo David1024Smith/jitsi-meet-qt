@@ -479,9 +479,19 @@ private:
     void initializeUI();
     
     /**
-     * @brief 初始化WebEngine
+     * @brief 初始化WebEngine（延迟加载）
      */
     void initializeWebEngine();
+    
+    /**
+     * @brief 延迟初始化WebEngine（仅在需要时创建）
+     */
+    void lazyInitializeWebEngine();
+    
+    /**
+     * @brief 检查WebEngine是否已初始化
+     */
+    bool isWebEngineInitialized() const;
     
     /**
      * @brief 初始化工具栏
@@ -619,6 +629,7 @@ private:
     bool m_isScreenSharing;             ///< 是否屏幕共享
     bool m_isChatVisible;               ///< 聊天是否可见
     bool m_isFullscreen;                ///< 是否全屏
+    bool m_webEngineInitialized;        ///< WebEngine是否已初始化
     int m_participantCount;             ///< 参与者数量
     int m_loadProgress;                 ///< 加载进度
     
