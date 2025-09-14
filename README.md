@@ -1,6 +1,16 @@
 # Jitsi Meet Qt
 
-Qt版本的Jitsi Meet桌面应用程序，基于原始的Electron版本重新实现。
+Qt版本的Jitsi Meet桌面应用程序!
+![PixPin_2025-09-14_13-23-44](./images/PixPin_2025-09-14_13-23-44.png)
+
+![PixPin_2025-09-14_13-24-33](./images/PixPin_2025-09-14_13-24-33.png)
+
+![PixPin_2025-09-14_13-25-44](./images/PixPin_2025-09-14_13-25-44.png)
+
+![PixPin_2025-09-14_13-26-44](./images/PixPin_2025-09-14_13-26-44.png)
+
+
+
 
 ## 功能特性
 
